@@ -15,19 +15,17 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Pluggable command settings via `ICommandSettings` — permission checks and messaging resolved through the dependency injector
 - Thread-safe event dispatch utilities — synchronous and asynchronous with `CompletableFuture` support
 - Custom event base classes with cancellation reasons
-- Spigot-specific hierarchy interfaces — `SpigotPlugin`, `SpigotManager`, `SpigotModule`, `SpigotSubModule`
 - Compatible with Bukkit, Spigot, and Paper
 - Designed for modern Java (Java 21+)
 
 ---
 
 ## Hierarchy
-
 ```
 SpigotPlugin (extends JavaPlugin, implements Plugin)
-  └─ SpigotManager
-       └─ AbstractCommand / SpigotModule
-            └─ AbstractSubCommand / SpigotSubModule
+  └─ Manager
+       └─ AbstractCommand / Module
+            └─ AbstractSubCommand / SubModule
 ```
 
 Commands integrate directly into the hierarchy as Modules, and subcommands as SubModules:
@@ -35,7 +33,7 @@ Commands integrate directly into the hierarchy as Modules, and subcommands as Su
 | Component | Hierarchy Role | Bukkit Integration |
 |---|---|---|
 | `SpigotPlugin` | Plugin | `JavaPlugin` lifecycle, component registration |
-| `SpigotManager` | Manager | Organizational grouping |
+| `Manager` | Manager | Organizational grouping |
 | `AbstractCommand` | Module | Registered with `CommandMap` |
 | `AbstractSubCommand` | SubModule | Attached to parent command |
 
@@ -112,7 +110,6 @@ public class CorePlugin extends SpigotPlugin {
 ### Implementing Command Settings
 
 Create a concrete `ICommandSettings` component to define permission and messaging behaviour:
-
 ```java
 @Component
 public class CommandSettings implements ICommandSettings {
@@ -137,7 +134,6 @@ public class CommandSettings implements ICommandSettings {
 ### Defining a Command
 
 Choose a base type based on the required sender:
-
 ```java
 @Component
 public class AccountCommand extends Command<CorePlugin, AccountManager> {
@@ -163,7 +159,6 @@ public class AccountCommand extends Command<CorePlugin, AccountManager> {
 ### Defining a SubCommand
 
 SubCommands are automatically attached to their parent command through the hierarchy:
-
 ```java
 @AllArgsConstructor
 @Component
@@ -202,7 +197,6 @@ public class AccountAdminSubCommand extends PlayerSubCommand<CorePlugin, Account
 This registers `/account admin` automatically — the parent `AccountCommand` routes the `admin` argument to `AccountAdminSubCommand` with the remaining args.
 
 ### Command Execution Flow
-
 ```
 /account admin
   │
@@ -265,8 +259,5 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 | Interface | Description |
 |---|---|
 | `SpigotPlugin` | Root plugin with automatic Bukkit registration callbacks |
-| `SpigotManager` | Spigot-bound manager within the hierarchy |
-| `SpigotModule` | Spigot-bound module (commands, listeners) |
-| `SpigotSubModule` | Spigot-bound sub-module (subcommands) |
 | `ICommandSettings` | Pluggable permission checks and command messaging |
 | `ISharedCommand` | Shared contract between commands and subcommands |

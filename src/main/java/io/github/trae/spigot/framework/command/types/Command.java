@@ -1,6 +1,6 @@
 package io.github.trae.spigot.framework.command.types;
 
-import io.github.trae.spigot.framework.SpigotManager;
+import io.github.trae.hf.Manager;
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.spigot.framework.command.abstracts.AbstractCommand;
 import org.bukkit.command.CommandSender;
@@ -14,10 +14,10 @@ import java.util.List;
  * and the console. Binds the sender type to {@link CommandSender}, allowing
  * all sender types to pass the sender validation check.</p>
  *
- * @param <Plugin>  the concrete plugin type
- * @param <Manager> the concrete manager type
+ * @param <BasePlugin>  the concrete plugin type
+ * @param <BaseManager> the concrete manager type
  */
-public abstract class Command<Plugin extends SpigotPlugin, Manager extends SpigotManager<Plugin>> extends AbstractCommand<Plugin, Manager, CommandSender> {
+public abstract class Command<BasePlugin extends SpigotPlugin, BaseManager extends Manager<BasePlugin>> extends AbstractCommand<BasePlugin, BaseManager, CommandSender> {
 
     /**
      * Constructs a new command with the given name, description, and aliases.

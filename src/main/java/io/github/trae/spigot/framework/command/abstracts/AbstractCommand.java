@@ -2,8 +2,8 @@ package io.github.trae.spigot.framework.command.abstracts;
 
 import io.github.trae.di.annotations.field.Inject;
 import io.github.trae.di.annotations.type.DependsOn;
-import io.github.trae.spigot.framework.SpigotManager;
-import io.github.trae.spigot.framework.SpigotModule;
+import io.github.trae.hf.Manager;
+import io.github.trae.hf.Module;
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.spigot.framework.command.abstracts.interfaces.IAbstractCommand;
 import io.github.trae.spigot.framework.command.events.CommandExecuteEvent;
@@ -25,7 +25,7 @@ import java.util.*;
  * Abstract base for all commands within the framework.
  *
  * <p>Extends Bukkit's {@link Command} and integrates with the hierarchy framework as a
- * {@link SpigotModule}. Provides built-in subcommand routing, sender type validation,
+ * {@link Module}. Provides built-in subcommand routing, sender type validation,
  * permission checking, and event dispatch at each stage of execution.</p>
  *
  * <p>Command settings (permission checks, messaging) are resolved via the dependency
@@ -44,12 +44,12 @@ import java.util.*;
  * <p>Tab completion follows an identical validation and routing chain, firing
  * a {@link CommandTabCompleteEvent} before delegating to the concrete implementation.</p>
  *
- * @param <Plugin>  the concrete plugin type
- * @param <Manager> the concrete manager type
- * @param <Sender>  the required sender type for this command
+ * @param <BasePlugin>  the concrete plugin type
+ * @param <BaseManager> the concrete manager type
+ * @param <Sender>      the required sender type for this command
  */
 @DependsOn(values = ICommandSettings.class)
-public abstract class AbstractCommand<Plugin extends SpigotPlugin, Manager extends SpigotManager<Plugin>, Sender extends CommandSender> extends Command implements SpigotModule<Plugin, Manager>, IAbstractCommand<Sender, AbstractSubCommand<?, ?, ?>> {
+public abstract class AbstractCommand<BasePlugin extends SpigotPlugin, BaseManager extends Manager<BasePlugin>, Sender extends CommandSender> extends Command implements IAbstractCommand<Sender, AbstractSubCommand<?, ?, ?>>, Module<BasePlugin, BaseManager> {
 
     @Getter(AccessLevel.PRIVATE)
     private final LinkedHashMap<String, AbstractSubCommand<?, ?, ?>> subCommandMap;

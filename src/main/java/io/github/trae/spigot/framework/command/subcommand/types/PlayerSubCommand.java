@@ -12,10 +12,10 @@ import org.bukkit.entity.Player;
  * players. Console and other sender types will be rejected during sender
  * validation in the parent {@link AbstractCommand}'s execution chain.</p>
  *
- * @param <Plugin> the concrete plugin type
- * @param <Module> the parent command type
+ * @param <BasePlugin> the concrete plugin type
+ * @param <BaseModule> the parent command type
  */
-public abstract class PlayerSubCommand<Plugin extends SpigotPlugin, Module extends AbstractCommand<Plugin, ?, ?>> extends AbstractSubCommand<Plugin, Module, Player> {
+public abstract class PlayerSubCommand<BasePlugin extends SpigotPlugin, BaseModule extends AbstractCommand<BasePlugin, ?, ?>> extends AbstractSubCommand<BasePlugin, BaseModule, Player> {
 
     /**
      * Constructs a new player-only subcommand with the given label and description.

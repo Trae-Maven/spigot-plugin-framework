@@ -1,6 +1,6 @@
 package io.github.trae.spigot.framework.command.types;
 
-import io.github.trae.spigot.framework.SpigotManager;
+import io.github.trae.hf.Manager;
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.spigot.framework.command.abstracts.AbstractCommand;
 import org.bukkit.entity.Player;
@@ -15,10 +15,10 @@ import java.util.List;
  * validation, triggering the invalid sender message via
  * {@link io.github.trae.spigot.framework.command.settings.ICommandSettings}.</p>
  *
- * @param <Plugin>  the concrete plugin type
- * @param <Manager> the concrete manager type
+ * @param <BasePlugin>  the concrete plugin type
+ * @param <BaseManager> the concrete manager type
  */
-public abstract class PlayerCommand<Plugin extends SpigotPlugin, Manager extends SpigotManager<Plugin>> extends AbstractCommand<Plugin, Manager, Player> {
+public abstract class PlayerCommand<BasePlugin extends SpigotPlugin, BaseManager extends Manager<BasePlugin>> extends AbstractCommand<BasePlugin, BaseManager, Player> {
 
     /**
      * Constructs a new player-only command with the given name, description, and aliases.
