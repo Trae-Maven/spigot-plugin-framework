@@ -32,6 +32,7 @@
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
+
         <repository>
             <id>github-hierarchy-framework</id>
             <url>https://maven.pkg.github.com/Trae-Maven/hierarchy-framework</url>
