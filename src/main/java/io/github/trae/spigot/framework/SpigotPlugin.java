@@ -1,5 +1,6 @@
 package io.github.trae.spigot.framework;
 
+import io.github.trae.di.InjectorApi;
 import io.github.trae.hf.Plugin;
 import io.github.trae.spigot.framework.command.abstracts.AbstractCommand;
 import io.github.trae.spigot.framework.command.subcommand.abstracts.AbstractSubCommand;
@@ -17,6 +18,24 @@ import org.bukkit.plugin.java.JavaPlugin;
  * are initialized and shut down through the hierarchy.</p>
  */
 public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
+
+    /**
+     * Initializes the plugin by setting the configuration directory to the
+     * plugin's data folder and then running the hierarchy lifecycle.
+     *
+     * <p>Sets the configuration directory via
+     * {@link InjectorApi#setConfigurationDirectory(java.nio.file.Path)} so that
+     * {@link io.github.trae.di.configuration.annotations.Configuration @Configuration}
+     * files are stored under the plugin's data folder, then delegates to
+     * {@link Plugin#initializePlugin()} to trigger component discovery and
+     * initialization.</p>
+     */
+    @Override
+    public void initializePlugin() {
+        InjectorApi.setConfigurationDirectory(this.getDataPath());
+
+        Plugin.super.initializePlugin();
+    }
 
     /**
      * Called when a component is initialized within the hierarchy.
