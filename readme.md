@@ -14,6 +14,8 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Cancellable command events at every execution stage — pre-execute, execute, and tab-complete
 - Pluggable command settings via `ICommandSettings` — permission checks and messaging resolved through the dependency injector
 - Thread-safe event dispatch utilities — synchronous and asynchronous with `CompletableFuture` support
+- Task scheduling with ChronoUnit-to-tick conversion — synchronous, asynchronous, and repeating with cancellation suppliers
+- MiniMessage-based messaging — configurable prefixes, broadcasting, filtering, and ignore lists
 - Custom event base classes with cancellation reasons
 - Compatible with Bukkit, Spigot, and Paper
 - Designed for modern Java (Java 21+)
@@ -223,6 +225,62 @@ UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
 UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(e -> System.out.println("Done: " + e.isCancelled()));
 ```
 
+### Task Execution
+
+Use `UtilTask` for scheduling across Bukkit's threading model:
+```java
+// Execute on the main server thread
+UtilTask.executeSynchronous(() -> {
+    player.teleport(spawn);
+});
+
+// Execute asynchronously off the main thread
+UtilTask.executeAsynchronous(() -> {
+    // Heavy computation or I/O
+});
+
+// Repeating task on the main thread with cancellation
+UtilTask.schedule(() -> {
+    player.sendMessage("Tick!");
+}, 0, 1, ChronoUnit.SECONDS, () -> !player.isOnline());
+
+// Repeating async task
+UtilTask.scheduleAsynchronous(() -> {
+    // Periodic background work
+}, 0, 5, ChronoUnit.SECONDS);
+```
+
+### Messaging
+
+Use `UtilMessage` for MiniMessage-formatted messaging with configurable prefixes:
+```java
+// Prefixed message to a player
+UtilMessage.message(player, "Factions", "<green>You have joined the faction!");
+
+// Prefixed message with MiniMessage tags
+UtilMessage.message(player, "Shop", "<gold>+50 coins <gray>from daily reward");
+
+// Broadcast to all online players
+UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5 minutes");
+
+// Broadcast with ignore list
+UtilMessage.broadcast("Alert", "<red>PvP is now enabled!", List.of(excludedPlayerUUID));
+
+// Log to console
+UtilMessage.log("Core", "Plugin loaded successfully");
+```
+
+---
+
+## Utilities
+
+| Utility | Description |
+|---|---|
+| `UtilEvent` | Synchronous and asynchronous event dispatch with supply variants |
+| `UtilTask` | Task scheduling — immediate, synchronous, asynchronous, and repeating with ChronoUnit-to-tick conversion |
+| `UtilMessage` | MiniMessage-based messaging with configurable prefixes, broadcasting, filtering, and ignore lists |
+| `UtilPlugin` | Plugin lookup — internal by name or class |
+
 ---
 
 ## Command Types
@@ -241,7 +299,18 @@ UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(e -> System.out.prin
 
 ---
 
-## Events
+## Event Types
+
+| Event Type | Description |
+|---|---|
+| `CustomEvent` | Base synchronous event with `Void` key type |
+| `CustomAsyncEvent` | Base asynchronous event with `Void` key type |
+| `CustomCancellableEvent` | Synchronous event with cancellation and reason |
+| `CustomCancellableAsyncEvent` | Asynchronous event with cancellation and reason |
+
+---
+
+## Command Events
 
 | Event | Fired When |
 |---|---|
@@ -259,5 +328,12 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 | Interface | Description |
 |---|---|
 | `SpigotPlugin` | Root plugin with automatic Bukkit registration callbacks |
+| `SpigotManager` | Spigot-bound manager within the hierarchy |
+| `SpigotModule` | Spigot-bound module (commands, listeners) |
+| `SpigotSubModule` | Spigot-bound sub-module (subcommands) |
 | `ICommandSettings` | Pluggable permission checks and command messaging |
 | `ISharedCommand` | Shared contract between commands and subcommands |
+| `IAbstractCommand` | Command contract with subcommand management |
+| `IAbstractSubCommand` | SubCommand contract with internal execution entry points |
+| `ICustomCancellableEvent` | Cancellable event with reason support |
+| `ICommandEvent` | Shared contract for command-related events |
