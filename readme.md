@@ -1,6 +1,6 @@
 # Spigot-Plugin-Framework
 
-A Spigot/Paper plugin framework providing structured command systems, event utilities, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
+A Spigot/Paper plugin framework providing structured command systems, event utilities, packet-based scoreboards, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
 
 Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-based hierarchy architecture, automatically handling registration and teardown of listeners, commands, and subcommands as components are initialized and shut down.
 
@@ -16,6 +16,8 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Thread-safe event dispatch utilities — synchronous and asynchronous with `CompletableFuture` support
 - Task scheduling with ChronoUnit-to-tick conversion — synchronous, asynchronous, and repeating with cancellation suppliers
 - MiniMessage-based messaging — configurable prefixes, broadcasting, filtering, and ignore lists
+- Asynchronous packet-based scoreboard system with priority resolution — only changed lines produce packets, zero flicker
+- NMS utilities for direct packet sending and Adventure-to-vanilla component conversion
 - Custom event base classes with cancellation reasons
 - Compatible with Bukkit, Spigot, and Paper
 - Designed for modern Java (Java 21+)
@@ -44,6 +46,26 @@ Commands integrate directly into the hierarchy as Modules, and subcommands as Su
 ## Requirements
 
 Spigot-Plugin-Framework requires Java 21+ and a Paper API environment.
+
+### NMS Access (paper-nms-maven-plugin)
+
+The scoreboard system and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
+
+Add `.paper-nms` to your `.gitignore` — it contains locally generated dependencies.
+
+After cloning, run the init goal once to generate the NMS dependency in your local `.m2` repository:
+```bash
+mvn ca.bkaw:paper-nms-maven-plugin:1.4.10:init -pl .
+```
+
+> **Note:** If `mvn` is not on your PATH, you can run it through IntelliJ's Maven tool window: expand Plugins → `paper-nms` → double-click `paper-nms:init`.
+
+> **Note:** The init goal requires your `JAVA_HOME` to point to JDK 21. If it fails with a Java version error, set it before running:
+> ```bash
+> # PowerShell
+> $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
+> mvn ca.bkaw:paper-nms-maven-plugin:1.4.10:init -pl .
+> ```
 
 The following is only needed at compile time for annotation processing:
 ```xml
@@ -255,7 +277,7 @@ UtilTask.scheduleAsynchronous(() -> {
 Use `UtilMessage` for MiniMessage-formatted messaging with configurable prefixes:
 ```java
 // Prefixed message to a player
-UtilMessage.message(player, "Factions", "<green>You have joined the faction!");
+UtilMessage.message(player, "Factions", "You joined <aqua>Faction %s</aqua>.".formatted(faction.getName()));
 
 // Prefixed message with MiniMessage tags
 UtilMessage.message(player, "Shop", "<gold>+50 coins <gray>from daily reward");
@@ -272,6 +294,117 @@ UtilMessage.log("Core", "Plugin loaded successfully");
 
 ---
 
+## Scoreboard System
+
+The framework provides an asynchronous packet-based scoreboard manager with priority-based resolution. Multiple systems can register scoreboards for the same player — the highest priority board is always displayed, and removing it falls back to the next highest automatically.
+
+All diffing and packet construction runs off the main thread. Only changed lines and title produce packets, eliminating flicker and minimising bandwidth.
+
+### Setting a Scoreboard
+
+Use `ScoreboardManager.board()` to build the layout, then `set()` to register it with a key and priority:
+```java
+private final ScoreboardManager scoreboardManager;
+
+// Lobby scoreboard at priority 0
+this.scoreboardManager.set(player, "lobby", 0,
+    Component.text("  MY SERVER  ", NamedTextColor.GOLD, TextDecoration.BOLD),
+    ScoreboardManager.board()
+        .pair(NamedTextColor.GRAY, "Server", "Lobby-1")
+        .pair(NamedTextColor.GOLD, "Rank", "Owner")
+        .pair(NamedTextColor.GREEN, "Gems", "1,500")
+        .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))
+);
+```
+
+### Priority Resolution
+
+Higher priority always wins. When a higher priority board is removed, the next one takes over seamlessly:
+```java
+// Game system takes over at priority 1
+this.scoreboardManager.set(player, "game", 1,
+    Component.text("  DOMINATION  ", NamedTextColor.RED, TextDecoration.BOLD),
+    ScoreboardManager.board()
+        .pair(NamedTextColor.GRAY, "Map", "Desert Temple")
+        .pair(NamedTextColor.AQUA, "Team", "Blue")
+        .pair(NamedTextColor.GREEN, "Kills", "0")
+        .pair(NamedTextColor.RED, "Deaths", "0")
+        .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))
+);
+
+// Game ends — remove it, lobby board reappears automatically
+this.scoreboardManager.remove(player, "game");
+```
+
+### Updating Lines
+
+Re-calling `set()` with the same key diffs against what's currently rendered. Only changed lines produce packets:
+```java
+// Only the "Kills" and "Deaths" values changed — only those 2 lines send packets
+scoreboardManager.set(player, "game", 1,
+    Component.text("  DOMINATION  ", NamedTextColor.RED, TextDecoration.BOLD),
+    ScoreboardManager.board()
+        .pair(NamedTextColor.GRAY, "Map", "Desert Temple")     // unchanged — no packet
+        .pair(NamedTextColor.AQUA, "Team", "Blue")              // unchanged — no packet
+        .pair(NamedTextColor.GREEN, "Kills", "3")                // changed — packet sent
+        .pair(NamedTextColor.RED, "Deaths", "1")                 // changed — packet sent
+        .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))  // unchanged — no packet
+);
+```
+
+### Custom Lines
+
+Use `line()` for a component with a trailing spacer, or `lineCompact()` for no spacer:
+```java
+ScoreboardManager.board()
+    .pair(NamedTextColor.GRAY, "Map", "Desert Temple")
+    .line(Component.text("Time: ", NamedTextColor.YELLOW, TextDecoration.BOLD).append(Component.text("2:34", NamedTextColor.WHITE)))
+    .pair(NamedTextColor.GREEN, "Kills", "3")
+    .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))
+```
+
+### Checking Active Board
+
+```java
+if (this.scoreboardManager.isActive(player, "game")) {
+    // The game board is currently the one being displayed
+}
+```
+
+### Cleanup
+
+Call `cleanup()` when a player disconnects to free all state:
+```java
+this.scoreboardManager.cleanup(player.getUniqueId());
+```
+
+### BoardBuilder API
+
+| Method | Description |
+|---|---|
+| `pair(NamedTextColor, String, String)` | Bold coloured label + white value + blank spacer |
+| `line(Component)` | Single component line + blank spacer |
+| `lineCompact(Component)` | Single component line, no trailing spacer |
+| `blank()` | Empty spacer line |
+
+---
+
+## NMS Utilities
+
+`UtilNms` provides direct access to NMS operations without requiring each consumer to handle CraftBukkit casting:
+
+```java
+// Convert Adventure component to vanilla Minecraft component
+net.minecraft.network.chat.Component nmsComponent = UtilNms.toNms(adventureComponent);
+
+// Send a raw NMS packet to a player (safe from any thread)
+UtilNms.sendPacket(player, packet);
+```
+
+Packet sending writes directly to the Netty channel pipeline, bypassing the main thread. This is what enables the scoreboard system to run entirely asynchronously.
+
+---
+
 ## Utilities
 
 | Utility | Description |
@@ -280,6 +413,7 @@ UtilMessage.log("Core", "Plugin loaded successfully");
 | `UtilTask` | Task scheduling — immediate, synchronous, asynchronous, and repeating with ChronoUnit-to-tick conversion |
 | `UtilMessage` | MiniMessage-based messaging with configurable prefixes, broadcasting, filtering, and ignore lists |
 | `UtilPlugin` | Plugin lookup — internal by name or class |
+| `UtilNms` | NMS packet sending and Adventure-to-vanilla component conversion |
 
 ---
 
@@ -337,3 +471,4 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 | `IAbstractSubCommand` | SubCommand contract with internal execution entry points |
 | `ICustomCancellableEvent` | Cancellable event with reason support |
 | `ICommandEvent` | Shared contract for command-related events |
+| `IScoreboardManager` | Scoreboard lifecycle — set, remove, priority check, and cleanup |
