@@ -4,6 +4,9 @@ import io.github.trae.di.InjectorApi;
 import io.github.trae.hf.Plugin;
 import io.github.trae.spigot.framework.command.abstracts.AbstractCommand;
 import io.github.trae.spigot.framework.command.subcommand.abstracts.AbstractSubCommand;
+import io.github.trae.spigot.framework.plugin.events.PluginInitializeEvent;
+import io.github.trae.spigot.framework.plugin.events.PluginShutdownEvent;
+import io.github.trae.spigot.framework.utility.UtilEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -35,6 +38,15 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
         InjectorApi.setConfigurationDirectory(this.getDataPath());
 
         Plugin.super.initializePlugin();
+
+        UtilEvent.dispatch(new PluginInitializeEvent(this));
+    }
+
+    @Override
+    public void shutdownPlugin() {
+        UtilEvent.dispatch(new PluginShutdownEvent(this));
+
+        Plugin.super.shutdownPlugin();
     }
 
     /**
