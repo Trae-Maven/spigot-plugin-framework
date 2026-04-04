@@ -46,31 +46,6 @@
         </repository>
     </repositories>
 
-    <build>
-        <plugins>
-            <!-- Paper NMS Maven Plugin — generates mojang-mapped dependency -->
-            <plugin>
-                <groupId>ca.bkaw</groupId>
-                <artifactId>paper-nms-maven-plugin</artifactId>
-                <version>1.4.10</version>
-            </plugin>
-
-            <!-- Mark jar as mojang-mapped so Paper skips remapping at load -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.5.0</version>
-                <configuration>
-                    <archive>
-                        <manifestEntries>
-                            <paperweight-mappings-namespace>mojang</paperweight-mappings-namespace>
-                        </manifestEntries>
-                    </archive>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-
     <dependencies>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -101,4 +76,28 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <!-- Paper NMS Maven Plugin — generates mojang-mapped dependency -->
+            <plugin>
+                <groupId>ca.bkaw</groupId>
+                <artifactId>paper-nms-maven-plugin</artifactId>
+                <version>1.4.10</version>
+            </plugin>
+
+            <!-- Mark jar as mojang-mapped so Paper skips remapping at load -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <paperweight-mappings-namespace>mojang</paperweight-mappings-namespace>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
