@@ -12,6 +12,8 @@ public interface IScoreboardManager {
 
     void remove(final Player player, final String key);
 
+    void remove(final Player player);
+
     boolean isActive(final Player player, final String key);
 
     void cleanup(final UUID uuid);

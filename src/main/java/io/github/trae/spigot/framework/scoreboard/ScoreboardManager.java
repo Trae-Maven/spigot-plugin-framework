@@ -115,10 +115,15 @@ public class ScoreboardManager implements IScoreboardManager {
     }
 
     /**
-     * {@inheritDoc}
+     * Registers or overwrites a scoreboard for the given key and priority.
      *
-     * <p>Registers or overwrites a scoreboard for the given key and priority.
-     * If this becomes the highest priority, it renders immediately via async diff.</p>
+     * <p>If this becomes the highest priority, it renders immediately via async diff.</p>
+     *
+     * @param player       the player to display the scoreboard to
+     * @param key          the unique source identifier for this scoreboard
+     * @param priority     the priority of this scoreboard; highest priority is rendered
+     * @param title        the sidebar title component
+     * @param boardBuilder the builder containing the scoreboard lines
      */
     @Override
     public void set(final Player player, final String key, final int priority, final Component title, final BoardBuilder boardBuilder) {
@@ -128,10 +133,13 @@ public class ScoreboardManager implements IScoreboardManager {
     }
 
     /**
-     * {@inheritDoc}
+     * Removes a scoreboard source for the given key.
      *
-     * <p>Removes a scoreboard source. If boards remain, the next highest
-     * priority is diffed and rendered. If none remain, the sidebar is hidden.</p>
+     * <p>If boards remain, the next highest priority is diffed and rendered.
+     * If none remain, the sidebar is hidden.</p>
+     *
+     * @param player the player to remove the scoreboard from
+     * @param key    the unique source identifier to remove
      */
     @Override
     public void remove(final Player player, final String key) {
@@ -148,7 +156,26 @@ public class ScoreboardManager implements IScoreboardManager {
     }
 
     /**
-     * {@inheritDoc}
+     * Removes all scoreboard sources for the given player.
+     *
+     * <p>The sidebar is hidden and the objective is removed from the client.</p>
+     *
+     * @param player the player to remove all scoreboards from
+     */
+    @Override
+    public void remove(final Player player) {
+        this.boardsMap.remove(player.getUniqueId());
+
+        this.executorService.execute(() -> this.resolve(player));
+    }
+
+    /**
+     * Checks whether the scoreboard registered under the given key is
+     * currently the active (highest priority) board for the player.
+     *
+     * @param player the player to check
+     * @param key    the source identifier to check
+     * @return {@code true} if the key's board is the currently rendered board
      */
     @Override
     public boolean isActive(final Player player, final String key) {
@@ -163,7 +190,12 @@ public class ScoreboardManager implements IScoreboardManager {
     }
 
     /**
-     * {@inheritDoc}
+     * Cleans up all scoreboard state for a player.
+     *
+     * <p>Should be called when a player disconnects to prevent memory leaks.
+     * Does not send any packets — assumes the client connection is already closed.</p>
+     *
+     * @param uuid the UUID of the player to clean up
      */
     @Override
     public void cleanup(final UUID uuid) {
@@ -194,7 +226,7 @@ public class ScoreboardManager implements IScoreboardManager {
             if (this.initializedSet.remove(player.getUniqueId())) {
                 final Objective objective = scoreboard.addObjective(OBJECTIVE, ObjectiveCriteria.DUMMY, net.minecraft.network.chat.Component.empty(), ObjectiveCriteria.RenderType.INTEGER, true, null);
 
-                UtilNms.sendPacket(player, new ClientboundSetObjectivePacket(objective, 1));
+                UtilNms.sendPacket(player, new ClientboundSetObjectivePacket(objective, ClientboundSetObjectivePacket.METHOD_REMOVE));
             }
 
             this.renderedTitleMap.remove(player.getUniqueId());
@@ -211,7 +243,7 @@ public class ScoreboardManager implements IScoreboardManager {
 
             // Create objective if this is the first time for this player
             if (this.initializedSet.add(player.getUniqueId())) {
-                packetList.add(new ClientboundSetObjectivePacket(objective, 0));
+                packetList.add(new ClientboundSetObjectivePacket(objective, ClientboundSetObjectivePacket.METHOD_ADD));
                 packetList.add(new ClientboundSetDisplayObjectivePacket(DisplaySlot.SIDEBAR, objective));
                 this.renderedTitleMap.put(player.getUniqueId(), highestBoardEntry.getTitle());
             }
@@ -219,7 +251,7 @@ public class ScoreboardManager implements IScoreboardManager {
             // Diff title — only send update if changed
             final Component oldTitle = this.renderedTitleMap.get(player.getUniqueId());
             if (oldTitle == null || !(oldTitle.equals(highestBoardEntry.getTitle()))) {
-                packetList.add(new ClientboundSetObjectivePacket(objective, 2));
+                packetList.add(new ClientboundSetObjectivePacket(objective, ClientboundSetObjectivePacket.METHOD_CHANGE));
                 this.renderedTitleMap.put(player.getUniqueId(), highestBoardEntry.getTitle());
             }
 
