@@ -5,7 +5,12 @@ import io.github.trae.di.annotations.method.PreDestroy;
 import io.github.trae.di.annotations.type.component.Service;
 import io.github.trae.spigot.framework.scoreboard.data.BoardBuilder;
 import io.github.trae.spigot.framework.scoreboard.data.BoardEntry;
+import io.github.trae.spigot.framework.scoreboard.events.ScoreboardCleanupEvent;
+import io.github.trae.spigot.framework.scoreboard.events.ScoreboardReceiveEvent;
+import io.github.trae.spigot.framework.scoreboard.events.ScoreboardRemoveEvent;
+import io.github.trae.spigot.framework.scoreboard.events.ScoreboardUpdateEvent;
 import io.github.trae.spigot.framework.scoreboard.interfaces.IScoreboardManager;
+import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilNms;
 import net.kyori.adventure.text.Component;
 import net.minecraft.network.chat.numbers.BlankFormat;
@@ -166,7 +171,10 @@ public class ScoreboardManager implements IScoreboardManager {
     public void remove(final Player player) {
         this.boardsMap.remove(player.getUniqueId());
 
-        this.executorService.execute(() -> this.resolve(player));
+        this.executorService.execute(() -> {
+            this.resolve(player);
+            UtilEvent.dispatch(new ScoreboardRemoveEvent(player));
+        });
     }
 
     /**
@@ -203,6 +211,8 @@ public class ScoreboardManager implements IScoreboardManager {
         this.renderedTitleMap.remove(uuid);
         this.renderedLinesMap.remove(uuid);
         this.initializedSet.remove(uuid);
+
+        UtilEvent.dispatch(new ScoreboardCleanupEvent(uuid));
     }
 
     /**
@@ -245,14 +255,22 @@ public class ScoreboardManager implements IScoreboardManager {
             if (this.initializedSet.add(player.getUniqueId())) {
                 packetList.add(new ClientboundSetObjectivePacket(objective, ClientboundSetObjectivePacket.METHOD_ADD));
                 packetList.add(new ClientboundSetDisplayObjectivePacket(DisplaySlot.SIDEBAR, objective));
+
                 this.renderedTitleMap.put(player.getUniqueId(), highestBoardEntry.getTitle());
+
+                UtilEvent.dispatch(new ScoreboardReceiveEvent(player));
             }
+
+            boolean updated = false;
 
             // Diff title — only send update if changed
             final Component oldTitle = this.renderedTitleMap.get(player.getUniqueId());
             if (oldTitle == null || !(oldTitle.equals(highestBoardEntry.getTitle()))) {
                 packetList.add(new ClientboundSetObjectivePacket(objective, ClientboundSetObjectivePacket.METHOD_CHANGE));
+
                 this.renderedTitleMap.put(player.getUniqueId(), highestBoardEntry.getTitle());
+
+                updated = true;
             }
 
             // Diff lines — only send packets for added, changed, or removed lines
@@ -267,9 +285,11 @@ public class ScoreboardManager implements IScoreboardManager {
                 if (i >= newLines.length) {
                     // Line was removed
                     packetList.add(new ClientboundResetScorePacket(SLOT_OWNERS[i], OBJECTIVE));
+                    updated = true;
                 } else if (i >= oldLines.length || !(newLines[i].equals(oldLines[i]))) {
                     // Line was added or changed
                     packetList.add(new ClientboundSetScorePacket(SLOT_OWNERS[i], OBJECTIVE, score, Optional.of(UtilNms.toNms(newLines[i])), Optional.of(BlankFormat.INSTANCE)));
+                    updated = true;
                 }
             }
 
@@ -280,6 +300,10 @@ public class ScoreboardManager implements IScoreboardManager {
                 for (final Packet<?> packet : packetList) {
                     UtilNms.sendPacket(player, packet);
                 }
+            }
+
+            if (updated) {
+                UtilEvent.dispatch(new ScoreboardUpdateEvent(player));
             }
         }
     }
