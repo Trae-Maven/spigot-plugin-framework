@@ -7,6 +7,7 @@ import io.github.trae.spigot.framework.command.subcommand.abstracts.AbstractSubC
 import io.github.trae.spigot.framework.plugin.events.PluginInitializeEvent;
 import io.github.trae.spigot.framework.plugin.events.PluginShutdownEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
+import io.github.trae.spigot.framework.utility.UtilTask;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -36,6 +37,9 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
     @Override
     public void initializePlugin() {
         InjectorApi.setConfigurationDirectory(this.getDataPath());
+
+        InjectorApi.setSynchronousExecutor(runnable -> UtilTask.executeSynchronous(this, runnable));
+        InjectorApi.setAsynchronousExecutor(runnable -> UtilTask.executeAsynchronous(this, runnable));
 
         Plugin.super.initializePlugin();
 
