@@ -98,6 +98,88 @@ public class UtilTask {
     }
 
     /**
+     * Schedules a {@link Runnable} to execute once on the main server thread
+     * after the specified delay.
+     *
+     * <p>The delay is converted from the given {@link ChronoUnit} to Bukkit
+     * ticks (1 tick = 50ms).</p>
+     *
+     * @param spigotPlugin the plugin owning the task
+     * @param runnable     the task to execute
+     * @param delay        the time to delay execution
+     * @param chronoUnit   the time unit of the {@code delay} parameter
+     * @throws IllegalArgumentException if {@code spigotPlugin} or {@code runnable} is {@code null}
+     */
+    public static void executeLaterSynchronous(final SpigotPlugin spigotPlugin, final Runnable runnable, final int delay, final ChronoUnit chronoUnit) {
+        if (spigotPlugin == null) {
+            throw new IllegalArgumentException("Spigot Plugin cannot be null.");
+        }
+
+        if (runnable == null) {
+            throw new IllegalArgumentException("Runnable cannot be null.");
+        }
+
+        final long delayTicks = Duration.of(delay, chronoUnit).toMillis() / 50L;
+
+        Bukkit.getServer().getScheduler().runTaskLater(spigotPlugin, runnable, delayTicks);
+    }
+
+    /**
+     * Schedules a {@link Runnable} to execute once on the main server thread
+     * after the specified delay, using the default plugin instance.
+     *
+     * @param runnable   the task to execute
+     * @param delay      the time to delay execution
+     * @param chronoUnit the time unit of the {@code delay} parameter
+     * @see #executeLaterSynchronous(SpigotPlugin, Runnable, int, ChronoUnit)
+     */
+    public static void executeLaterSynchronous(final Runnable runnable, final int delay, final ChronoUnit chronoUnit) {
+        executeLaterSynchronous(UtilPlugin.getInstance(), runnable, delay, chronoUnit);
+    }
+
+    /**
+     * Schedules a {@link Runnable} to execute once on an async thread
+     * after the specified delay.
+     *
+     * <p>The delay is converted from the given {@link ChronoUnit} to Bukkit
+     * ticks (1 tick = 50ms). Callers must ensure no Bukkit API calls are
+     * made from within the runnable unless explicitly documented as
+     * thread-safe.</p>
+     *
+     * @param spigotPlugin the plugin owning the task
+     * @param runnable     the task to execute asynchronously
+     * @param delay        the time to delay execution
+     * @param chronoUnit   the time unit of the {@code delay} parameter
+     * @throws IllegalArgumentException if {@code spigotPlugin} or {@code runnable} is {@code null}
+     */
+    public static void executeLaterAsynchronous(final SpigotPlugin spigotPlugin, final Runnable runnable, final int delay, final ChronoUnit chronoUnit) {
+        if (spigotPlugin == null) {
+            throw new IllegalArgumentException("Spigot Plugin cannot be null.");
+        }
+
+        if (runnable == null) {
+            throw new IllegalArgumentException("Runnable cannot be null.");
+        }
+
+        final long delayTicks = Duration.of(delay, chronoUnit).toMillis() / 50L;
+
+        Bukkit.getServer().getScheduler().runTaskLaterAsynchronously(spigotPlugin, runnable, delayTicks);
+    }
+
+    /**
+     * Schedules a {@link Runnable} to execute once on an async thread
+     * after the specified delay, using the default plugin instance.
+     *
+     * @param runnable   the task to execute asynchronously
+     * @param delay      the time to delay execution
+     * @param chronoUnit the time unit of the {@code delay} parameter
+     * @see #executeLaterAsynchronous(SpigotPlugin, Runnable, int, ChronoUnit)
+     */
+    public static void executeLaterAsynchronous(final Runnable runnable, final int delay, final ChronoUnit chronoUnit) {
+        executeLaterAsynchronous(UtilPlugin.getInstance(), runnable, delay, chronoUnit);
+    }
+
+    /**
      * Schedules a {@link Runnable} to execute at a fixed rate on the main server thread
      * with an optional cancellation supplier.
      *
