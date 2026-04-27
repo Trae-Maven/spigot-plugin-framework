@@ -24,19 +24,19 @@ import org.bukkit.plugin.java.JavaPlugin;
 public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
 
     /**
-     * Initializes the plugin by setting the configuration directory to the
-     * plugin's data folder and then running the hierarchy lifecycle.
+     * Initializes the plugin by registering the configuration directory
+     * for this application and then running the hierarchy lifecycle.
      *
-     * <p>Sets the configuration directory via
-     * {@link InjectorApi#setConfigurationDirectory(java.nio.file.Path)} so that
-     * {@link io.github.trae.di.configuration.annotations.Configuration @Configuration}
-     * files are stored under the plugin's data folder, then delegates to
+     * <p>Registers the configuration directory via
+     * {@link InjectorApi#setConfigurationDirectory(Class, java.nio.file.Path)}
+     * so that {@link io.github.trae.di.configuration.annotations.Configuration @Configuration}
+     * files are stored under this plugin's data folder, then delegates to
      * {@link Plugin#initializePlugin()} to trigger component discovery and
      * initialization.</p>
      */
     @Override
     public void initializePlugin() {
-        InjectorApi.setConfigurationDirectory(this.getDataPath());
+        InjectorApi.setConfigurationDirectory(this.getClass(), this.getDataPath());
 
         InjectorApi.setSynchronousExecutor(runnable -> UtilTask.executeSynchronous(this, runnable));
         InjectorApi.setAsynchronousExecutor(runnable -> UtilTask.executeAsynchronous(this, runnable));
