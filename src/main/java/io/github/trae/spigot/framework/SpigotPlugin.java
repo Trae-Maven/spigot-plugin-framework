@@ -24,6 +24,24 @@ import org.bukkit.plugin.java.JavaPlugin;
 public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
 
     /**
+     * Creates a new {@link SpigotPlugin} and configures the dependency
+     * injection framework for this application.
+     *
+     * <p>Registers this plugin's data directory as the configuration
+     * directory for {@link io.github.trae.di.configuration.annotations.Configuration @Configuration}
+     * file resolution, and sets up the per-application synchronous and
+     * asynchronous executors for dispatching
+     * {@link io.github.trae.di.annotations.method.Scheduler @Scheduler}
+     * tasks onto the Bukkit thread pool via {@link UtilTask}.</p>
+     */
+    public SpigotPlugin() {
+        InjectorApi.setConfigurationDirectory(this.getClass(), this.getDataPath());
+
+        InjectorApi.setSynchronousExecutor(this.getClass(), UtilTask::executeSynchronous);
+        InjectorApi.setAsynchronousExecutor(this.getClass(), UtilTask::executeAsynchronous);
+    }
+
+    /**
      * Initializes the plugin by registering the configuration directory
      * for this application and then running the hierarchy lifecycle.
      *
@@ -36,11 +54,6 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
      */
     @Override
     public void initializePlugin() {
-        InjectorApi.setConfigurationDirectory(this.getClass(), this.getDataPath());
-
-        InjectorApi.setSynchronousExecutor(runnable -> UtilTask.executeSynchronous(this, runnable));
-        InjectorApi.setAsynchronousExecutor(runnable -> UtilTask.executeAsynchronous(this, runnable));
-
         Plugin.super.initializePlugin();
 
         UtilEvent.dispatch(new PluginInitializeEvent(this));
