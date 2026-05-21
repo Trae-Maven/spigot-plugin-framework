@@ -42,15 +42,10 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
     }
 
     /**
-     * Initializes the plugin by registering the configuration directory
-     * for this application and then running the hierarchy lifecycle.
-     *
-     * <p>Registers the configuration directory via
-     * {@link InjectorApi#setConfigurationDirectory(Class, java.nio.file.Path)}
-     * so that {@link io.github.trae.di.configuration.annotations.Configuration @Configuration}
-     * files are stored under this plugin's data folder, then delegates to
-     * {@link Plugin#initializePlugin()} to trigger component discovery and
-     * initialization.</p>
+     * Initializes the plugin by running the hierarchy lifecycle via
+     * {@link Plugin#initializePlugin()}, then dispatching a
+     * {@link PluginInitializeEvent} to notify listeners that the
+     * plugin is fully initialized.
      */
     @Override
     public void initializePlugin() {
@@ -59,6 +54,11 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
         UtilEvent.dispatch(new PluginInitializeEvent(this));
     }
 
+    /**
+     * Dispatches a {@link PluginShutdownEvent} to notify listeners
+     * that the plugin is about to shut down, then runs the hierarchy
+     * teardown via {@link Plugin#shutdownPlugin()}.
+     */
     @Override
     public void shutdownPlugin() {
         UtilEvent.dispatch(new PluginShutdownEvent(this));
@@ -69,7 +69,9 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
     /**
      * Called when a component is initialized within the hierarchy.
      *
-     * <p>Performs automatic Bukkit registration based on the component type:</p>
+     * <p>Delegates to {@link Plugin#onComponentInitialize(Object)} to
+     * invoke {@link io.github.trae.hf.Frame#initializeFrame()}, then
+     * performs automatic Bukkit registration based on the component type:</p>
      * <ul>
      *     <li>{@link Listener} — registered with the Bukkit event system</li>
      *     <li>{@link AbstractCommand} — registered with the server's {@link org.bukkit.command.CommandMap}</li>
@@ -80,6 +82,8 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
      */
     @Override
     public void onComponentInitialize(final Object instance) {
+        Plugin.super.onComponentInitialize(instance);
+
         if (instance instanceof final Listener listener) {
             Bukkit.getServer().getPluginManager().registerEvents(listener, this);
         }
@@ -96,7 +100,9 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
     /**
      * Called when a component is shut down within the hierarchy.
      *
-     * <p>Performs automatic Bukkit deregistration based on the component type:</p>
+     * <p>Delegates to {@link Plugin#onComponentShutdown(Object)} to
+     * invoke {@link io.github.trae.hf.Frame#shutdownFrame()}, then
+     * performs automatic Bukkit deregistration based on the component type:</p>
      * <ul>
      *     <li>{@link Listener} — unregistered from all handler lists</li>
      *     <li>{@link AbstractCommand} — unregistered from the server's {@link org.bukkit.command.CommandMap}</li>
@@ -107,6 +113,8 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
      */
     @Override
     public void onComponentShutdown(final Object instance) {
+        Plugin.super.onComponentShutdown(instance);
+
         if (instance instanceof final Listener listener) {
             HandlerList.unregisterAll(listener);
         }
