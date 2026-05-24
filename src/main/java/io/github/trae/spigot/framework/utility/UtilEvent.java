@@ -40,7 +40,6 @@ public class UtilEvent {
         }
 
         Bukkit.getServer().getPluginManager().callEvent(event);
-
     }
 
     /**
