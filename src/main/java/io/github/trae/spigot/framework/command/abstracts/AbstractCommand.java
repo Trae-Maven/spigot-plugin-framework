@@ -9,6 +9,7 @@ import io.github.trae.spigot.framework.command.abstracts.interfaces.IAbstractCom
 import io.github.trae.spigot.framework.command.events.CommandExecuteEvent;
 import io.github.trae.spigot.framework.command.events.CommandTabCompleteEvent;
 import io.github.trae.spigot.framework.command.events.SubCommandExecuteEvent;
+import io.github.trae.spigot.framework.command.events.SubCommandTabCompleteEvent;
 import io.github.trae.spigot.framework.command.settings.ICommandSettings;
 import io.github.trae.spigot.framework.command.subcommand.abstracts.AbstractSubCommand;
 import io.github.trae.spigot.framework.utility.UtilEvent;
@@ -133,11 +134,13 @@ public abstract class AbstractCommand<BasePlugin extends SpigotPlugin, BaseManag
                     return false;
                 }
 
-                if (UtilEvent.supply(new SubCommandExecuteEvent(abstractSubCommand, sender, args)).isCancelled()) {
+                final String[] adjustedArgs = Arrays.copyOfRange(args, 1, args.length);
+
+                if (UtilEvent.supply(new SubCommandExecuteEvent(abstractSubCommand, sender, adjustedArgs)).isCancelled()) {
                     return false;
                 }
 
-                abstractSubCommand._internalExecute(sender, Arrays.copyOfRange(args, 1, args.length));
+                abstractSubCommand._internalExecute(sender, adjustedArgs);
                 return true;
             }
         }
@@ -187,11 +190,13 @@ public abstract class AbstractCommand<BasePlugin extends SpigotPlugin, BaseManag
                     return Collections.emptyList();
                 }
 
-                if (UtilEvent.supply(new SubCommandExecuteEvent(abstractSubCommand, sender, args)).isCancelled()) {
+                final String[] adjustedArgs = Arrays.copyOfRange(args, 1, args.length);
+
+                if (UtilEvent.supply(new SubCommandTabCompleteEvent(abstractSubCommand, sender, adjustedArgs)).isCancelled()) {
                     return Collections.emptyList();
                 }
 
-                return abstractSubCommand._internalGetTabComplete(sender, Arrays.copyOfRange(args, 1, args.length));
+                return abstractSubCommand._internalGetTabComplete(sender, adjustedArgs);
             }
         }
 
