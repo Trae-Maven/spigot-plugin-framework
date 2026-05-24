@@ -184,16 +184,17 @@ public class AccountCommand extends Command<CorePlugin, AccountManager> {
 
 SubCommands are automatically attached to their parent command through the hierarchy:
 ```java
-@AllArgsConstructor
 @Component
 public class AccountAdminSubCommand extends PlayerSubCommand<CorePlugin, AccountCommand> {
     
     private final AccountManager accountManager;
 
-    public AccountAdminSubCommand() {
+    public AccountAdminSubCommand(AccountManager accountManager) {
         super("admin", "Toggle Admin Mode");
-        
+
         this.setPermission("core.commands.account.admin");
+
+        this.accountManager = accountManager;
     }
 
     @Override
@@ -282,11 +283,14 @@ UtilMessage.message(player, "Factions", "You joined <aqua>Faction %s</aqua>.".fo
 // Prefixed message with MiniMessage tags
 UtilMessage.message(player, "Shop", "<gold>+50 coins <gray>from daily reward");
 
+// Message a Collection of Players with Predicate and Ignored
+UtilMessage.message(players, "Punish", "<yellow>%s</yellow> has banned <yellow>%s</yellow> for <light_purple>%s</light_purple>".formatted(sender.getName(), target.getName(), duration), player -> player.isOp(), Collections.singletonList(target.getUniqueId()));
+
 // Broadcast to all online players
-UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5 minutes");
+UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5 minutes</yellow>.");
 
 // Broadcast with ignore list
-UtilMessage.broadcast("Alert", "<red>PvP is now enabled!", List.of(excludedPlayerUUID));
+UtilMessage.broadcast("Alert", "<red>PvP is now enabled!</red>", List.of(excludedPlayerUUID));
 
 // Log to console
 UtilMessage.log("Core", "Plugin loaded successfully");
