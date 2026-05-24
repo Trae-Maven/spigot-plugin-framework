@@ -203,11 +203,11 @@ public class AccountAdminSubCommand extends PlayerSubCommand<CorePlugin, Account
             if (account.isAdministrating()) {
                 account.setAdministrating(false);
                 
-                player.sendMessage("Admin Mode: Disabled");
+                UtilMessage.message(player, "Account", UtilString.pair("Admin Mode", "<red>Disabled</red>"));
             } else {
                 account.setAdministrating(true);
-                
-                player.sendMessage("Admin Mode: Enabled");
+
+                UtilMessage.message(player, "Account", UtilString.pair("Admin Mode", "<green>Enabled</green>"));
             }
         });
     }
@@ -281,10 +281,10 @@ Use `UtilMessage` for MiniMessage-formatted messaging with configurable prefixes
 UtilMessage.message(player, "Factions", "You joined <aqua>Faction %s</aqua>.".formatted(faction.getName()));
 
 // Prefixed message with MiniMessage tags
-UtilMessage.message(player, "Shop", "<gold>+50 coins <gray>from daily reward");
+UtilMessage.message(player, "Shop", "<gold>+50 coins</gold> from daily reward!");
 
 // Message a Collection of Players with Predicate and Ignored
-UtilMessage.message(players, "Punish", "<yellow>%s</yellow> has banned <yellow>%s</yellow> for <light_purple>%s</light_purple>".formatted(sender.getName(), target.getName(), duration), player -> player.isOp(), Collections.singletonList(target.getUniqueId()));
+UtilMessage.message(players, "Punish", "<yellow>%s</yellow> has banned <yellow>%s</yellow> for <light_purple>%s</light_purple>.".formatted(sender.getName(), target.getName(), duration), player -> player.isOp(), Collections.singletonList(target.getUniqueId()));
 
 // Broadcast to all online players
 UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5 minutes</yellow>.");
@@ -293,7 +293,7 @@ UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5
 UtilMessage.broadcast("Alert", "<red>PvP is now enabled!</red>", List.of(excludedPlayerUUID));
 
 // Log to console
-UtilMessage.log("Core", "Plugin loaded successfully");
+UtilMessage.log("Core", "Plugin loaded successfully!");
 ```
 
 ---
