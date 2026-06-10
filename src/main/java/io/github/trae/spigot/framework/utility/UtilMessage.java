@@ -70,8 +70,8 @@ public class UtilMessage {
     /**
      * Builds a MiniMessage-serialized prefix string with the given color and name.
      *
-     * <p>The prefix is constructed as a {@link Component} using {@link #getPrefixFormat()}
-     * and then serialized back to a MiniMessage string for later deserialization.</p>
+     * <p>The prefix is constructed as a {@link Component} using the {@link #prefixFormat}
+     * value and then serialized back to a MiniMessage string for later deserialization.</p>
      *
      * @param color  the {@link NamedTextColor} to apply to the prefix
      * @param prefix the prefix name to insert into the format string
@@ -83,7 +83,7 @@ public class UtilMessage {
 
     /**
      * Builds a MiniMessage-serialized prefix string using the default
-     * {@link #getPrefixNamedTextColor()}.
+     * {@link #prefixNamedTextColor}.
      *
      * @param prefix the prefix name to insert into the format string
      * @return a MiniMessage-encoded string representing the colored prefix
@@ -114,7 +114,7 @@ public class UtilMessage {
      *
      * <p>The prefix is resolved via {@link #resolvePrefix(String)} and prepended
      * to the component. When a prefix is present, the message body is colored
-     * with {@link #getMessageNamedTextColor()}; otherwise, the component is sent as-is.</p>
+     * with the {@link #messageNamedTextColor}; otherwise, the component is sent as-is.</p>
      *
      * @param sender    the recipient of the message (may be {@code null})
      * @param prefix    the prefix name (may be {@code null} for no prefix)
