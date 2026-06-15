@@ -82,7 +82,7 @@
             <plugin>
                 <groupId>ca.bkaw</groupId>
                 <artifactId>paper-nms-maven-plugin</artifactId>
-                <version>1.4.10</version>
+                <version>1.5</version>
             </plugin>
 
             <!-- Mark jar as mojang-mapped so Paper skips remapping at load -->
