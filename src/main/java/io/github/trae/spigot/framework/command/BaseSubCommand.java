@@ -22,18 +22,19 @@ import java.util.List;
 @Getter
 public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand extends BaseCommand<Plugin, ?, ?>, Sender extends CommandSender> implements SubModule<Plugin, ParentCommand>, SharedCommand<Sender> {
 
-    private final String label, description, permission;
+    private final String label, description;
     private final List<String> aliases;
+    private final String permission;
 
     /**
      * Constructs a subcommand with a permission node.
      *
      * @param label       the primary label used to invoke this subcommand
      * @param description a short description of this subcommand
-     * @param permission  the permission node required to execute this subcommand
      * @param aliases     alternative labels for this subcommand
+     * @param permission  the permission node required to execute this subcommand
      */
-    public BaseSubCommand(final String label, final String description, final String permission, final List<String> aliases) {
+    public BaseSubCommand(final String label, final String description, final List<String> aliases, final String permission) {
         this.label = label;
         this.description = description;
         this.permission = permission;
@@ -43,7 +44,7 @@ public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand 
     /**
      * Constructs a subcommand without a permission node.
      * <p>
-     * Equivalent to calling {@link #BaseSubCommand(String, String, String, List)} with {@code null}
+     * Equivalent to calling {@link #BaseSubCommand(String, String, List, String)} with {@code null}
      * as the permission, meaning all senders of the correct type may execute it.
      *
      * @param label       the primary label used to invoke this subcommand
@@ -51,7 +52,7 @@ public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand 
      * @param aliases     alternative labels for this subcommand
      */
     public BaseSubCommand(final String label, final String description, final List<String> aliases) {
-        this(label, description, null, aliases);
+        this(label, description, aliases, null);
     }
 
     /**

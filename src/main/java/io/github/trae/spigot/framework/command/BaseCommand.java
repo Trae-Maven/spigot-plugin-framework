@@ -29,8 +29,9 @@ import java.util.Optional;
 @Getter
 public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager extends Manager<Plugin>, Sender extends CommandSender> implements Module<Plugin, SpigotManager>, SharedCommand<Sender>, IBaseCommand {
 
-    private final String label, description, permission;
+    private final String label, description;
     private final List<String> aliases;
+    private final String permission;
 
     private final LinkedHashMap<String, BaseSubCommand<?, ?, ?>> subCommands = new LinkedHashMap<>();
 
@@ -41,10 +42,10 @@ public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager ext
      *
      * @param label       the primary command label
      * @param description a short description of the command
-     * @param permission  the permission node required to execute this command
      * @param aliases     alternative labels for this command
+     * @param permission  the permission node required to execute this command
      */
-    public BaseCommand(final String label, final String description, final String permission, final List<String> aliases) {
+    public BaseCommand(final String label, final String description, final List<String> aliases, final String permission) {
         this.label = label;
         this.description = description;
         this.permission = permission;
@@ -56,7 +57,7 @@ public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager ext
     /**
      * Constructs a command without a permission node.
      * <p>
-     * Equivalent to calling {@link #BaseCommand(String, String, String, List)} with {@code null}
+     * Equivalent to calling {@link #BaseCommand(String, String, List, String)} with {@code null}
      * as the permission, meaning all senders of the correct type may execute it.
      *
      * @param label       the primary command label
@@ -64,7 +65,7 @@ public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager ext
      * @param aliases     alternative labels for this command
      */
     public BaseCommand(final String label, final String description, final List<String> aliases) {
-        this(label, description, null, aliases);
+        this(label, description, aliases, null);
     }
 
     /**
