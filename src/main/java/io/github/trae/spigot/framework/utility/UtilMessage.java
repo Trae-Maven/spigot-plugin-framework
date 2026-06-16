@@ -58,6 +58,15 @@ public class UtilMessage {
     private static NamedTextColor resetNamedTextColor = NamedTextColor.WHITE;
 
     /**
+     * Whether broadcasts should also be sent to the server console.
+     *
+     * <p>Defaults to {@code false}.</p>
+     */
+    @Getter
+    @Setter
+    private static boolean broadcastForConsole = false;
+
+    /**
      * The format string used to construct the prefix text.
      * Must contain a single {@code %s} placeholder for the prefix name.
      *
@@ -295,6 +304,10 @@ public class UtilMessage {
      */
     public static void broadcast(final Component prefix, final Component message, final List<UUID> ignored) {
         message(Bukkit.getServer().getOnlinePlayers(), prefix, message, ignored);
+
+        if (broadcastForConsole) {
+            log(prefix, message);
+        }
     }
 
     /**
@@ -317,6 +330,10 @@ public class UtilMessage {
      */
     public static void broadcast(final String prefix, final Component message, final List<UUID> ignored) {
         message(Bukkit.getServer().getOnlinePlayers(), prefix, message, ignored);
+
+        if (broadcastForConsole) {
+            log(prefix, message);
+        }
     }
 
     /**
@@ -358,6 +375,10 @@ public class UtilMessage {
      */
     public static void broadcast(final Component prefix, final String message, final List<UUID> ignored) {
         message(Bukkit.getServer().getOnlinePlayers(), prefix, message, ignored);
+
+        if (broadcastForConsole) {
+            log(prefix, message);
+        }
     }
 
     /**
@@ -380,6 +401,10 @@ public class UtilMessage {
      */
     public static void broadcast(final String prefix, final String message, final List<UUID> ignored) {
         message(Bukkit.getServer().getOnlinePlayers(), prefix, message, ignored);
+
+        if (broadcastForConsole) {
+            log(prefix, message);
+        }
     }
 
     /**
