@@ -114,8 +114,10 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
                 )
         ));
 
+        final int reversedIndex = lines.size() - 1;
+
         for (int index = 0; index < lines.size(); index++) {
-            this.sendLine(player, identifier, lines.get(index), index);
+            this.sendLine(player, identifier, lines.get(reversedIndex - index), index);
         }
 
         this.cachedTitleMap.put(player.getUniqueId(), title);
