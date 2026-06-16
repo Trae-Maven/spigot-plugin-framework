@@ -21,6 +21,21 @@ public class CustomCancellableEvent extends CustomEvent implements ICustomCancel
     private String cancelledReason;
 
     /**
+     * Creates a synchronous custom cancellable event.
+     */
+    public CustomCancellableEvent() {
+    }
+
+    /**
+     * Creates a custom cancellable event with the specified async mode.
+     *
+     * @param isAsync true if this event should be fired asynchronously
+     */
+    public CustomCancellableEvent(final boolean isAsync) {
+        super(isAsync);
+    }
+
+    /**
      * Cancels this event and sets the reason for cancellation.
      *
      * <p>Convenience method equivalent to calling {@link #setCancelled(boolean)}
