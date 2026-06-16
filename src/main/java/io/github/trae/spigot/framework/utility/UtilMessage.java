@@ -108,23 +108,13 @@ public class UtilMessage {
     }
 
     /**
-     * Wraps a pre-built {@link Component} prefix with the configured {@link #prefixFormat} spacing.
-     * <p>
-     * The format's {@code %s} slot is replaced by the supplied component, preserving its own styling.
+     * Returns the given pre-built {@link Component} prefix as-is.
      *
      * @param prefix the pre-built prefix component, or {@code null} for an empty component
-     * @return the formatted prefix component
+     * @return the prefix component, or {@link Component#empty()} if {@code null}
      */
     public static Component resolvePrefix(final Component prefix) {
-        if (prefix == null) {
-            return Component.empty();
-        }
-
-        final String[] parts = prefixFormat.split("%s", 2);
-        final String before = parts.length > 0 ? parts[0] : "";
-        final String after = parts.length > 1 ? parts[1] : "";
-
-        return Component.text().append(Component.text(before)).append(prefix).append(Component.text(after)).build();
+        return prefix == null ? Component.empty() : prefix;
     }
 
     /**
