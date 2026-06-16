@@ -22,8 +22,8 @@ import java.util.UUID;
  * clickable links ({@code <click:open_url:'https://...'>text</click>}), translations
  * ({@code <lang:key>}), and more.</p>
  *
- * <p>Every operation has both a {@link String} (parsed as MiniMessage) and a pre-built
- * {@link Component} overload.</p>
+ * <p>Both the message body and the prefix accept either a {@link String} (parsed as MiniMessage)
+ * or a pre-built {@link Component}.</p>
  */
 @UtilityClass
 public class UtilMessage {
@@ -108,15 +108,35 @@ public class UtilMessage {
     }
 
     /**
+     * Wraps a pre-built {@link Component} prefix with the configured {@link #prefixFormat} spacing.
+     * <p>
+     * The format's {@code %s} slot is replaced by the supplied component, preserving its own styling.
+     *
+     * @param prefix the pre-built prefix component, or {@code null} for an empty component
+     * @return the formatted prefix component
+     */
+    public static Component resolvePrefix(final Component prefix) {
+        if (prefix == null) {
+            return Component.empty();
+        }
+
+        final String[] parts = prefixFormat.split("%s", 2);
+        final String before = parts.length > 0 ? parts[0] : "";
+        final String after = parts.length > 1 ? parts[1] : "";
+
+        return Component.text().append(Component.text(before)).append(prefix).append(Component.text(after)).build();
+    }
+
+    /**
      * Parses a MiniMessage body and applies the appropriate base color where none was specified.
      * Uses {@link #messageNamedTextColor} when a prefix is present, otherwise {@link #resetNamedTextColor}.
      *
-     * @param prefix  the prefix label, or {@code null}
-     * @param message the raw MiniMessage body
+     * @param prefixed whether a prefix is present
+     * @param message  the raw MiniMessage body
      * @return the parsed, base-colored body component
      */
-    private static Component resolveBody(final String prefix, final String message) {
-        return parse(message).colorIfAbsent(prefix == null ? resetNamedTextColor : messageNamedTextColor);
+    private static Component resolveBody(final boolean prefixed, final String message) {
+        return parse(message).colorIfAbsent(prefixed ? messageNamedTextColor : resetNamedTextColor);
     }
 
     // -----------------------------------------------------------------------
@@ -144,11 +164,22 @@ public class UtilMessage {
      * @param message  the raw MiniMessage string
      */
     public static void message(final Audience audience, final String message) {
-        message(audience, resolveBody(null, message));
+        message(audience, resolveBody(false, message));
     }
 
     /**
-     * Sends a prefixed, pre-built {@link Component} to a single audience.
+     * Sends a {@link Component}-prefixed, pre-built {@link Component} to a single audience.
+     *
+     * @param audience the target audience
+     * @param prefix   the pre-built prefix component
+     * @param message  the pre-built body component
+     */
+    public static void message(final Audience audience, final Component prefix, final Component message) {
+        message(audience, resolvePrefix(prefix).append(message));
+    }
+
+    /**
+     * Sends a {@link String}-prefixed, pre-built {@link Component} to a single audience.
      *
      * @param audience the target audience
      * @param prefix   the prefix label
@@ -159,14 +190,25 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage string and sends it with a prefix to a single audience.
+     * Parses a MiniMessage body and sends it with a {@link Component} prefix to a single audience.
+     *
+     * @param audience the target audience
+     * @param prefix   the pre-built prefix component, or {@code null} for no prefix
+     * @param message  the raw MiniMessage body
+     */
+    public static void message(final Audience audience, final Component prefix, final String message) {
+        message(audience, resolvePrefix(prefix).append(resolveBody(prefix != null, message)));
+    }
+
+    /**
+     * Parses a MiniMessage body and sends it with a {@link String} prefix to a single audience.
      *
      * @param audience the target audience
      * @param prefix   the prefix label, or {@code null} for no prefix
      * @param message  the raw MiniMessage body
      */
     public static void message(final Audience audience, final String prefix, final String message) {
-        message(audience, resolvePrefix(prefix).append(resolveBody(prefix, message)));
+        message(audience, resolvePrefix(prefix).append(resolveBody(prefix != null, message)));
     }
 
     // -----------------------------------------------------------------------
@@ -174,8 +216,27 @@ public class UtilMessage {
     // -----------------------------------------------------------------------
 
     /**
-     * Sends a prefixed, pre-built {@link Component} to a collection of players, optionally
-     * ignoring specific UUIDs.
+     * Sends a {@link Component}-prefixed, pre-built {@link Component} to a collection of players,
+     * optionally ignoring specific UUIDs.
+     *
+     * @param players the target players
+     * @param prefix  the pre-built prefix component
+     * @param message the pre-built body component
+     * @param ignored UUIDs to skip, or {@code null} to send to all
+     */
+    public static void message(final Collection<? extends Player> players, final Component prefix, final Component message, final List<UUID> ignored) {
+        for (final Player player : players) {
+            if (ignored != null && ignored.contains(player.getUniqueId())) {
+                continue;
+            }
+
+            message(player, prefix, message);
+        }
+    }
+
+    /**
+     * Sends a {@link String}-prefixed, pre-built {@link Component} to a collection of players,
+     * optionally ignoring specific UUIDs.
      *
      * @param players the target players
      * @param prefix  the prefix label
@@ -193,8 +254,27 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage string and sends it with a prefix to a collection of players, optionally
-     * ignoring specific UUIDs.
+     * Parses a MiniMessage body and sends it with a {@link Component} prefix to a collection of
+     * players, optionally ignoring specific UUIDs.
+     *
+     * @param players the target players
+     * @param prefix  the pre-built prefix component
+     * @param message the raw MiniMessage body
+     * @param ignored UUIDs to skip, or {@code null} to send to all
+     */
+    public static void message(final Collection<? extends Player> players, final Component prefix, final String message, final List<UUID> ignored) {
+        for (final Player player : players) {
+            if (ignored != null && ignored.contains(player.getUniqueId())) {
+                continue;
+            }
+
+            message(player, prefix, message);
+        }
+    }
+
+    /**
+     * Parses a MiniMessage body and sends it with a {@link String} prefix to a collection of
+     * players, optionally ignoring specific UUIDs.
      *
      * @param players the target players
      * @param prefix  the prefix label
@@ -216,8 +296,30 @@ public class UtilMessage {
     // -----------------------------------------------------------------------
 
     /**
-     * Broadcasts a prefixed, pre-built {@link Component} to all online players, optionally ignoring
-     * specific UUIDs.
+     * Broadcasts a {@link Component}-prefixed, pre-built {@link Component} to all online players,
+     * optionally ignoring specific UUIDs.
+     *
+     * @param prefix  the pre-built prefix component
+     * @param message the pre-built body component
+     * @param ignored UUIDs to skip, or {@code null} to send to all
+     */
+    public static void broadcast(final Component prefix, final Component message, final List<UUID> ignored) {
+        message(Bukkit.getServer().getOnlinePlayers(), prefix, message, ignored);
+    }
+
+    /**
+     * Broadcasts a {@link Component}-prefixed, pre-built {@link Component} to all online players.
+     *
+     * @param prefix  the pre-built prefix component
+     * @param message the pre-built body component
+     */
+    public static void broadcast(final Component prefix, final Component message) {
+        broadcast(prefix, message, null);
+    }
+
+    /**
+     * Broadcasts a {@link String}-prefixed, pre-built {@link Component} to all online players,
+     * optionally ignoring specific UUIDs.
      *
      * @param prefix  the prefix label
      * @param message the pre-built body component
@@ -228,7 +330,7 @@ public class UtilMessage {
     }
 
     /**
-     * Broadcasts a prefixed, pre-built {@link Component} to all online players.
+     * Broadcasts a {@link String}-prefixed, pre-built {@link Component} to all online players.
      *
      * @param prefix  the prefix label
      * @param message the pre-built body component
@@ -244,7 +346,7 @@ public class UtilMessage {
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
     public static void broadcast(final Component message, final List<UUID> ignored) {
-        broadcast(null, message, ignored);
+        broadcast((String) null, message, ignored);
     }
 
     /**
@@ -253,12 +355,34 @@ public class UtilMessage {
      * @param message the component to broadcast
      */
     public static void broadcast(final Component message) {
-        broadcast(null, message, null);
+        broadcast((String) null, message, null);
     }
 
     /**
-     * Parses and broadcasts a prefixed MiniMessage string to all online players, optionally ignoring
-     * specific UUIDs.
+     * Parses and broadcasts a {@link Component}-prefixed MiniMessage string to all online players,
+     * optionally ignoring specific UUIDs.
+     *
+     * @param prefix  the pre-built prefix component
+     * @param message the raw MiniMessage body
+     * @param ignored UUIDs to skip, or {@code null} to send to all
+     */
+    public static void broadcast(final Component prefix, final String message, final List<UUID> ignored) {
+        message(Bukkit.getServer().getOnlinePlayers(), prefix, message, ignored);
+    }
+
+    /**
+     * Parses and broadcasts a {@link Component}-prefixed MiniMessage string to all online players.
+     *
+     * @param prefix  the pre-built prefix component
+     * @param message the raw MiniMessage body
+     */
+    public static void broadcast(final Component prefix, final String message) {
+        broadcast(prefix, message, null);
+    }
+
+    /**
+     * Parses and broadcasts a {@link String}-prefixed MiniMessage string to all online players,
+     * optionally ignoring specific UUIDs.
      *
      * @param prefix  the prefix label
      * @param message the raw MiniMessage body
@@ -269,7 +393,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses and broadcasts a prefixed MiniMessage string to all online players.
+     * Parses and broadcasts a {@link String}-prefixed MiniMessage string to all online players.
      *
      * @param prefix  the prefix label
      * @param message the raw MiniMessage body
@@ -285,7 +409,7 @@ public class UtilMessage {
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
     public static void broadcast(final String message, final List<UUID> ignored) {
-        broadcast(null, message, ignored);
+        broadcast((String) null, message, ignored);
     }
 
     /**
@@ -294,7 +418,7 @@ public class UtilMessage {
      * @param message the raw MiniMessage string
      */
     public static void broadcast(final String message) {
-        broadcast(null, message, null);
+        broadcast((String) null, message, null);
     }
 
     // -----------------------------------------------------------------------
@@ -302,7 +426,17 @@ public class UtilMessage {
     // -----------------------------------------------------------------------
 
     /**
-     * Sends a prefixed, pre-built {@link Component} to the server console.
+     * Sends a {@link Component}-prefixed, pre-built {@link Component} to the server console.
+     *
+     * @param prefix  the pre-built prefix component
+     * @param message the pre-built body component
+     */
+    public static void log(final Component prefix, final Component message) {
+        message(Bukkit.getServer().getConsoleSender(), prefix, message);
+    }
+
+    /**
+     * Sends a {@link String}-prefixed, pre-built {@link Component} to the server console.
      *
      * @param prefix  the prefix label
      * @param message the pre-built body component
@@ -321,7 +455,17 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage string and sends it with a prefix to the server console.
+     * Parses a MiniMessage body and sends it with a {@link Component} prefix to the server console.
+     *
+     * @param prefix  the pre-built prefix component
+     * @param message the raw MiniMessage body
+     */
+    public static void log(final Component prefix, final String message) {
+        message(Bukkit.getServer().getConsoleSender(), prefix, message);
+    }
+
+    /**
+     * Parses a MiniMessage body and sends it with a {@link String} prefix to the server console.
      *
      * @param prefix  the prefix label
      * @param message the raw MiniMessage body
