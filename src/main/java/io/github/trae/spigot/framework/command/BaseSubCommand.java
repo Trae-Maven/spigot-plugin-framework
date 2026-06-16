@@ -2,7 +2,7 @@ package io.github.trae.spigot.framework.command;
 
 import io.github.trae.hf.SubModule;
 import io.github.trae.spigot.framework.SpigotPlugin;
-import io.github.trae.spigot.framework.command.interfaces.SharedCommand;
+import io.github.trae.spigot.framework.command.interfaces.SharedBaseCommand;
 import lombok.Getter;
 import org.bukkit.command.CommandSender;
 
@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * Abstract base class for subcommands belonging to a {@link BaseCommand}.
  * <p>
- * Combines {@link SubModule} and {@link SharedCommand} to provide a typed subcommand
+ * Combines {@link SubModule} and {@link SharedBaseCommand} to provide a typed subcommand
  * with its own sender validation, permission check, and tab-complete logic. Subcommands
  * are registered into their parent via {@link io.github.trae.spigot.framework.command.interfaces.IBaseCommand#$addSubCommand}.
  *
@@ -20,7 +20,7 @@ import java.util.List;
  * @param <Sender>        the expected {@link CommandSender} type
  */
 @Getter
-public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand extends BaseCommand<Plugin, ?, ?>, Sender extends CommandSender> implements SubModule<Plugin, ParentCommand>, SharedCommand<Sender> {
+public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand extends BaseCommand<Plugin, ?, ?>, Sender extends CommandSender> implements SubModule<Plugin, ParentCommand>, SharedBaseCommand<Sender> {
 
     private final String label, description;
     private final List<String> aliases;

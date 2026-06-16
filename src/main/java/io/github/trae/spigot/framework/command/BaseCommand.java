@@ -4,7 +4,7 @@ import io.github.trae.hf.Manager;
 import io.github.trae.hf.Module;
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.spigot.framework.command.interfaces.IBaseCommand;
-import io.github.trae.spigot.framework.command.interfaces.SharedCommand;
+import io.github.trae.spigot.framework.command.interfaces.SharedBaseCommand;
 import io.github.trae.spigot.framework.command.wrappers.SpigotCommandWrapper;
 import lombok.Getter;
 import org.bukkit.command.CommandSender;
@@ -17,7 +17,7 @@ import java.util.Optional;
 /**
  * Abstract base class for top-level plugin commands.
  * <p>
- * Combines {@link Module}, {@link SharedCommand}, and {@link IBaseCommand} to provide
+ * Combines {@link Module}, {@link SharedBaseCommand}, and {@link IBaseCommand} to provide
  * a fully typed, self-registering command with built-in subcommand management.
  * A {@link SpigotCommandWrapper} is created automatically on construction and used
  * to bridge this command into Bukkit's command map.
@@ -27,7 +27,7 @@ import java.util.Optional;
  * @param <Sender>        the expected {@link CommandSender} type
  */
 @Getter
-public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager extends Manager<Plugin>, Sender extends CommandSender> implements Module<Plugin, SpigotManager>, SharedCommand<Sender>, IBaseCommand {
+public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager extends Manager<Plugin>, Sender extends CommandSender> implements Module<Plugin, SpigotManager>, SharedBaseCommand<Sender>, IBaseCommand {
 
     private final String label, description;
     private final List<String> aliases;

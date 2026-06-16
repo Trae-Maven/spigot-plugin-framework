@@ -18,13 +18,13 @@ import java.util.List;
  *
  * @param <Sender> the expected {@link CommandSender} type for this command
  */
-public interface SharedCommand<Sender extends CommandSender> {
+public interface SharedBaseCommand<Sender extends CommandSender> {
 
     /**
      * Resolves the generic {@link CommandSender} type parameter declared on the implementing class.
      * <p>
      * Uses {@link UtilGeneric#getGenericParameter} to reflectively extract the first type argument
-     * of {@link SharedCommand} from the concrete class. The result is used for sender validation
+     * of {@link SharedBaseCommand} from the concrete class. The result is used for sender validation
      * and casting in {@link #isValidSender} and {@link #$execute}.
      *
      * @return the resolved {@link Class} of {@code Sender}
@@ -32,7 +32,7 @@ public interface SharedCommand<Sender extends CommandSender> {
      */
     @SuppressWarnings("unchecked")
     default Class<Sender> getClassOfCommandSender() {
-        final Class<?> commandSenderClass = UtilGeneric.getGenericParameter(this.getClass(), SharedCommand.class, 0);
+        final Class<?> commandSenderClass = UtilGeneric.getGenericParameter(this.getClass(), SharedBaseCommand.class, 0);
         if (commandSenderClass == null) {
             throw new IllegalStateException("Could not resolve command sender type for: %s".formatted(this.getClass().getName()));
         }
