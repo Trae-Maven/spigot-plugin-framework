@@ -82,18 +82,29 @@ public class UtilMessage {
     }
 
     /**
-     * Builds a prefix {@link Component} from the configured {@link #prefixFormat} and
+     * Builds a prefix {@link Component} from the configured {@link #prefixFormat} using the given color.
+     *
+     * @param namedTextColor the color to apply to the prefix
+     * @param prefix         the prefix label, or {@code null} for an empty component
+     * @return the formatted prefix component
+     */
+    public static Component resolvePrefix(final NamedTextColor namedTextColor, final String prefix) {
+        if (prefix == null) {
+            return Component.empty();
+        }
+
+        return Component.text(prefixFormat.formatted(prefix), namedTextColor);
+    }
+
+    /**
+     * Builds a prefix {@link Component} from the configured {@link #prefixFormat}, using the default
      * {@link #prefixNamedTextColor}.
      *
      * @param prefix the prefix label, or {@code null} for an empty component
      * @return the formatted prefix component
      */
     public static Component resolvePrefix(final String prefix) {
-        if (prefix == null) {
-            return Component.empty();
-        }
-
-        return Component.text(prefixFormat.formatted(prefix), prefixNamedTextColor);
+        return resolvePrefix(prefixNamedTextColor, prefix);
     }
 
     /**
