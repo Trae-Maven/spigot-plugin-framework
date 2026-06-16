@@ -32,12 +32,35 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Manages per-player sidebars using direct NMS scoreboard packets.
+ * <p>
+ * Resolves the lowest-priority eligible {@link Sidebar} for each player (discovered via the
+ * dependency injector) and sends create, update, and clear packets directly through
+ * {@link UtilNms}. The currently displayed sidebar, along with its rendered title and lines, is
+ * cached per player so that updates only send packets for content that actually changed,
+ * eliminating flicker.
+ * <p>
+ * A scheduler re-evaluates eligibility and drives animated (non-static) titles. Player join and
+ * quit are handled automatically, as are {@link SidebarUpdateEvent}s.
+ *
+ * @param <Plugin> the plugin type this manager belongs to
+ */
 public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Manager<Plugin>, Listener {
 
     private final ConcurrentHashMap<UUID, Sidebar> activeSidebarMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Component> cachedTitleMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, List<Component>> cachedLinesMap = new ConcurrentHashMap<>();
 
+    /**
+     * Periodic tick that, for each online player, re-resolves eligibility of their active sidebar
+     * and updates the title if it is animated.
+     * <p>
+     * If the active sidebar is no longer eligible (failing either {@link Sidebar#canDisplay()} or
+     * {@link Sidebar#canDisplay(Player)}), a {@link SidebarUpdateEvent} is dispatched to re-resolve
+     * and switch to the next eligible sidebar. Otherwise {@link #updateTitle(Player)} is called to
+     * refresh animated titles.
+     */
     @Scheduler(period = 100, unit = TimeUnit.MILLISECONDS)
     public void onScheduler() {
         for (final Player player : Bukkit.getServer().getOnlinePlayers()) {
@@ -53,6 +76,13 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         }
     }
 
+    /**
+     * Creates and displays the given sidebar for the player by sending the objective, display-slot,
+     * and all line packets, then caches the rendered title and lines.
+     *
+     * @param player  the player to display the sidebar to
+     * @param sidebar the sidebar to create
+     */
     private void create(final Player player, final Sidebar sidebar) {
         final String identifier = sidebar.getIdentifier();
         final Component title = sidebar.getTitle(player);
@@ -92,6 +122,14 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         this.cachedLinesMap.put(player.getUniqueId(), lines);
     }
 
+    /**
+     * Re-resolves the active sidebar's title for the player and, if it changed since last render,
+     * sends a title-change packet and updates the cache.
+     * <p>
+     * No-op if the player has no active sidebar or its title is static.
+     *
+     * @param player the player whose title to refresh
+     */
     private void updateTitle(final Player player) {
         final Sidebar activeSidebar = this.activeSidebarMap.get(player.getUniqueId());
         if (activeSidebar == null || activeSidebar.isStaticTitle()) {
@@ -113,6 +151,14 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         this.cachedTitleMap.put(player.getUniqueId(), newTitle);
     }
 
+    /**
+     * Diffs the sidebar's current lines against the cached lines for the player and sends packets
+     * only for changed lines, removing any trailing lines that no longer exist. Updates the line
+     * cache afterwards.
+     *
+     * @param player  the player whose lines to update
+     * @param sidebar the sidebar providing the new lines
+     */
     private void updateLines(final Player player, final Sidebar sidebar) {
         final List<Component> newLines = sidebar.getLines(player);
         final List<Component> oldLines = this.cachedLinesMap.getOrDefault(player.getUniqueId(), Collections.emptyList());
@@ -131,6 +177,15 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         this.cachedLinesMap.put(player.getUniqueId(), newLines);
     }
 
+    /**
+     * Sends a single score line to the player. The score entry name is keyed by player name and
+     * line index to keep each slot unique, and the score value doubles as the line ordering.
+     *
+     * @param player     the player to send the line to
+     * @param identifier the objective identifier
+     * @param line       the line component
+     * @param score      the line index / score value
+     */
     private void sendLine(final Player player, final String identifier, final Component line, final int score) {
         UtilNms.sendPacket(player, new ClientboundSetScorePacket(
                 "%s_%s".formatted(player.getName(), score),
@@ -141,6 +196,13 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         ));
     }
 
+    /**
+     * Removes a single score line from the player by resetting its score entry.
+     *
+     * @param player     the player to remove the line from
+     * @param identifier the objective identifier
+     * @param score      the line index / score value to remove
+     */
     private void removeLine(final Player player, final String identifier, final int score) {
         UtilNms.sendPacket(player, new ClientboundResetScorePacket(
                 "%s_%s".formatted(player.getName(), score),
@@ -148,6 +210,12 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         ));
     }
 
+    /**
+     * Clears the player's sidebar, evicting their title and line caches and removing the active
+     * sidebar entry, then sending an objective-remove packet if a sidebar was active.
+     *
+     * @param player the player whose sidebar to clear
+     */
     private void clear(final Player player) {
         this.cachedTitleMap.remove(player.getUniqueId());
         this.cachedLinesMap.remove(player.getUniqueId());
@@ -171,6 +239,13 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         ));
     }
 
+    /**
+     * Resolves the eligible sidebar for the player — the one with the lowest priority that passes
+     * both the global and per-player display checks.
+     *
+     * @param player the player to resolve a sidebar for
+     * @return an {@link Optional} containing the eligible sidebar, or empty if none qualify
+     */
     private Optional<Sidebar> getEligibleSidebar(final Player player) {
         return InjectorApi.getAll(Sidebar.class)
                 .stream()
@@ -179,6 +254,16 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
                 .findFirst();
     }
 
+    /**
+     * Handles a {@link SidebarUpdateEvent}.
+     * <p>
+     * If the event is scoped to an identifier that does not match the player's active sidebar, the
+     * event is ignored. Otherwise the eligible sidebar is re-resolved: if none qualify the sidebar
+     * is cleared; if the same sidebar remains active its lines are diffed and updated; if a
+     * different sidebar wins the old one is cleared and the new one created.
+     *
+     * @param event the sidebar update event
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onSidebarUpdate(final SidebarUpdateEvent event) {
         final Player player = event.getPlayer();
@@ -207,6 +292,11 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         this.activeSidebarMap.put(player.getUniqueId(), eligibleSidebar);
     }
 
+    /**
+     * Creates the eligible sidebar for a player when they join, if any qualifies.
+     *
+     * @param event the player join event
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(final PlayerJoinEvent event) {
         final Player player = event.getPlayer();
@@ -217,6 +307,11 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         });
     }
 
+    /**
+     * Clears all sidebar state for a player when they quit.
+     *
+     * @param event the player quit event
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(final PlayerQuitEvent event) {
         this.clear(event.getPlayer());

@@ -1,6 +1,6 @@
 # Spigot-Plugin-Framework
 
-A Spigot/Paper plugin framework providing structured command systems, event utilities, packet-based scoreboards, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
+A Spigot/Paper plugin framework providing structured command systems, event utilities, packet-based sidebars and teams, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
 
 Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-based hierarchy architecture, automatically handling registration and teardown of listeners, commands, and subcommands as components are initialized and shut down.
 
@@ -11,12 +11,12 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Automatic Bukkit registration — listeners, commands, and subcommands are registered/unregistered through hierarchy lifecycle callbacks
 - Type-safe command system with sender validation — Player, Console, or any CommandSender
 - Built-in subcommand routing with automatic argument stripping and tab completion delegation
-- Cancellable command events at every execution stage — pre-execute, execute, and tab-complete
-- Pluggable command settings via `ICommandSettings` — permission checks and messaging resolved through the dependency injector
+- Cancellable command events at every execution stage — execute and tab-complete
 - Thread-safe event dispatch utilities — synchronous and asynchronous with `CompletableFuture` support
 - Task scheduling with ChronoUnit-to-tick conversion — synchronous, asynchronous, and repeating with cancellation suppliers
 - MiniMessage-based messaging — configurable prefixes, broadcasting, filtering, and ignore lists
-- Asynchronous packet-based scoreboard system with priority resolution — only changed lines produce packets, zero flicker
+- Packet-based sidebar system with priority resolution — only changed lines and title produce packets, zero flicker, dynamic animated titles
+- Packet-based team system with per-viewer prefix/suffix resolution — relation-aware nametag colors via priority-sorted `Team` implementations
 - NMS utilities for direct packet sending and Adventure-to-vanilla component conversion
 - Custom event base classes with cancellation reasons
 - Compatible with Bukkit, Spigot, and Paper
@@ -28,8 +28,8 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 ```
 SpigotPlugin (extends JavaPlugin, implements Plugin)
   └─ Manager
-       └─ AbstractCommand / Module
-            └─ AbstractSubCommand / SubModule
+       └─ BaseCommand / Module
+            └─ BaseSubCommand / SubModule
 ```
 
 Commands integrate directly into the hierarchy as Modules, and subcommands as SubModules:
@@ -38,8 +38,8 @@ Commands integrate directly into the hierarchy as Modules, and subcommands as Su
 |---|---|---|
 | `SpigotPlugin` | Plugin | `JavaPlugin` lifecycle, component registration |
 | `Manager` | Manager | Organizational grouping |
-| `AbstractCommand` | Module | Registered with `CommandMap` |
-| `AbstractSubCommand` | SubModule | Attached to parent command |
+| `BaseCommand` | Module | Registered with `CommandMap` |
+| `BaseSubCommand` | SubModule | Attached to parent command |
 
 ---
 
@@ -49,7 +49,7 @@ Spigot-Plugin-Framework requires Java 21+ and a Paper API environment.
 
 ### NMS Access (paper-nms-maven-plugin)
 
-The scoreboard system and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
+The sidebar/team systems and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
 
 Add `.paper-nms` to your `.gitignore` — it contains locally generated dependencies.
 
@@ -131,41 +131,15 @@ public class CorePlugin extends SpigotPlugin {
 }
 ```
 
-### Implementing Command Settings
-
-Create a concrete `ICommandSettings` component to define permission and messaging behaviour:
-```java
-@Component
-public class CommandSettings implements ICommandSettings {
-
-    @Override
-    public boolean hasPermission(ISharedCommand<?> command, CommandSender sender) {
-        return ICommandSettings.super.hasPermission(command, sender);
-    }
-
-    @Override
-    public void sendInvalidCommandSenderMessage(ISharedCommand<?> command, CommandSender sender) {
-        sender.sendMessage("Invalid Command Sender!");
-    }
-
-    @Override
-    public void sendInsufficientPermissionMessage(ISharedCommand<?> command, CommandSender sender) {
-        sender.sendMessage("You do not have permission to execute this command!");
-    }
-}
-```
-
 ### Defining a Command
 
-Choose a base type based on the required sender:
+Extend `BaseCommand` with the appropriate sender type. Permission is passed via the constructor:
 ```java
 @Component
-public class AccountCommand extends Command<CorePlugin, AccountManager> {
+public class AccountCommand extends BaseCommand<CorePlugin, AccountManager, CommandSender> {
 
     public AccountCommand() {
-        super("account", "Account management", Collections.emptyList());
-        
-        this.setPermission("core.commands.account");
+        super("account", "Account management", "core.commands.account", Collections.emptyList());
     }
 
     @Override
@@ -174,7 +148,7 @@ public class AccountCommand extends Command<CorePlugin, AccountManager> {
     }
 
     @Override
-    public List<String> getTabCompletion(CommandSender sender, String[] args) {
+    public List<String> getTabComplete(CommandSender sender, String[] args) {
         return Collections.emptyList();
     }
 }
@@ -185,14 +159,12 @@ public class AccountCommand extends Command<CorePlugin, AccountManager> {
 SubCommands are automatically attached to their parent command through the hierarchy:
 ```java
 @Component
-public class AccountAdminSubCommand extends PlayerSubCommand<CorePlugin, AccountCommand> {
-    
+public class AccountAdminSubCommand extends BaseSubCommand<CorePlugin, AccountCommand, Player> {
+
     private final AccountManager accountManager;
 
     public AccountAdminSubCommand(AccountManager accountManager) {
-        super("admin", "Toggle Admin Mode");
-
-        this.setPermission("core.commands.account.admin");
+        super("admin", "Toggle Admin Mode", "core.commands.account.admin", Collections.emptyList());
 
         this.accountManager = accountManager;
     }
@@ -202,7 +174,7 @@ public class AccountAdminSubCommand extends PlayerSubCommand<CorePlugin, Account
         this.accountManager.getAccountByPlayer(player).ifPresent(account -> {
             if (account.isAdministrating()) {
                 account.setAdministrating(false);
-                
+
                 UtilMessage.message(player, "Account", UtilString.pair("Admin Mode", "<red>Disabled</red>"));
             } else {
                 account.setAdministrating(true);
@@ -213,7 +185,7 @@ public class AccountAdminSubCommand extends PlayerSubCommand<CorePlugin, Account
     }
 
     @Override
-    public List<String> getTabCompletion(Player player, String[] args) {
+    public List<String> getTabComplete(Player player, String[] args) {
         return Collections.emptyList();
     }
 }
@@ -225,10 +197,10 @@ This registers `/account admin` automatically — the parent `AccountCommand` ro
 ```
 /account admin
   │
-  ├─ Sender type validation (any CommandSender)
-  ├─ Permission check via ICommandSettings
-  ├─ SubCommandExecuteEvent (cancellable)
-  └─ AccountAdminSubCommand.execute(sender, new String[0])
+  ├─ Sender type validation (Player)
+  ├─ Permission check (core.commands.account.admin)
+  ├─ CommandExecuteEvent (cancellable)
+  └─ AccountAdminSubCommand.execute(player, new String[0])
 ```
 
 ### Event Dispatch
@@ -238,14 +210,14 @@ Use `UtilEvent` for thread-safe event dispatch:
 // Synchronous — fire and inspect
 MyEvent event = UtilEvent.supply(new MyEvent());
 if (event.isCancelled()) {
-    return;
-}
+        return;
+        }
 
 // Asynchronous — fire and forget
-UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
+        UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
 
 // Asynchronous — fire and chain
-UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(e -> System.out.println("Done: " + e.isCancelled()));
+        UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(e -> System.out.println("Done: " + e.isCancelled()));
 ```
 
 ### Task Execution
@@ -254,23 +226,23 @@ Use `UtilTask` for scheduling across Bukkit's threading model:
 ```java
 // Execute on the main server thread
 UtilTask.executeSynchronous(() -> {
-    player.teleport(spawn);
+        player.teleport(spawn);
 });
 
 // Execute asynchronously off the main thread
-UtilTask.executeAsynchronous(() -> {
-    // Heavy computation or I/O
-});
+        UtilTask.executeAsynchronous(() -> {
+        // Heavy computation or I/O
+        });
 
 // Repeating task on the main thread with cancellation
-UtilTask.schedule(() -> {
-    player.sendMessage("Tick!");
+        UtilTask.schedule(() -> {
+        player.sendMessage("Tick!");
 }, 0, 1, ChronoUnit.SECONDS, () -> !player.isOnline());
 
 // Repeating async task
-UtilTask.scheduleAsynchronous(() -> {
-    // Periodic background work
-}, 0, 5, ChronoUnit.SECONDS);
+        UtilTask.scheduleAsynchronous(() -> {
+        // Periodic background work
+        }, 0, 5, ChronoUnit.SECONDS);
 ```
 
 ### Messaging
@@ -281,115 +253,232 @@ Use `UtilMessage` for MiniMessage-formatted messaging with configurable prefixes
 UtilMessage.message(player, "Factions", "You joined <aqua>Faction %s</aqua>.".formatted(faction.getName()));
 
 // Prefixed message with MiniMessage tags
-UtilMessage.message(player, "Shop", "<gold>+50 coins</gold> from daily reward!");
+        UtilMessage.message(player, "Shop", "<gold>+50 coins</gold> from daily reward!");
 
 // Message a Collection of Players with Predicate and Ignored
 UtilMessage.message(players, "Punish", "<yellow>%s</yellow> has banned <yellow>%s</yellow> for <light_purple>%s</light_purple>.".formatted(sender.getName(), target.getName(), duration), player -> player.isOp(), Collections.singletonList(target.getUniqueId()));
 
 // Broadcast to all online players
-UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5 minutes</yellow>.");
+        UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5 minutes</yellow>.");
 
 // Broadcast with ignore list
 UtilMessage.broadcast("Alert", "<red>PvP is now enabled!</red>", List.of(excludedPlayerUUID));
 
 // Log to console
-UtilMessage.log("Core", "Plugin loaded successfully!");
+        UtilMessage.log("Core", "Plugin loaded successfully!");
 ```
 
 ---
 
-## Scoreboard System
+## Sidebar System
 
-The framework provides an asynchronous packet-based scoreboard manager with priority-based resolution. Multiple systems can register scoreboards for the same player — the highest priority board is always displayed, and removing it falls back to the next highest automatically.
+The framework provides a packet-based sidebar (scoreboard) system with priority-based resolution. Multiple `Sidebar` implementations can be registered — the lowest priority one that passes all display checks is shown. Only changed lines and title produce packets, eliminating flicker.
 
-All diffing and packet construction runs off the main thread. Only changed lines and title produce packets, eliminating flicker and minimising bandwidth.
+### Defining a Sidebar Manager
 
-### Setting a Scoreboard
-
-Use `ScoreboardManager.board()` to build the layout, then `set()` to register it with a key and priority:
+Extend `AbstractSidebarManager` in your plugin and register it as a service:
 ```java
-private final ScoreboardManager scoreboardManager;
+@Service
+public class SidebarManager extends AbstractSidebarManager<CorePlugin> {}
+```
 
-// Lobby scoreboard at priority 0
-this.scoreboardManager.set(player, "lobby", 0,
-    Component.text("  MY SERVER  ", NamedTextColor.GOLD, TextDecoration.BOLD),
-    ScoreboardManager.board()
-        .pair(NamedTextColor.GRAY, "Server", "Lobby-1")
-        .pair(NamedTextColor.GOLD, "Rank", "Owner")
-        .pair(NamedTextColor.GREEN, "Gems", "1,500")
-        .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))
+### Defining a Sidebar
+
+Implement `Sidebar` and register it as a component. The manager discovers all implementations automatically via the dependency injector:
+
+```java
+@AllArgsConstructor
+@Component
+public class HubSidebar implements Sidebar {
+
+    private final PlayerManager playerManager;
+
+    @Override
+    public String getIdentifier() {
+        return "hub";
+    }
+
+    @Override
+    public int getPriority() {
+        return 10;
+    }
+
+    @Override
+    public Component getTitle(final Player player) {
+        return Component.text("MY SERVER", NamedTextColor.GOLD, TextDecoration.BOLD);
+    }
+
+    @Override
+    public List<Component> getLines(final Player player) {
+        final PlayerData data = this.playerManager.getPlayerData(player);
+
+        return List.of(
+                Component.text("Online: ", NamedTextColor.GRAY).append(Component.text(Bukkit.getOnlinePlayers().size(), NamedTextColor.WHITE)),
+                Component.text("Rank: ", NamedTextColor.GRAY).append(Component.text(data.getRank(), NamedTextColor.GOLD)),
+                Component.text("Coins: ", NamedTextColor.GRAY).append(Component.text(data.getCoins(), NamedTextColor.YELLOW))
+        );
+    }
+}
+```
+
+### Animated Title
+
+Override `isStaticTitle()` to enable per-tick title updates driven by the manager's scheduler:
+```java
+private int tick = 0;
+
+private static final List<TextColor> COLORS = List.of(
+    NamedTextColor.RED, NamedTextColor.GOLD, NamedTextColor.YELLOW,
+    NamedTextColor.GREEN, NamedTextColor.AQUA, NamedTextColor.LIGHT_PURPLE
 );
+
+@Override
+public boolean isStaticTitle() {
+    return false;
+}
+
+@Override
+public Component getTitle(final Player player) {
+    return Component.text("MY SERVER", COLORS.get(this.tick++ % COLORS.size()), TextDecoration.BOLD);
+}
 ```
 
 ### Priority Resolution
 
-Higher priority always wins. When a higher priority board is removed, the next one takes over seamlessly:
-```java
-// Game system takes over at priority 1
-this.scoreboardManager.set(player, "game", 1,
-    Component.text("  DOMINATION  ", NamedTextColor.RED, TextDecoration.BOLD),
-    ScoreboardManager.board()
-        .pair(NamedTextColor.GRAY, "Map", "Desert Temple")
-        .pair(NamedTextColor.AQUA, "Team", "Blue")
-        .pair(NamedTextColor.GREEN, "Kills", "0")
-        .pair(NamedTextColor.RED, "Deaths", "0")
-        .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))
-);
-
-// Game ends — remove it, lobby board reappears automatically
-this.scoreboardManager.remove(player, "game");
-```
-
-### Updating Lines
-
-Re-calling `set()` with the same key diffs against what's currently rendered. Only changed lines produce packets:
-```java
-// Only the "Kills" and "Deaths" values changed — only those 2 lines send packets
-scoreboardManager.set(player, "game", 1,
-    Component.text("  DOMINATION  ", NamedTextColor.RED, TextDecoration.BOLD),
-    ScoreboardManager.board()
-        .pair(NamedTextColor.GRAY, "Map", "Desert Temple")     // unchanged — no packet
-        .pair(NamedTextColor.AQUA, "Team", "Blue")              // unchanged — no packet
-        .pair(NamedTextColor.GREEN, "Kills", "3")                // changed — packet sent
-        .pair(NamedTextColor.RED, "Deaths", "1")                 // changed — packet sent
-        .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))  // unchanged — no packet
-);
-```
-
-### Custom Lines
-
-Use `line()` for a component with a trailing spacer, or `lineCompact()` for no spacer:
-```java
-ScoreboardManager.board()
-    .pair(NamedTextColor.GRAY, "Map", "Desert Temple")
-    .line(Component.text("Time: ", NamedTextColor.YELLOW, TextDecoration.BOLD).append(Component.text("2:34", NamedTextColor.WHITE)))
-    .pair(NamedTextColor.GREEN, "Kills", "3")
-    .lineCompact(Component.text("play.myserver.com", NamedTextColor.RED, TextDecoration.BOLD))
-```
-
-### Checking Active Board
+Lower priority always wins. When the lowest-numbered sidebar becomes ineligible, the next one takes over automatically:
 
 ```java
-if (this.scoreboardManager.isActive(player, "game")) {
-    // The game board is currently the one being displayed
+@AllArgsConstructor
+@Component
+public class FactionsSidebar implements Sidebar {
+    
+    private final FactionManager factionManager;
+
+    @Override
+    public String getIdentifier() {
+        return "factions";
+    }
+
+    @Override
+    public int getPriority() {
+        return 0; // wins over HubSidebar at 10
+    }
+
+    @Override
+    public boolean canDisplay(final Player player) {
+        return this.factionsManager.isInFaction(player);
+    }
+
+    @Override
+    public Component getTitle(final Player player) {
+        return Component.text("FACTIONS", NamedTextColor.RED, TextDecoration.BOLD);
+    }
+
+    @Override
+    public List<Component> getLines(final Player player) {
+        // faction-specific lines
+    }
 }
 ```
 
-### Cleanup
+### Updating a Sidebar
 
-Call `cleanup()` when a player disconnects to free all state:
+Fire `SidebarUpdateEvent` to trigger a line refresh for a player:
 ```java
-this.scoreboardManager.cleanup(player.getUniqueId());
+// Update whatever sidebar is currently active
+UtilEvent.dispatch(new SidebarUpdateEvent(player));
+
+// Only update if the active sidebar matches the given identifier
+UtilEvent.dispatch(new SidebarUpdateEvent("hub", player));
 ```
 
-### BoardBuilder API
+---
 
-| Method | Description |
-|---|---|
-| `pair(NamedTextColor, String, String)` | Bold coloured label + white value + blank spacer |
-| `line(Component)` | Single component line + blank spacer |
-| `lineCompact(Component)` | Single component line, no trailing spacer |
-| `blank()` | Empty spacer line |
+## Team System
+
+The framework provides a packet-based team system for per-viewer prefix/suffix resolution. Each online player has a team entry sent individually to every viewer, allowing relation-aware nametag colors (e.g. faction ally vs enemy).
+
+### Defining a Team Manager
+
+Extend `AbstractTeamManager` in your plugin and register it as a service:
+```java
+@Service
+public class TeamManager extends AbstractTeamManager<CorePlugin> {}
+```
+
+### Defining a Team
+
+Implement `Team` and register it as a component. Lower priority teams win when multiple are eligible:
+
+```java
+@AllArgsConstructor
+@Component
+public class RankTeam implements Team {
+
+    private final PlayerManager playerManager;
+
+    @Override
+    public String getIdentifier() {
+        return "rank";
+    }
+
+    @Override
+    public int getPriority() {
+        return 10; // fallback
+    }
+
+    @Override
+    public Component getPrefix(final Player player, final Player viewer) {
+        final String rank = this.playerManager.getPlayerData(player).getRank();
+        return Component.text("[" + rank + "] ", NamedTextColor.GOLD);
+    }
+}
+```
+
+```java
+@AllArgsConstructor
+@Component
+public class FactionsTeam implements Team {
+
+    private final FactionsManager factionsManager;
+
+    @Override
+    public String getIdentifier() {
+        return "factions";
+    }
+
+    @Override
+    public int getPriority() {
+        return 0; // wins over RankTeam
+    }
+
+    @Override
+    public boolean canDisplay(final Player player, final Player viewer) {
+        return this.factionsManager.isInFaction(player);
+    }
+
+    @Override
+    public Component getPrefix(final Player player, final Player viewer) {
+        final FactionRelation relation = this.factionsManager.getRelation(viewer, player);
+        return switch (relation) {
+            case ALLY -> Component.text("[ALLY] ", NamedTextColor.GREEN);
+            case ENEMY -> Component.text("[ENEMY] ", NamedTextColor.RED);
+            default -> Component.text("[NEUTRAL] ", NamedTextColor.YELLOW);
+        };
+    }
+}
+```
+
+### Updating a Team
+
+Fire `TeamUpdateEvent` to push prefix/suffix updates to all viewers:
+```java
+// Update this player's team for all viewers
+UtilEvent.dispatch(new TeamUpdateEvent(player));
+
+// Only update if the active team matches the given identifier
+UtilEvent.dispatch(new TeamUpdateEvent("factions", player));
+```
 
 ---
 
@@ -405,7 +494,7 @@ net.minecraft.network.chat.Component nmsComponent = UtilNms.toNms(adventureCompo
 UtilNms.sendPacket(player, packet);
 ```
 
-Packet sending writes directly to the Netty channel pipeline, bypassing the main thread. This is what enables the scoreboard system to run entirely asynchronously.
+Packet sending writes directly to the Netty channel pipeline, bypassing the main thread. This is what enables the sidebar and team systems to run without blocking the main thread.
 
 ---
 
@@ -425,15 +514,15 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 
 | Type | Sender | Use Case |
 |---|---|---|
-| `Command` | `CommandSender` | Any sender |
-| `PlayerCommand` | `Player` | Player-only commands |
-| `ServerCommand` | `ConsoleCommandSender` | Console-only commands |
+| `BaseCommand<Plugin, Manager, CommandSender>` | `CommandSender` | Any sender |
+| `BaseCommand<Plugin, Manager, Player>` | `Player` | Player-only commands |
+| `BaseCommand<Plugin, Manager, ConsoleCommandSender>` | `ConsoleCommandSender` | Console-only commands |
 
 | SubCommand Type | Sender | Use Case |
 |---|---|---|
-| `SubCommand` | `CommandSender` | Any sender |
-| `PlayerSubCommand` | `Player` | Player-only subcommands |
-| `ServerSubCommand` | `ConsoleCommandSender` | Console-only subcommands |
+| `BaseSubCommand<Plugin, Command, CommandSender>` | `CommandSender` | Any sender |
+| `BaseSubCommand<Plugin, Command, Player>` | `Player` | Player-only subcommands |
+| `BaseSubCommand<Plugin, Command, ConsoleCommandSender>` | `ConsoleCommandSender` | Console-only subcommands |
 
 ---
 
@@ -452,12 +541,26 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 
 | Event | Fired When |
 |---|---|
-| `CommandExecuteEvent` | Root command is about to execute |
-| `CommandTabCompleteEvent` | Root command tab completion is requested |
-| `SubCommandExecuteEvent` | Subcommand is about to execute |
-| `SubCommandTabCompleteEvent` | Subcommand tab completion is requested |
+| `CommandExecuteEvent` | Any command or subcommand is about to execute |
+| `CommandTabCompleteEvent` | Any command or subcommand tab completion is requested |
 
 All events are cancellable. Cancelling an execute event prevents execution; cancelling a tab complete event returns an empty list.
+
+---
+
+## Sidebar Events
+
+| Event | Fired When |
+|---|---|
+| `SidebarUpdateEvent` | A sidebar update is requested for a player |
+
+---
+
+## Team Events
+
+| Event | Fired When |
+|---|---|
+| `TeamUpdateEvent` | A team prefix/suffix update is requested for a player |
 
 ---
 
@@ -466,13 +569,8 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 | Interface | Description |
 |---|---|
 | `SpigotPlugin` | Root plugin with automatic Bukkit registration callbacks |
-| `SpigotManager` | Spigot-bound manager within the hierarchy |
-| `SpigotModule` | Spigot-bound module (commands, listeners) |
-| `SpigotSubModule` | Spigot-bound sub-module (subcommands) |
-| `ICommandSettings` | Pluggable permission checks and command messaging |
-| `ISharedCommand` | Shared contract between commands and subcommands |
-| `IAbstractCommand` | Command contract with subcommand management |
-| `IAbstractSubCommand` | SubCommand contract with internal execution entry points |
+| `SharedCommand` | Shared contract between commands and subcommands — sender validation, permission, execution, and tab-complete |
+| `IBaseCommand` | Command contract with subcommand management |
+| `Sidebar` | Contract for a priority-sorted sidebar implementation |
+| `Team` | Contract for a priority-sorted, per-viewer team prefix/suffix implementation |
 | `ICustomCancellableEvent` | Cancellable event with reason support |
-| `ICommandEvent` | Shared contract for command-related events |
-| `IScoreboardManager` | Scoreboard lifecycle — set, remove, priority check, and cleanup |

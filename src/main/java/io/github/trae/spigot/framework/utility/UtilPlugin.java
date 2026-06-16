@@ -2,8 +2,12 @@ package io.github.trae.spigot.framework.utility;
 
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.utilities.UtilJava;
+import lombok.Getter;
 import lombok.experimental.UtilityClass;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.LinkedHashMap;
+import java.util.Locale;
 
 /**
  * Utility class for retrieving active {@link SpigotPlugin} instances.
@@ -15,6 +19,21 @@ import org.bukkit.plugin.java.JavaPlugin;
  */
 @UtilityClass
 public class UtilPlugin {
+
+    @Getter
+    private static final LinkedHashMap<String, SpigotPlugin> internalPluginMap = new LinkedHashMap<>();
+
+    public static void addInternalPlugin(final SpigotPlugin spigotPlugin) {
+        internalPluginMap.put(spigotPlugin.getPluginName().toUpperCase(Locale.ROOT), spigotPlugin);
+    }
+
+    public static void removeInternalPlugin(final SpigotPlugin spigotPlugin) {
+        internalPluginMap.remove(spigotPlugin.getPluginName().toUpperCase(Locale.ROOT));
+    }
+
+    public static SpigotPlugin getInternalPluginByName(final String name) {
+        return internalPluginMap.getOrDefault(name.toUpperCase(Locale.ROOT), null);
+    }
 
     /**
      * Returns the active plugin instance for the given concrete plugin class.
