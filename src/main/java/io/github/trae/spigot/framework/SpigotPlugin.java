@@ -2,11 +2,12 @@ package io.github.trae.spigot.framework;
 
 import io.github.trae.di.InjectorApi;
 import io.github.trae.hf.Plugin;
-import io.github.trae.spigot.framework.command.abstracts.AbstractCommand;
-import io.github.trae.spigot.framework.command.subcommand.abstracts.AbstractSubCommand;
+import io.github.trae.spigot.framework.command.BaseCommand;
+import io.github.trae.spigot.framework.command.BaseSubCommand;
 import io.github.trae.spigot.framework.plugin.events.PluginInitializeEvent;
 import io.github.trae.spigot.framework.plugin.events.PluginShutdownEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
+import io.github.trae.spigot.framework.utility.UtilPlugin;
 import io.github.trae.spigot.framework.utility.UtilTask;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
@@ -52,6 +53,8 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
         Plugin.super.initializePlugin();
 
         UtilEvent.dispatch(new PluginInitializeEvent(this));
+
+        UtilPlugin.addInternalPlugin(this);
     }
 
     /**
@@ -64,6 +67,8 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
         UtilEvent.dispatch(new PluginShutdownEvent(this));
 
         Plugin.super.shutdownPlugin();
+
+        UtilPlugin.removeInternalPlugin(this);
     }
 
     /**
@@ -74,8 +79,8 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
      * performs automatic Bukkit registration based on the component type:</p>
      * <ul>
      *     <li>{@link Listener} — registered with the Bukkit event system</li>
-     *     <li>{@link AbstractCommand} — registered with the server's {@link org.bukkit.command.CommandMap}</li>
-     *     <li>{@link AbstractSubCommand} — attached to its parent command's subcommand map</li>
+     *     <li>{@link BaseCommand} — registered with the server's {@link org.bukkit.command.CommandMap}</li>
+     *     <li>{@link BaseSubCommand} — attached to its parent command's subcommand map</li>
      * </ul>
      *
      * @param instance the component being initialized
@@ -88,12 +93,12 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
             Bukkit.getServer().getPluginManager().registerEvents(listener, this);
         }
 
-        if (instance instanceof final AbstractCommand<?, ?, ?> abstractCommand) {
-            Bukkit.getServer().getCommandMap().register(abstractCommand.getLabel(), this.getName(), abstractCommand);
+        if (instance instanceof final BaseCommand<?, ?, ?> baseCommand) {
+            Bukkit.getServer().getCommandMap().register(baseCommand.getLabel(), this.getName(), baseCommand.getSpigotCommandWrapper());
         }
 
-        if (instance instanceof final AbstractSubCommand<?, ?, ?> abstractSubCommand) {
-            abstractSubCommand.getModule().addSubCommand(abstractSubCommand);
+        if (instance instanceof final BaseSubCommand<?, ?, ?> baseSubCommand) {
+            baseSubCommand.getModule().$addSubCommand(baseSubCommand);
         }
     }
 
@@ -105,26 +110,26 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
      * performs automatic Bukkit deregistration based on the component type:</p>
      * <ul>
      *     <li>{@link Listener} — unregistered from all handler lists</li>
-     *     <li>{@link AbstractCommand} — unregistered from the server's {@link org.bukkit.command.CommandMap}</li>
-     *     <li>{@link AbstractSubCommand} — removed from its parent command's subcommand map</li>
+     *     <li>{@link BaseCommand} — unregistered from the server's {@link org.bukkit.command.CommandMap}</li>
+     *     <li>{@link BaseSubCommand} — removed from its parent command's subcommand map</li>
      * </ul>
      *
      * @param instance the component being shut down
      */
     @Override
     public void onComponentShutdown(final Object instance) {
-        Plugin.super.onComponentShutdown(instance);
-
         if (instance instanceof final Listener listener) {
             HandlerList.unregisterAll(listener);
         }
 
-        if (instance instanceof final AbstractCommand<?, ?, ?> abstractCommand) {
-            abstractCommand.unregister(Bukkit.getServer().getCommandMap());
+        if (instance instanceof final BaseCommand<?, ?, ?> baseCommand) {
+            baseCommand.getSpigotCommandWrapper().unregister(Bukkit.getServer().getCommandMap());
         }
 
-        if (instance instanceof final AbstractSubCommand<?, ?, ?> abstractSubCommand) {
-            abstractSubCommand.getModule().removeSubCommand(abstractSubCommand);
+        if (instance instanceof final BaseSubCommand<?, ?, ?> baseSubCommand) {
+            baseSubCommand.getModule().$removeSubCommand(baseSubCommand);
         }
+
+        Plugin.super.onComponentShutdown(instance);
     }
 }

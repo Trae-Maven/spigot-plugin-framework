@@ -1,36 +1,28 @@
 package io.github.trae.spigot.framework.command.events;
 
-import io.github.trae.spigot.framework.command.abstracts.AbstractCommand;
-import io.github.trae.spigot.framework.command.events.interfaces.ICommandEvent;
+import io.github.trae.spigot.framework.command.interfaces.SharedCommand;
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.command.CommandSender;
 
 /**
- * Fired when a root command's tab completion is about to be processed.
- *
- * <p>This cancellable event is dispatched after sender type validation and
- * permission checks have passed, but before the command's concrete tab
- * completion logic is invoked. Cancelling this event returns an empty
- * completion list to the sender.</p>
+ * Fired before tab-complete suggestions are returned via {@link SharedCommand#$getTabComplete}.
+ * <p>
+ * Cancelling this event causes an empty suggestion list to be returned. Can be listened to
+ * by any plugin to intercept or suppress tab-completion globally.
  */
 @AllArgsConstructor
 @Getter
-public class CommandTabCompleteEvent extends CustomCancellableEvent implements ICommandEvent {
+public class CommandTabCompleteEvent extends CustomCancellableEvent {
 
     /**
-     * The command being tab-completed.
+     * The command whose tab-completion is being requested.
      */
-    private final AbstractCommand<?, ?, ?> command;
+    private final SharedCommand<?> command;
 
     /**
-     * The sender requesting tab completions.
+     * The sender requesting tab-complete suggestions.
      */
     private final CommandSender sender;
-
-    /**
-     * The current arguments being typed.
-     */
-    private final String[] args;
 }
