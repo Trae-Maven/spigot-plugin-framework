@@ -31,8 +31,8 @@ public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand 
     /**
      * Constructs a subcommand without a permission node.
      * <p>
-     * Equivalent to calling {@link #BaseSubCommand(String, String, List, String)} with {@code null}
-     * as the permission, meaning all senders of the correct type may execute it.
+     * Equivalent to the full constructor with {@code null} as the permission,
+     * meaning all senders of the correct type may execute it.
      *
      * @param label       the primary label used to invoke this subcommand
      * @param description a short description of this subcommand
