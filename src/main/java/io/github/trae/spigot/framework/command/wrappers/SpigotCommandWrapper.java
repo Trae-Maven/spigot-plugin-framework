@@ -46,9 +46,9 @@ public class SpigotCommandWrapper extends BukkitCommand {
     @Override
     public boolean execute(@NotNull final CommandSender commandSender, @NotNull final String commandLabel, @NotNull final String @NotNull [] args) {
         if (args.length > 0) {
-            final Optional<BaseSubCommand<?, ?, ?>> subCommandOptional = this.baseCommand.getSubCommandByLabel(args[0]);
-            if (subCommandOptional.isPresent()) {
-                return subCommandOptional.get().$execute(commandSender, Arrays.copyOfRange(args, 1, args.length));
+            final Optional<BaseSubCommand<?, ?, ?>> baseSubCommandOptional = this.baseCommand.getSubCommandByLabel(args[0]);
+            if (baseSubCommandOptional.isPresent()) {
+                return baseSubCommandOptional.get().$execute(commandSender, Arrays.copyOfRange(args, 1, args.length));
             }
         }
 
@@ -68,9 +68,9 @@ public class SpigotCommandWrapper extends BukkitCommand {
     @Override
     public @NotNull List<String> tabComplete(@NotNull final CommandSender commandSender, @NotNull final String alias, @NotNull final String @NotNull [] args) throws IllegalArgumentException {
         if (args.length > 0) {
-            final Optional<BaseSubCommand<?, ?, ?>> subCommandOptional = this.baseCommand.getSubCommandByLabel(args[0]);
-            if (subCommandOptional.isPresent()) {
-                return subCommandOptional.get().$getTabComplete(commandSender, Arrays.copyOfRange(args, 1, args.length));
+            final Optional<BaseSubCommand<?, ?, ?>> baseSubCommandOptional = this.baseCommand.getSubCommandByLabel(args[0]);
+            if (baseSubCommandOptional.isPresent()) {
+                return baseSubCommandOptional.get().$getTabComplete(commandSender, Arrays.copyOfRange(args, 1, args.length));
             }
         }
 

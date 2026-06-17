@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.command;
 import io.github.trae.hf.SubModule;
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.spigot.framework.command.interfaces.SharedBaseCommand;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.command.CommandSender;
 
@@ -19,27 +20,13 @@ import java.util.List;
  * @param <ParentCommand> the parent {@link BaseCommand} type
  * @param <Sender>        the expected {@link CommandSender} type
  */
+@AllArgsConstructor
 @Getter
 public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand extends BaseCommand<Plugin, ?, ?>, Sender extends CommandSender> implements SubModule<Plugin, ParentCommand>, SharedBaseCommand<Sender> {
 
     private final String label, description;
     private final List<String> aliases;
     private final String permission;
-
-    /**
-     * Constructs a subcommand with a permission node.
-     *
-     * @param label       the primary label used to invoke this subcommand
-     * @param description a short description of this subcommand
-     * @param aliases     alternative labels for this subcommand
-     * @param permission  the permission node required to execute this subcommand
-     */
-    public BaseSubCommand(final String label, final String description, final List<String> aliases, final String permission) {
-        this.label = label;
-        this.description = description;
-        this.permission = permission;
-        this.aliases = aliases;
-    }
 
     /**
      * Constructs a subcommand without a permission node.
