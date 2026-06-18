@@ -35,9 +35,9 @@ public class UtilSearch {
      * @param <Type>            the element type
      * @return the matched element, or {@link Optional#empty()} if zero or multiple matches were found
      */
-    public static <Type> Optional<Type> search(final Collection<? extends Type> collection, final Predicate<Type> typePredicate, final Predicate<Type> equalsPredicate, final Predicate<Type> containsPredicate, final Consumer<List<Type>> listConsumer, final Function<String, String> colorFunction, final Function<Type, String> resultFunction, final String prefix, final CommandSender commandSender, final String input, final boolean inform) {
+    public static <Type> Optional<Type> search(final Class<Type> clazz, final Collection<? extends Type> collection, final Predicate<Type> typePredicate, final Predicate<Type> equalsPredicate, final Predicate<Type> containsPredicate, final Consumer<List<Type>> listConsumer, final Function<String, String> colorFunction, final Function<Type, String> resultFunction, final String prefix, final CommandSender commandSender, final String input, final boolean inform) {
         final Consumer<String> messageConsumer = message -> UtilMessage.message(commandSender, prefix, message);
 
-        return UtilCollection.search(collection, typePredicate, equalsPredicate, containsPredicate, listConsumer, messageConsumer, colorFunction, resultFunction, input, inform);
+        return UtilCollection.search(clazz, collection, typePredicate, equalsPredicate, containsPredicate, listConsumer, messageConsumer, colorFunction, resultFunction, input, inform);
     }
 }
