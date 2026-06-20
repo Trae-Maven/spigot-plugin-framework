@@ -50,11 +50,11 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
      */
     @Override
     public void initializePlugin() {
+        UtilPlugin.addInternalPlugin(this);
+
         Plugin.super.initializePlugin();
 
         UtilEvent.dispatch(new PluginInitializeEvent(this));
-
-        UtilPlugin.addInternalPlugin(this);
     }
 
     /**
