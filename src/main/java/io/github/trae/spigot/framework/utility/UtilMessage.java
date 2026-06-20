@@ -91,6 +91,24 @@ public class UtilMessage {
     }
 
     /**
+     * Serializes a {@link Component} into its MiniMessage string representation,
+     * appending a trailing {@code <reset>} so styling does not bleed into surrounding
+     * text when the result is inlined into a larger MiniMessage string.
+     *
+     * <p>Not a clean round-trip: the trailing {@code <reset>} means
+     * {@code deserialize(serializeWithReset(component))} is not equivalent to
+     * {@code component}. Use {@link #serialize(Component)} where an exact round-trip is
+     * needed. Note also that {@code <reset>} clears color and decorations only, not
+     * interaction data such as hover or click events.</p>
+     *
+     * @param component the component to serialize
+     * @return the MiniMessage string with a trailing {@code <reset>}
+     */
+    public static String serializeWithReset(final Component component) {
+        return MINI_MESSAGE.serialize(component) + "<reset>";
+    }
+
+    /**
      * Deserializes a MiniMessage string into a {@link Component}.
      *
      * @param string the raw MiniMessage string
