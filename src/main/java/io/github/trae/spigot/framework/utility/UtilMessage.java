@@ -22,7 +22,7 @@ import java.util.UUID;
  * clickable links ({@code <click:open_url:'https://...'>text</click>}), translations
  * ({@code <lang:key>}), and more.</p>
  *
- * <p>Both the message body and the prefix accept either a {@link String} (parsed as MiniMessage)
+ * <p>Both the message body and the prefix accept either a {@link String} (deserialized as MiniMessage)
  * or a pre-built {@link Component}.</p>
  */
 @UtilityClass
@@ -77,17 +77,27 @@ public class UtilMessage {
     private static String prefixFormat = "[%s] ";
 
     // -----------------------------------------------------------------------
-    // Parsing & prefix resolution
+    // Serialization & prefix resolution
     // -----------------------------------------------------------------------
 
     /**
-     * Parses a MiniMessage string into a {@link Component}.
+     * Serializes a {@link Component} into its MiniMessage string representation.
      *
-     * @param message the raw MiniMessage string
-     * @return the parsed component
+     * @param component the component to serialize
+     * @return the MiniMessage string
      */
-    public static Component parse(final String message) {
-        return MINI_MESSAGE.deserialize(message);
+    public static String serialize(final Component component) {
+        return MINI_MESSAGE.serialize(component);
+    }
+
+    /**
+     * Deserializes a MiniMessage string into a {@link Component}.
+     *
+     * @param string the raw MiniMessage string
+     * @return the deserialized component
+     */
+    public static Component deserialize(final String string) {
+        return MINI_MESSAGE.deserialize(string);
     }
 
     /**
@@ -127,15 +137,15 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage body and applies the appropriate base color where none was specified.
+     * Deserializes a MiniMessage body and applies the appropriate base color where none was specified.
      * Uses {@link #messageNamedTextColor} when a prefix is present, otherwise {@link #resetNamedTextColor}.
      *
      * @param prefixed whether a prefix is present
      * @param message  the raw MiniMessage body
-     * @return the parsed, base-colored body component
+     * @return the deserialized, base-colored body component
      */
     private static Component resolveBody(final boolean prefixed, final String message) {
-        return parse(message).colorIfAbsent(prefixed ? messageNamedTextColor : resetNamedTextColor);
+        return deserialize(message).colorIfAbsent(prefixed ? messageNamedTextColor : resetNamedTextColor);
     }
 
     // -----------------------------------------------------------------------
@@ -157,7 +167,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage string and sends it to a single audience.
+     * Deserializes a MiniMessage string and sends it to a single audience.
      *
      * @param audience the target audience
      * @param message  the raw MiniMessage string
@@ -189,7 +199,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage body and sends it with a {@link Component} prefix to a single audience.
+     * Deserializes a MiniMessage body and sends it with a {@link Component} prefix to a single audience.
      *
      * @param audience the target audience
      * @param prefix   the pre-built prefix component, or {@code null} for no prefix
@@ -200,7 +210,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage body and sends it with a {@link String} prefix to a single audience.
+     * Deserializes a MiniMessage body and sends it with a {@link String} prefix to a single audience.
      *
      * @param audience the target audience
      * @param prefix   the prefix label, or {@code null} for no prefix
@@ -253,7 +263,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage body and sends it with a {@link Component} prefix to a collection of
+     * Deserializes a MiniMessage body and sends it with a {@link Component} prefix to a collection of
      * players, optionally ignoring specific UUIDs.
      *
      * @param players the target players
@@ -272,7 +282,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage body and sends it with a {@link String} prefix to a collection of
+     * Deserializes a MiniMessage body and sends it with a {@link String} prefix to a collection of
      * players, optionally ignoring specific UUIDs.
      *
      * @param players the target players
@@ -366,7 +376,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses and broadcasts a {@link Component}-prefixed MiniMessage string to all online players,
+     * Deserializes and broadcasts a {@link Component}-prefixed MiniMessage string to all online players,
      * optionally ignoring specific UUIDs.
      *
      * @param prefix  the pre-built prefix component
@@ -382,7 +392,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses and broadcasts a {@link Component}-prefixed MiniMessage string to all online players.
+     * Deserializes and broadcasts a {@link Component}-prefixed MiniMessage string to all online players.
      *
      * @param prefix  the pre-built prefix component
      * @param message the raw MiniMessage body
@@ -392,7 +402,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses and broadcasts a {@link String}-prefixed MiniMessage string to all online players,
+     * Deserializes and broadcasts a {@link String}-prefixed MiniMessage string to all online players,
      * optionally ignoring specific UUIDs.
      *
      * @param prefix  the prefix label
@@ -408,7 +418,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses and broadcasts a {@link String}-prefixed MiniMessage string to all online players.
+     * Deserializes and broadcasts a {@link String}-prefixed MiniMessage string to all online players.
      *
      * @param prefix  the prefix label
      * @param message the raw MiniMessage body
@@ -418,7 +428,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses and broadcasts a MiniMessage string to all online players, optionally ignoring specific UUIDs.
+     * Deserializes and broadcasts a MiniMessage string to all online players, optionally ignoring specific UUIDs.
      *
      * @param message the raw MiniMessage string
      * @param ignored UUIDs to skip, or {@code null} to send to all
@@ -428,7 +438,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses and broadcasts a MiniMessage string to all online players.
+     * Deserializes and broadcasts a MiniMessage string to all online players.
      *
      * @param message the raw MiniMessage string
      */
@@ -470,7 +480,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage body and sends it with a {@link Component} prefix to the server console.
+     * Deserializes a MiniMessage body and sends it with a {@link Component} prefix to the server console.
      *
      * @param prefix  the pre-built prefix component
      * @param message the raw MiniMessage body
@@ -480,7 +490,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage body and sends it with a {@link String} prefix to the server console.
+     * Deserializes a MiniMessage body and sends it with a {@link String} prefix to the server console.
      *
      * @param prefix  the prefix label
      * @param message the raw MiniMessage body
@@ -490,7 +500,7 @@ public class UtilMessage {
     }
 
     /**
-     * Parses a MiniMessage string and sends it to the server console.
+     * Deserializes a MiniMessage string and sends it to the server console.
      *
      * @param message the raw MiniMessage string
      */
