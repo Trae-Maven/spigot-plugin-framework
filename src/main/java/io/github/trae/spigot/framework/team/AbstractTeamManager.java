@@ -35,33 +35,27 @@ import java.util.Optional;
 public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager<Plugin>, Listener {
 
     /**
-     * Creates and sends the eligible team for the given player/viewer pair, if any qualifies,
-     * registering the team and adding the player as its sole member.
+     * Registers (or replaces) the eligible team for the given player/viewer pair on the viewer's
+     * client and binds the target player as its member.
+     * <p>
+     * Sends two packets: an add-or-modify packet with {@code updatePlayers = true} (method
+     * {@code ADD}), then a player packet with {@code ADD}. The {@code false} (method {@code CHANGE})
+     * variant is deliberately not used: {@code CHANGE} only updates a team the client already has
+     * registered, so a pair whose team first becomes eligible after join — having never received an
+     * initial {@code ADD} — would have a {@code CHANGE} packet silently dropped. An {@code ADD}
+     * packet built from a memberless {@link PlayerTeam} also carries an empty roster, so the explicit
+     * player {@code ADD} packet is required to (re)bind the member. Both calls together are
+     * idempotent, so this serves equally for the initial display and for later updates.
      *
      * @param player the target player the team applies to
      * @param viewer the viewer the team is sent to
+     * @param team   the team supplying the options
      */
-    private void create(final Player player, final Player viewer) {
-        this.getEligibleTeam(player, viewer).ifPresent(team -> {
-            final PlayerTeam playerTeam = this.buildPlayerTeam(player, viewer, team);
-
-            UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createAddOrModifyPacket(playerTeam, true));
-            UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createPlayerPacket(playerTeam, player.getName(), ClientboundSetPlayerTeamPacket.Action.ADD));
-        });
-    }
-
-    /**
-     * Sends a modify packet for an already-registered team, updating its options (prefix, suffix,
-     * etc.) without re-adding the player entry.
-     *
-     * @param player the target player the team applies to
-     * @param viewer the viewer the update is sent to
-     * @param team   the team providing the new options
-     */
-    private void update(final Player player, final Player viewer, final Team team) {
+    private void send(final Player player, final Player viewer, final Team team) {
         final PlayerTeam playerTeam = this.buildPlayerTeam(player, viewer, team);
 
-        UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createAddOrModifyPacket(playerTeam, false));
+        UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createAddOrModifyPacket(playerTeam, true));
+        UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createPlayerPacket(playerTeam, player.getName(), ClientboundSetPlayerTeamPacket.Action.ADD));
     }
 
     /**
@@ -161,11 +155,11 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
             final Optional<Team> eligibleTeamOptional = this.getEligibleTeam(player, viewer);
 
             if (event.getIdentifier() == null) {
-                eligibleTeamOptional.ifPresentOrElse(team -> this.update(player, viewer, team), () -> this.remove(player, viewer));
+                eligibleTeamOptional.ifPresentOrElse(team -> this.send(player, viewer, team), () -> this.remove(player, viewer));
                 continue;
             }
 
-            eligibleTeamOptional.filter(team -> team.getIdentifier().equals(event.getIdentifier())).ifPresent(team -> this.update(player, viewer, team));
+            eligibleTeamOptional.filter(team -> team.getIdentifier().equals(event.getIdentifier())).ifPresent(team -> this.send(player, viewer, team));
         }
     }
 
@@ -180,10 +174,10 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
         final Player player = event.getPlayer();
 
         for (final Player viewer : Bukkit.getServer().getOnlinePlayers()) {
-            this.create(player, viewer);
+            this.getEligibleTeam(player, viewer).ifPresent(team -> this.send(player, viewer, team));
 
             if (!(player.equals(viewer))) {
-                this.create(viewer, player);
+                this.getEligibleTeam(viewer, player).ifPresent(team -> this.send(viewer, player, team));
             }
         }
     }

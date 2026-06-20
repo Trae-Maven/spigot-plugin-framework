@@ -79,6 +79,8 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
     /**
      * Creates and displays the given sidebar for the player by sending the objective, display-slot,
      * and all line packets, then caches the rendered title and lines.
+     * <p>
+     * Line {@code i} is sent at score {@code (size - 1 - i)} so the first line renders at the top.
      *
      * @param player  the player to display the sidebar to
      * @param sidebar the sidebar to create
@@ -114,10 +116,10 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
                 )
         ));
 
-        final int reversedIndex = lines.size() - 1;
+        final int size = lines.size();
 
-        for (int index = 0; index < lines.size(); index++) {
-            this.sendLine(player, identifier, lines.get(reversedIndex - index), index);
+        for (int index = 0; index < size; index++) {
+            this.sendLine(player, identifier, lines.get(index), size - 1 - index);
         }
 
         this.cachedTitleMap.put(player.getUniqueId(), title);
@@ -155,8 +157,13 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
 
     /**
      * Diffs the sidebar's current lines against the cached lines for the player and sends packets
-     * only for changed lines, removing any trailing lines that no longer exist. Updates the line
-     * cache afterwards.
+     * only for changed lines, removing any lines that no longer exist. Updates the line cache
+     * afterwards.
+     * <p>
+     * Line {@code i} maps to score {@code (size - 1 - i)}, matching {@link #create(Player, Sidebar)}.
+     * Lines are compared by their list index directly, so adding or removing a line only resends the
+     * lines whose content actually changed, and stale trailing scores from the previous (longer)
+     * render are removed.
      *
      * @param player  the player whose lines to update
      * @param sidebar the sidebar providing the new lines
@@ -165,32 +172,37 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         final List<Component> newLines = sidebar.getLines(player);
         final List<Component> oldLines = this.cachedLinesMap.getOrDefault(player.getUniqueId(), Collections.emptyList());
 
-        for (int index = 0; index < newLines.size(); index++) {
+        final int newSize = newLines.size();
+        final int oldSize = oldLines.size();
+
+        for (int index = 0; index < newSize; index++) {
             final Component newLine = newLines.get(index);
-            if (index >= oldLines.size() || !(newLine.equals(oldLines.get(index)))) {
-                this.sendLine(player, sidebar.getIdentifier(), newLine, index);
+            final Component oldLine = index < oldSize ? oldLines.get(index) : null;
+
+            if (!(newLine.equals(oldLine))) {
+                this.sendLine(player, sidebar.getIdentifier(), newLine, newSize - 1 - index);
             }
         }
 
-        for (int index = newLines.size(); index < oldLines.size(); index++) {
-            this.removeLine(player, sidebar.getIdentifier(), index);
+        for (int index = newSize; index < oldSize; index++) {
+            this.removeLine(player, sidebar.getIdentifier(), oldSize - 1 - index);
         }
 
         this.cachedLinesMap.put(player.getUniqueId(), newLines);
     }
 
     /**
-     * Sends a single score line to the player. The score entry name is keyed by player name and
-     * line index to keep each slot unique, and the score value doubles as the line ordering.
+     * Sends a single score line to the player. The score entry is keyed by player UUID and score to
+     * keep each slot unique and stable across renames, and the score value drives the line ordering.
      *
      * @param player     the player to send the line to
      * @param identifier the objective identifier
      * @param line       the line component
-     * @param score      the line index / score value
+     * @param score      the score value (higher renders nearer the top)
      */
     private void sendLine(final Player player, final String identifier, final Component line, final int score) {
         UtilNms.sendPacket(player, new ClientboundSetScorePacket(
-                "%s_%s".formatted(player.getName(), score),
+                this.getScoreOwner(player, score),
                 identifier,
                 score,
                 Optional.of(UtilNms.toNms(line)),
@@ -203,13 +215,10 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
      *
      * @param player     the player to remove the line from
      * @param identifier the objective identifier
-     * @param score      the line index / score value to remove
+     * @param score      the score value to remove
      */
     private void removeLine(final Player player, final String identifier, final int score) {
-        UtilNms.sendPacket(player, new ClientboundResetScorePacket(
-                "%s_%s".formatted(player.getName(), score),
-                identifier
-        ));
+        UtilNms.sendPacket(player, new ClientboundResetScorePacket(this.getScoreOwner(player, score), identifier));
     }
 
     /**
@@ -317,5 +326,17 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(final PlayerQuitEvent event) {
         this.clear(event.getPlayer());
+    }
+
+    /**
+     * Builds the unique score-holder name for a line slot from the player's UUID and score, keeping
+     * each line's entry stable across renames and distinct per score.
+     *
+     * @param player the player the line belongs to
+     * @param score  the score value identifying the line slot
+     * @return the score-holder name in the format {@code {uuid}:{score}}
+     */
+    private String getScoreOwner(final Player player, final int score) {
+        return "%s:%s".formatted(player.getUniqueId(), score);
     }
 }
