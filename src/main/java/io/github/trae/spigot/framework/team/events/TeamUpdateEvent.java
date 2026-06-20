@@ -1,5 +1,6 @@
 package io.github.trae.spigot.framework.team.events;
 
+import io.github.trae.spigot.framework.event.CustomEvent;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -15,7 +16,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class TeamUpdateEvent {
+public class TeamUpdateEvent extends CustomEvent {
 
     /**
      * The identifier of the team to scope this update to, or {@code null} to update the eligible team.
