@@ -18,6 +18,8 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages per-viewer player teams using direct NMS team packets.
@@ -27,12 +29,18 @@ import java.util.Optional;
  * team's prefix, suffix, and other options. Because resolution is per-pair, the same target player
  * can present different nametag decorations to different viewers — enabling relation-aware coloring.
  * <p>
- * Teams are keyed uniquely per player/viewer pair so they never collide. Player join and quit are
- * handled automatically, as are {@link TeamUpdateEvent}s.
+ * Teams are keyed uniquely per player/viewer pair so they never collide, and the set of currently
+ * displayed pairs is tracked so removals only fire for pairs that actually have a team registered.
+ * Player join and quit are handled automatically, as are {@link TeamUpdateEvent}s. Whether a pair
+ * is eligible at all is decided entirely by {@link #getEligibleTeam(Player, Player)}, so any
+ * suppression (such as a per-player preference) is expressed through a team's display checks rather
+ * than at the event level.
  *
  * @param <Plugin> the plugin type this manager belongs to
  */
 public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager<Plugin>, Listener {
+
+    private final Set<String> activeTeamSet = ConcurrentHashMap.newKeySet();
 
     /**
      * Registers (or replaces) the eligible team for the given player/viewer pair on the viewer's
@@ -51,25 +59,49 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
      * @param viewer the viewer the team is sent to
      * @param team   the team supplying the options
      */
-    private void send(final Player player, final Player viewer, final Team team) {
-        final PlayerTeam playerTeam = this.buildPlayerTeam(player, viewer, team);
+    private void create(final Player player, final Player viewer, final Team team) {
+        final String teamName = this.getTeamName(player, viewer);
+
+        final PlayerTeam playerTeam = this.buildPlayerTeam(teamName, player, viewer, team);
 
         UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createAddOrModifyPacket(playerTeam, true));
         UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createPlayerPacket(playerTeam, player.getName(), ClientboundSetPlayerTeamPacket.Action.ADD));
+
+        this.activeTeamSet.add(teamName);
     }
 
     /**
      * Removes the player/viewer team from the viewer's client by detaching the player entry and
      * removing the team itself.
+     * <p>
+     * No-ops when the pair has no team currently registered, so this is safe to call
+     * unconditionally and never emits stray removal packets.
      *
      * @param player the target player whose team to remove
      * @param viewer the viewer the removal is sent to
      */
     private void remove(final Player player, final Player viewer) {
-        final PlayerTeam playerTeam = new PlayerTeam(new Scoreboard(), this.getTeamName(player, viewer));
+        final String teamName = this.getTeamName(player, viewer);
+
+        if (!(this.activeTeamSet.remove(teamName))) {
+            return;
+        }
+
+        final PlayerTeam playerTeam = new PlayerTeam(new Scoreboard(), teamName);
 
         UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createPlayerPacket(playerTeam, player.getName(), ClientboundSetPlayerTeamPacket.Action.REMOVE));
         UtilNms.sendPacket(viewer, ClientboundSetPlayerTeamPacket.createRemovePacket(playerTeam));
+    }
+
+    /**
+     * Re-resolves the eligible team for the given pair and applies the result: creates the team if
+     * one qualifies, otherwise removes any team the pair currently has.
+     *
+     * @param player the target player the team applies to
+     * @param viewer the viewer the team is rendered for
+     */
+    private void refresh(final Player player, final Player viewer) {
+        this.getEligibleTeam(player, viewer).ifPresentOrElse(team -> this.create(player, viewer, team), () -> this.remove(player, viewer));
     }
 
     /**
@@ -78,13 +110,14 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
      * Options that return {@code null} are skipped, leaving the underlying {@link PlayerTeam}
      * default in place rather than overriding it.
      *
-     * @param player the target player the team applies to
-     * @param viewer the viewer the team is rendered for
-     * @param team   the team supplying the options
+     * @param teamName the pre-computed unique team name for the pair
+     * @param player   the target player the team applies to
+     * @param viewer   the viewer the team is rendered for
+     * @param team     the team supplying the options
      * @return the populated {@link PlayerTeam}
      */
-    private PlayerTeam buildPlayerTeam(final Player player, final Player viewer, final Team team) {
-        final PlayerTeam playerTeam = new PlayerTeam(new Scoreboard(), this.getTeamName(player, viewer));
+    private PlayerTeam buildPlayerTeam(final String teamName, final Player player, final Player viewer, final Team team) {
+        final PlayerTeam playerTeam = new PlayerTeam(new Scoreboard(), teamName);
 
         // Display Name
         Optional.ofNullable(team.getDisplayName(player, viewer)).ifPresent(component -> playerTeam.setDisplayName(UtilNms.toNms(component)));
@@ -139,11 +172,12 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
     }
 
     /**
-     * Handles a {@link TeamUpdateEvent} by refreshing the player's team for every online viewer.
+     * Handles a {@link TeamUpdateEvent} by re-resolving the player's team for every online viewer.
      * <p>
-     * When the event is unscoped, each viewer's eligible team is re-resolved and either updated or
-     * removed if none qualify. When scoped to an identifier, only viewers whose eligible team
-     * matches that identifier are updated.
+     * An unscoped event re-resolves each pair and creates or removes the team accordingly. A scoped
+     * event creates the team only for pairs whose eligible team matches the event identifier, and
+     * removes it from all others. A pair that resolves to no eligible team is always removed, so
+     * suppression handled inside the team display checks tears the pair down on the next update.
      *
      * @param event the team update event
      */
@@ -152,19 +186,19 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
         final Player player = event.getPlayer();
 
         for (final Player viewer : Bukkit.getServer().getOnlinePlayers()) {
-            final Optional<Team> eligibleTeamOptional = this.getEligibleTeam(player, viewer);
-
             if (event.getIdentifier() == null) {
-                eligibleTeamOptional.ifPresentOrElse(team -> this.send(player, viewer, team), () -> this.remove(player, viewer));
+                this.refresh(player, viewer);
                 continue;
             }
 
-            eligibleTeamOptional.filter(team -> team.getIdentifier().equals(event.getIdentifier())).ifPresent(team -> this.send(player, viewer, team));
+            this.getEligibleTeam(player, viewer)
+                    .filter(team -> team.getIdentifier().equals(event.getIdentifier()))
+                    .ifPresentOrElse(team -> this.create(player, viewer, team), () -> this.remove(player, viewer));
         }
     }
 
     /**
-     * On join, sends the joining player's team to all viewers and, reciprocally, sends every other
+     * On join, sends the joining player's team to every viewer and, reciprocally, sends every other
      * online player's team to the joining player.
      *
      * @param event the player join event
@@ -174,16 +208,19 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
         final Player player = event.getPlayer();
 
         for (final Player viewer : Bukkit.getServer().getOnlinePlayers()) {
-            this.getEligibleTeam(player, viewer).ifPresent(team -> this.send(player, viewer, team));
+            this.refresh(player, viewer);
 
             if (!(player.equals(viewer))) {
-                this.getEligibleTeam(viewer, player).ifPresent(team -> this.send(viewer, player, team));
+                this.refresh(viewer, player);
             }
         }
     }
 
     /**
-     * On quit, removes the quitting player's team from every online viewer.
+     * On quit, removes the quitting player's team in both directions for every other online player:
+     * the quitting player's team is removed from each viewer, and each viewer's team is removed from
+     * the quitting player. This clears every tracked pair involving the quitting player, leaving no
+     * stale entries.
      *
      * @param event the player quit event
      */
@@ -191,8 +228,12 @@ public class AbstractTeamManager<Plugin extends SpigotPlugin> implements Manager
     public void onPlayerQuit(final PlayerQuitEvent event) {
         final Player player = event.getPlayer();
 
-        for (final Player target : Bukkit.getServer().getOnlinePlayers()) {
-            this.remove(player, target);
+        for (final Player viewer : Bukkit.getServer().getOnlinePlayers()) {
+            this.remove(player, viewer);
+
+            if (!(player.equals(viewer))) {
+                this.remove(viewer, player);
+            }
         }
     }
 }
