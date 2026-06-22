@@ -41,6 +41,12 @@ import java.util.concurrent.TimeUnit;
  * cached per player so that updates only send packets for content that actually changed,
  * eliminating flicker.
  * <p>
+ * Each line is bound to a score-holder keyed by its list index ({@code {uuid}:{index}}) rather than
+ * by its score, so a line's entry stays stable even when the line count changes and the displayed
+ * score (which only drives ordering) shifts. This keeps the index-based diff in
+ * {@link #updateLines(Player, Sidebar)} correct across additions and removals without orphaning
+ * entries.
+ * <p>
  * A scheduler re-evaluates eligibility and drives animated (non-static) titles. Player join and
  * quit are handled automatically, as are {@link SidebarUpdateEvent}s.
  *
@@ -61,7 +67,7 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
      * and switch to the next eligible sidebar. Otherwise {@link #updateTitle(Player)} is called to
      * refresh animated titles.
      */
-    @Scheduler(period = 100, unit = TimeUnit.MILLISECONDS)
+    @Scheduler(period = 100, unit = TimeUnit.MILLISECONDS, asynchronous = true)
     public void onScheduler() {
         for (final Player player : Bukkit.getServer().getOnlinePlayers()) {
             final Sidebar activeSidebar = this.activeSidebarMap.get(player.getUniqueId());
@@ -80,7 +86,8 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
      * Creates and displays the given sidebar for the player by sending the objective, display-slot,
      * and all line packets, then caches the rendered title and lines.
      * <p>
-     * Line {@code i} is sent at score {@code (size - 1 - i)} so the first line renders at the top.
+     * Line {@code i} is sent at score {@code (size - 1 - i)} so the first line renders at the top,
+     * with its entry keyed by index via {@link #getScoreOwner(Player, int)}.
      *
      * @param player  the player to display the sidebar to
      * @param sidebar the sidebar to create
@@ -90,36 +97,15 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         final Component title = sidebar.getTitle(player);
         final List<Component> lines = sidebar.getLines(player);
 
-        UtilNms.sendPacket(player, new ClientboundSetObjectivePacket(
-                new Objective(
-                        new Scoreboard(),
-                        identifier,
-                        ObjectiveCriteria.DUMMY,
-                        UtilNms.toNms(title),
-                        ObjectiveCriteria.RenderType.INTEGER,
-                        false,
-                        null
-                ),
-                ClientboundSetObjectivePacket.METHOD_ADD
-        ));
+        final Objective objective = this.buildObjective(identifier, title);
 
-        UtilNms.sendPacket(player, new ClientboundSetDisplayObjectivePacket(
-                DisplaySlot.SIDEBAR,
-                new Objective(
-                        new Scoreboard(),
-                        identifier,
-                        ObjectiveCriteria.DUMMY,
-                        UtilNms.toNms(title),
-                        ObjectiveCriteria.RenderType.INTEGER,
-                        false,
-                        null
-                )
-        ));
+        UtilNms.sendPacket(player, new ClientboundSetObjectivePacket(objective, ClientboundSetObjectivePacket.METHOD_ADD));
+        UtilNms.sendPacket(player, new ClientboundSetDisplayObjectivePacket(DisplaySlot.SIDEBAR, objective));
 
         final int size = lines.size();
 
         for (int index = 0; index < size; index++) {
-            this.sendLine(player, identifier, lines.get(index), size - 1 - index);
+            this.sendLine(player, identifier, index, lines.get(index), size - 1 - index);
         }
 
         this.cachedTitleMap.put(player.getUniqueId(), title);
@@ -130,7 +116,9 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
      * Re-resolves the active sidebar's title for the player and, if it changed since last render,
      * sends a title-change packet and updates the cache.
      * <p>
-     * No-op if the player has no active sidebar or its title is static.
+     * No-op if the player has no active sidebar or its title is static (animation disabled). For
+     * static titles that change in response to an event rather than the timer, the title is
+     * refreshed by {@link #refreshTitle(Player, Sidebar)} on the update path instead.
      *
      * @param player the player whose title to refresh
      */
@@ -140,7 +128,19 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
             return;
         }
 
-        final Component newTitle = activeSidebar.getTitle(player);
+        this.refreshTitle(player, activeSidebar);
+    }
+
+    /**
+     * Re-resolves the sidebar's title for the player and, if it differs from the cached title, sends
+     * a title-change packet and updates the cache. Unlike {@link #updateTitle(Player)}, this does
+     * not skip static titles, so it catches event-driven title changes.
+     *
+     * @param player  the player whose title to refresh
+     * @param sidebar the active sidebar providing the title
+     */
+    private void refreshTitle(final Player player, final Sidebar sidebar) {
+        final Component newTitle = sidebar.getTitle(player);
         final Component cachedTitle = this.cachedTitleMap.get(player.getUniqueId());
 
         if (newTitle.equals(cachedTitle)) {
@@ -148,7 +148,7 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         }
 
         UtilNms.sendPacket(player, new ClientboundSetObjectivePacket(
-                new Objective(new Scoreboard(), activeSidebar.getIdentifier(), ObjectiveCriteria.DUMMY, UtilNms.toNms(newTitle), ObjectiveCriteria.RenderType.INTEGER, false, null),
+                this.buildObjective(sidebar.getIdentifier(), newTitle),
                 ClientboundSetObjectivePacket.METHOD_CHANGE
         ));
 
@@ -157,13 +157,13 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
 
     /**
      * Diffs the sidebar's current lines against the cached lines for the player and sends packets
-     * only for changed lines, removing any lines that no longer exist. Updates the line cache
-     * afterwards.
+     * only for changed lines, removing any trailing lines that no longer exist. Updates the line
+     * cache afterwards.
      * <p>
-     * Line {@code i} maps to score {@code (size - 1 - i)}, matching {@link #create(Player, Sidebar)}.
-     * Lines are compared by their list index directly, so adding or removing a line only resends the
-     * lines whose content actually changed, and stale trailing scores from the previous (longer)
-     * render are removed.
+     * Each line is compared by its list index. The line's entry is keyed by index (stable across
+     * length changes), while its score {@code (size - 1 - index)} only drives ordering. Because a
+     * length change shifts every score, a changed line is always re-sent with its current score,
+     * and trailing indices beyond the new size are reset.
      *
      * @param player  the player whose lines to update
      * @param sidebar the sidebar providing the new lines
@@ -179,30 +179,32 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
             final Component newLine = newLines.get(index);
             final Component oldLine = index < oldSize ? oldLines.get(index) : null;
 
-            if (!(newLine.equals(oldLine))) {
-                this.sendLine(player, sidebar.getIdentifier(), newLine, newSize - 1 - index);
+            // Re-send when the content changed, or when a length change shifted this line's score.
+            if (!(newLine.equals(oldLine)) || newSize != oldSize) {
+                this.sendLine(player, sidebar.getIdentifier(), index, newLine, newSize - 1 - index);
             }
         }
 
         for (int index = newSize; index < oldSize; index++) {
-            this.removeLine(player, sidebar.getIdentifier(), oldSize - 1 - index);
+            this.removeLine(player, sidebar.getIdentifier(), index);
         }
 
         this.cachedLinesMap.put(player.getUniqueId(), newLines);
     }
 
     /**
-     * Sends a single score line to the player. The score entry is keyed by player UUID and score to
-     * keep each slot unique and stable across renames, and the score value drives the line ordering.
+     * Sends a single score line to the player. The score entry is keyed by player UUID and line
+     * index to keep each slot stable across length changes, while the score value drives ordering.
      *
      * @param player     the player to send the line to
      * @param identifier the objective identifier
+     * @param index      the line's list index, used to key the score-holder
      * @param line       the line component
      * @param score      the score value (higher renders nearer the top)
      */
-    private void sendLine(final Player player, final String identifier, final Component line, final int score) {
+    private void sendLine(final Player player, final String identifier, final int index, final Component line, final int score) {
         UtilNms.sendPacket(player, new ClientboundSetScorePacket(
-                this.getScoreOwner(player, score),
+                this.getScoreOwner(player, index),
                 identifier,
                 score,
                 Optional.of(UtilNms.toNms(line)),
@@ -211,14 +213,14 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
     }
 
     /**
-     * Removes a single score line from the player by resetting its score entry.
+     * Removes a single score line from the player by resetting its score entry, keyed by line index.
      *
      * @param player     the player to remove the line from
      * @param identifier the objective identifier
-     * @param score      the score value to remove
+     * @param index      the line's list index whose entry to reset
      */
-    private void removeLine(final Player player, final String identifier, final int score) {
-        UtilNms.sendPacket(player, new ClientboundResetScorePacket(this.getScoreOwner(player, score), identifier));
+    private void removeLine(final Player player, final String identifier, final int index) {
+        UtilNms.sendPacket(player, new ClientboundResetScorePacket(this.getScoreOwner(player, index), identifier));
     }
 
     /**
@@ -237,17 +239,28 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         }
 
         UtilNms.sendPacket(player, new ClientboundSetObjectivePacket(
-                new Objective(
-                        new Scoreboard(),
-                        activeSidebar.getIdentifier(),
-                        ObjectiveCriteria.DUMMY,
-                        UtilNms.toNms(activeSidebar.getTitle(player)),
-                        ObjectiveCriteria.RenderType.INTEGER,
-                        false,
-                        null
-                ),
+                this.buildObjective(activeSidebar.getIdentifier(), activeSidebar.getTitle(player)),
                 ClientboundSetObjectivePacket.METHOD_REMOVE
         ));
+    }
+
+    /**
+     * Builds a dummy sidebar {@link Objective} with the given identifier and rendered title.
+     *
+     * @param identifier the objective identifier
+     * @param title      the rendered title component
+     * @return the objective
+     */
+    private Objective buildObjective(final String identifier, final Component title) {
+        return new Objective(
+                new Scoreboard(),
+                identifier,
+                ObjectiveCriteria.DUMMY,
+                UtilNms.toNms(title),
+                ObjectiveCriteria.RenderType.INTEGER,
+                false,
+                null
+        );
     }
 
     /**
@@ -268,10 +281,11 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
     /**
      * Handles a {@link SidebarUpdateEvent}.
      * <p>
-     * If the event is scoped to an identifier that does not match the player's active sidebar, the
-     * event is ignored. Otherwise the eligible sidebar is re-resolved: if none qualify the sidebar
-     * is cleared; if the same sidebar remains active its lines are diffed and updated; if a
-     * different sidebar wins the old one is cleared and the new one created.
+     * A cancelled event clears the player's sidebar. If the event is scoped to an identifier that
+     * does not match the player's active sidebar, it is ignored. Otherwise the eligible sidebar is
+     * re-resolved: if none qualify the sidebar is cleared; if the same sidebar remains active its
+     * title and lines are diffed and updated; if a different sidebar wins the old one is cleared and
+     * the new one created.
      *
      * @param event the sidebar update event
      */
@@ -280,6 +294,13 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         final Player player = event.getPlayer();
 
         final Sidebar activeSidebar = this.activeSidebarMap.get(player.getUniqueId());
+
+        if (event.isCancelled()) {
+            if (activeSidebar != null) {
+                this.clear(player);
+            }
+            return;
+        }
 
         if (event.getIdentifier() != null && (activeSidebar == null || !(activeSidebar.getIdentifier().equals(event.getIdentifier())))) {
             return;
@@ -294,6 +315,7 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
         final Sidebar eligibleSidebar = eligibleSidebarOptional.get();
 
         if (activeSidebar != null && activeSidebar.getIdentifier().equals(eligibleSidebar.getIdentifier())) {
+            this.refreshTitle(player, eligibleSidebar);
             this.updateLines(player, eligibleSidebar);
         } else {
             this.clear(player);
@@ -329,14 +351,14 @@ public class AbstractSidebarManager<Plugin extends SpigotPlugin> implements Mana
     }
 
     /**
-     * Builds the unique score-holder name for a line slot from the player's UUID and score, keeping
-     * each line's entry stable across renames and distinct per score.
+     * Builds the unique score-holder name for a line slot from the player's UUID and the line's list
+     * index, keeping each line's entry stable across length changes and distinct per index.
      *
      * @param player the player the line belongs to
-     * @param score  the score value identifying the line slot
-     * @return the score-holder name in the format {@code {uuid}:{score}}
+     * @param index  the line's list index identifying the slot
+     * @return the score-holder name in the format {@code {uuid}:{index}}
      */
-    private String getScoreOwner(final Player player, final int score) {
-        return "%s:%s".formatted(player.getUniqueId(), score);
+    private String getScoreOwner(final Player player, final int index) {
+        return "%s:%s".formatted(player.getUniqueId(), index);
     }
 }

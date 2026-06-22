@@ -1,6 +1,6 @@
 package io.github.trae.spigot.framework.sidebar.events;
 
-import io.github.trae.spigot.framework.event.CustomEvent;
+import io.github.trae.spigot.framework.event.CustomCancellableEvent;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -16,7 +16,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class SidebarUpdateEvent extends CustomEvent {
+public class SidebarUpdateEvent extends CustomCancellableEvent {
 
     /**
      * The identifier of the sidebar to scope this update to, or {@code null} to update the active sidebar.
