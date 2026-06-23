@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.command;
 import io.github.trae.hf.Manager;
 import io.github.trae.hf.Module;
 import io.github.trae.spigot.framework.SpigotPlugin;
+import io.github.trae.spigot.framework.command.constants.DefaultSuggestions;
 import io.github.trae.spigot.framework.command.interfaces.IBaseCommand;
 import io.github.trae.spigot.framework.command.interfaces.SharedBaseCommand;
 import io.github.trae.spigot.framework.command.wrappers.SpigotCommandWrapper;
@@ -66,6 +67,21 @@ public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager ext
      */
     public BaseCommand(final String label, final String description, final List<String> aliases) {
         this(label, description, aliases, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * For the first argument, suggests the labels of registered subcommands; deeper arguments fall
+     * back to the {@link SharedBaseCommand} default.
+     */
+    @Override
+    public List<String> getTabComplete(final Sender sender, final String[] args) {
+        if (args.length == 1) {
+            return DefaultSuggestions.SUB_COMMANDS.apply(this, sender, args[0]);
+        }
+
+        return SharedBaseCommand.super.getTabComplete(sender, args);
     }
 
     /**
