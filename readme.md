@@ -20,11 +20,12 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - NMS utilities for direct packet sending and Adventure-to-vanilla component conversion
 - Custom event base classes with cancellation reasons
 - Compatible with Bukkit, Spigot, and Paper
-- Designed for modern Java (Java 21+)
+- Designed for modern Java (Java 25+)
 
 ---
 
 ## Hierarchy
+
 ```
 SpigotPlugin (extends JavaPlugin, implements Plugin)
   └─ Manager
@@ -34,18 +35,18 @@ SpigotPlugin (extends JavaPlugin, implements Plugin)
 
 Commands integrate directly into the hierarchy as Modules, and subcommands as SubModules:
 
-| Component | Hierarchy Role | Bukkit Integration |
-|---|---|---|
-| `SpigotPlugin` | Plugin | `JavaPlugin` lifecycle, component registration |
-| `Manager` | Manager | Organizational grouping |
-| `BaseCommand` | Module | Registered with `CommandMap` |
-| `BaseSubCommand` | SubModule | Attached to parent command |
+| Component        | Hierarchy Role | Bukkit Integration                             |
+|------------------|----------------|------------------------------------------------|
+| `SpigotPlugin`   | Plugin         | `JavaPlugin` lifecycle, component registration |
+| `Manager`        | Manager        | Organizational grouping                        |
+| `BaseCommand`    | Module         | Registered with `CommandMap`                   |
+| `BaseSubCommand` | SubModule      | Attached to parent command                     |
 
 ---
 
 ## Requirements
 
-Spigot-Plugin-Framework requires Java 21+ and a Paper API environment.
+Spigot-Plugin-Framework requires Java 25+ and a Paper API environment.
 
 ### NMS Access (paper-nms-maven-plugin)
 
@@ -54,25 +55,28 @@ The sidebar/team systems and `UtilNms` use NMS (net.minecraft.server) classes di
 Add `.paper-nms` to your `.gitignore` — it contains locally generated dependencies.
 
 After cloning, run the init goal once to generate the NMS dependency in your local `.m2` repository:
+
 ```bash
-mvn ca.bkaw:paper-nms-maven-plugin:1.4.10:init -pl .
+mvn ca.bkaw:paper-nms-maven-plugin:1.4.11-SNAPSHOT:init -pl .
 ```
 
 > **Note:** If `mvn` is not on your PATH, you can run it through IntelliJ's Maven tool window: expand Plugins → `paper-nms` → double-click `paper-nms:init`.
 
-> **Note:** The init goal requires your `JAVA_HOME` to point to JDK 21. If it fails with a Java version error, set it before running:
+> **Note:** The init goal requires your `JAVA_HOME` to point to JDK 25. If it fails with a Java version error, set it before running:
 > ```bash
 > # PowerShell
-> $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
-> mvn ca.bkaw:paper-nms-maven-plugin:1.4.10:init -pl .
+> $env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
+> mvn ca.bkaw:paper-nms-maven-plugin:1.4.11-SNAPSHOT:init -pl .
 > ```
 
 The following is only needed at compile time for annotation processing:
+
 ```xml
+
 <dependency>
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <version>1.18.36</version>
+    <version>1.18.46</version>
     <scope>provided</scope>
 </dependency>
 ```
@@ -92,7 +96,9 @@ Spigot-Plugin-Framework depends on the following libraries, which are included a
 ## Installation
 
 Add the dependency to your Maven project:
+
 ```xml
+
 <dependencies>
     <dependency>
         <groupId>io.github.trae</groupId>
@@ -115,7 +121,9 @@ Add the dependency to your Maven project:
 ### Defining the Plugin
 
 Extend `SpigotPlugin` to get automatic listener, command, and subcommand registration:
+
 ```java
+
 @Application
 public class CorePlugin extends SpigotPlugin {
 
@@ -134,7 +142,9 @@ public class CorePlugin extends SpigotPlugin {
 ### Defining a Command
 
 Extend `BaseCommand` with the appropriate sender type. Permission is passed via the constructor:
+
 ```java
+
 @Component
 public class AccountCommand extends BaseCommand<CorePlugin, AccountManager, CommandSender> {
 
@@ -157,7 +167,9 @@ public class AccountCommand extends BaseCommand<CorePlugin, AccountManager, Comm
 ### Defining a SubCommand
 
 SubCommands are automatically attached to their parent command through the hierarchy:
+
 ```java
+
 @Component
 public class AccountAdminSubCommand extends BaseSubCommand<CorePlugin, AccountCommand, Player> {
 
@@ -194,6 +206,7 @@ public class AccountAdminSubCommand extends BaseSubCommand<CorePlugin, AccountCo
 This registers `/account admin` automatically — the parent `AccountCommand` routes the `admin` argument to `AccountAdminSubCommand` with the remaining args.
 
 ### Command Execution Flow
+
 ```
 /account admin
   │
@@ -206,66 +219,107 @@ This registers `/account admin` automatically — the parent `AccountCommand` ro
 ### Event Dispatch
 
 Use `UtilEvent` for thread-safe event dispatch:
+
 ```java
 // Synchronous — fire and inspect
 MyEvent event = UtilEvent.supply(new MyEvent());
-if (event.isCancelled()) {
+if(event.
+
+isCancelled()){
         return;
         }
 
 // Asynchronous — fire and forget
-        UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
+        UtilEvent.
+
+dispatchAsynchronous(new MyAsyncEvent());
 
 // Asynchronous — fire and chain
-        UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(e -> System.out.println("Done: " + e.isCancelled()));
+        UtilEvent.
+
+supplyAsynchronous(new MyAsyncEvent()).
+
+thenAccept(e ->System.out.
+
+println("Done: "+e.isCancelled()));
 ```
 
 ### Task Execution
 
 Use `UtilTask` for scheduling across Bukkit's threading model:
+
 ```java
 // Execute on the main server thread
-UtilTask.executeSynchronous(() -> {
-        player.teleport(spawn);
+UtilTask.executeSynchronous(() ->{
+        player.
+
+teleport(spawn);
 });
 
 // Execute asynchronously off the main thread
-        UtilTask.executeAsynchronous(() -> {
+        UtilTask.
+
+executeAsynchronous(() ->{
         // Heavy computation or I/O
         });
 
 // Repeating task on the main thread with cancellation
-        UtilTask.schedule(() -> {
-        player.sendMessage("Tick!");
-}, 0, 1, ChronoUnit.SECONDS, () -> !player.isOnline());
+        UtilTask.
+
+schedule(() ->{
+        player.
+
+sendMessage("Tick!");
+},0,1,ChronoUnit.SECONDS,()->!player.
+
+isOnline());
 
 // Repeating async task
-        UtilTask.scheduleAsynchronous(() -> {
+        UtilTask.
+
+scheduleAsynchronous(() ->{
         // Periodic background work
-        }, 0, 5, ChronoUnit.SECONDS);
+        },0,5,ChronoUnit.SECONDS);
 ```
 
 ### Messaging
 
 Use `UtilMessage` for MiniMessage-formatted messaging with configurable prefixes:
+
 ```java
 // Prefixed message to a player
-UtilMessage.message(player, "Factions", "You joined <aqua>Faction %s</aqua>.".formatted(faction.getName()));
+UtilMessage.message(player, "Factions","You joined <aqua>Faction %s</aqua>.".formatted(faction.getName()));
 
 // Prefixed message with MiniMessage tags
-        UtilMessage.message(player, "Shop", "<gold>+50 coins</gold> from daily reward!");
+        UtilMessage.
+
+message(player, "Shop","<gold>+50 coins</gold> from daily reward!");
 
 // Message a Collection of Players with Predicate and Ignored
-UtilMessage.message(players, "Punish", "<yellow>%s</yellow> has banned <yellow>%s</yellow> for <light_purple>%s</light_purple>.".formatted(sender.getName(), target.getName(), duration), player -> player.isOp(), Collections.singletonList(target.getUniqueId()));
+UtilMessage.
+
+message(players, "Punish","<yellow>%s</yellow> has banned <yellow>%s</yellow> for <light_purple>%s</light_purple>.".formatted(sender.getName(),target.
+
+getName(),duration),player ->player.
+
+isOp(),Collections.
+
+singletonList(target.getUniqueId()));
 
 // Broadcast to all online players
-        UtilMessage.broadcast("Server", "<red><bold>Restarting</bold></red> in <yellow>5 minutes</yellow>.");
+        UtilMessage.
+
+broadcast("Server","<red><bold>Restarting</bold></red> in <yellow>5 minutes</yellow>.");
 
 // Broadcast with ignore list
-UtilMessage.broadcast("Alert", "<red>PvP is now enabled!</red>", List.of(excludedPlayerUUID));
+UtilMessage.
+
+broadcast("Alert","<red>PvP is now enabled!</red>",List.of(excludedPlayerUUID));
 
 // Log to console
-        UtilMessage.log("Core", "Plugin loaded successfully!");
+        UtilMessage.
+
+log("Core","Plugin loaded successfully!");
 ```
 
 ---
@@ -277,7 +331,9 @@ The framework provides a packet-based sidebar (scoreboard) system with priority-
 ### Defining a Sidebar Manager
 
 Extend `AbstractSidebarManager` in your plugin and register it as a service:
+
 ```java
+
 @Service
 public class SidebarManager extends AbstractSidebarManager<CorePlugin> {}
 ```
@@ -287,6 +343,7 @@ public class SidebarManager extends AbstractSidebarManager<CorePlugin> {}
 Implement `Sidebar` and register it as a component. The manager discovers all implementations automatically via the dependency injector:
 
 ```java
+
 @AllArgsConstructor
 @Component
 public class HubSidebar implements Sidebar {
@@ -324,12 +381,13 @@ public class HubSidebar implements Sidebar {
 ### Animated Title
 
 Override `isStaticTitle()` to enable per-tick title updates driven by the manager's scheduler:
+
 ```java
 private int tick = 0;
 
 private static final List<TextColor> COLORS = List.of(
-    NamedTextColor.RED, NamedTextColor.GOLD, NamedTextColor.YELLOW,
-    NamedTextColor.GREEN, NamedTextColor.AQUA, NamedTextColor.LIGHT_PURPLE
+        NamedTextColor.RED, NamedTextColor.GOLD, NamedTextColor.YELLOW,
+        NamedTextColor.GREEN, NamedTextColor.AQUA, NamedTextColor.LIGHT_PURPLE
 );
 
 @Override
@@ -348,10 +406,11 @@ public Component getTitle(final Player player) {
 Lower priority always wins. When the lowest-numbered sidebar becomes ineligible, the next one takes over automatically:
 
 ```java
+
 @AllArgsConstructor
 @Component
 public class FactionsSidebar implements Sidebar {
-    
+
     private final FactionManager factionManager;
 
     @Override
@@ -384,12 +443,15 @@ public class FactionsSidebar implements Sidebar {
 ### Updating a Sidebar
 
 Fire `SidebarUpdateEvent` to trigger a line refresh for a player:
+
 ```java
 // Update whatever sidebar is currently active
 UtilEvent.dispatch(new SidebarUpdateEvent(player));
 
 // Only update if the active sidebar matches the given identifier
-UtilEvent.dispatch(new SidebarUpdateEvent("hub", player));
+        UtilEvent.
+
+dispatch(new SidebarUpdateEvent("hub", player));
 ```
 
 ---
@@ -401,7 +463,9 @@ The framework provides a packet-based team system for per-viewer prefix/suffix r
 ### Defining a Team Manager
 
 Extend `AbstractTeamManager` in your plugin and register it as a service:
+
 ```java
+
 @Service
 public class TeamManager extends AbstractTeamManager<CorePlugin> {}
 ```
@@ -411,6 +475,7 @@ public class TeamManager extends AbstractTeamManager<CorePlugin> {}
 Implement `Team` and register it as a component. Lower priority teams win when multiple are eligible:
 
 ```java
+
 @AllArgsConstructor
 @Component
 public class RankTeam implements Team {
@@ -430,12 +495,14 @@ public class RankTeam implements Team {
     @Override
     public Component getPrefix(final Player player, final Player viewer) {
         final String rank = this.playerManager.getPlayerData(player).getRank();
+
         return Component.text("[" + rank + "] ", NamedTextColor.GOLD);
     }
 }
 ```
 
 ```java
+
 @AllArgsConstructor
 @Component
 public class FactionsTeam implements Team {
@@ -472,12 +539,15 @@ public class FactionsTeam implements Team {
 ### Updating a Team
 
 Fire `TeamUpdateEvent` to push prefix/suffix updates to all viewers:
+
 ```java
 // Update this player's team for all viewers
 UtilEvent.dispatch(new TeamUpdateEvent(player));
 
 // Only update if the active team matches the given identifier
-UtilEvent.dispatch(new TeamUpdateEvent("factions", player));
+        UtilEvent.
+
+dispatch(new TeamUpdateEvent("factions", player));
 ```
 
 ---
@@ -491,7 +561,9 @@ UtilEvent.dispatch(new TeamUpdateEvent("factions", player));
 net.minecraft.network.chat.Component nmsComponent = UtilNms.toNms(adventureComponent);
 
 // Send a raw NMS packet to a player (safe from any thread)
-UtilNms.sendPacket(player, packet);
+UtilNms.
+
+sendPacket(player, packet);
 ```
 
 Packet sending writes directly to the Netty channel pipeline, bypassing the main thread. This is what enables the sidebar and team systems to run without blocking the main thread.
@@ -500,48 +572,48 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 
 ## Utilities
 
-| Utility | Description |
-|---|---|
-| `UtilEvent` | Synchronous and asynchronous event dispatch with supply variants |
-| `UtilTask` | Task scheduling — immediate, synchronous, asynchronous, and repeating with ChronoUnit-to-tick conversion |
-| `UtilMessage` | MiniMessage-based messaging with configurable prefixes, broadcasting, filtering, and ignore lists |
-| `UtilPlugin` | Plugin lookup — internal by name or class |
-| `UtilNms` | NMS packet sending and Adventure-to-vanilla component conversion |
+| Utility       | Description                                                                                              |
+|---------------|----------------------------------------------------------------------------------------------------------|
+| `UtilEvent`   | Synchronous and asynchronous event dispatch with supply variants                                         |
+| `UtilTask`    | Task scheduling — immediate, synchronous, asynchronous, and repeating with ChronoUnit-to-tick conversion |
+| `UtilMessage` | MiniMessage-based messaging with configurable prefixes, broadcasting, filtering, and ignore lists        |
+| `UtilPlugin`  | Plugin lookup — internal by name or class                                                                |
+| `UtilNms`     | NMS packet sending and Adventure-to-vanilla component conversion                                         |
 
 ---
 
 ## Command Types
 
-| Type | Sender | Use Case |
-|---|---|---|
-| `BaseCommand<Plugin, Manager, CommandSender>` | `CommandSender` | Any sender |
-| `BaseCommand<Plugin, Manager, Player>` | `Player` | Player-only commands |
+| Type                                                 | Sender                 | Use Case              |
+|------------------------------------------------------|------------------------|-----------------------|
+| `BaseCommand<Plugin, Manager, CommandSender>`        | `CommandSender`        | Any sender            |
+| `BaseCommand<Plugin, Manager, Player>`               | `Player`               | Player-only commands  |
 | `BaseCommand<Plugin, Manager, ConsoleCommandSender>` | `ConsoleCommandSender` | Console-only commands |
 
-| SubCommand Type | Sender | Use Case |
-|---|---|---|
-| `BaseSubCommand<Plugin, Command, CommandSender>` | `CommandSender` | Any sender |
-| `BaseSubCommand<Plugin, Command, Player>` | `Player` | Player-only subcommands |
+| SubCommand Type                                         | Sender                 | Use Case                 |
+|---------------------------------------------------------|------------------------|--------------------------|
+| `BaseSubCommand<Plugin, Command, CommandSender>`        | `CommandSender`        | Any sender               |
+| `BaseSubCommand<Plugin, Command, Player>`               | `Player`               | Player-only subcommands  |
 | `BaseSubCommand<Plugin, Command, ConsoleCommandSender>` | `ConsoleCommandSender` | Console-only subcommands |
 
 ---
 
 ## Event Types
 
-| Event Type | Description |
-|---|---|
-| `CustomEvent` | Base synchronous event with `Void` key type |
-| `CustomAsyncEvent` | Base asynchronous event with `Void` key type |
-| `CustomCancellableEvent` | Synchronous event with cancellation and reason |
+| Event Type                    | Description                                     |
+|-------------------------------|-------------------------------------------------|
+| `CustomEvent`                 | Base synchronous event with `Void` key type     |
+| `CustomAsyncEvent`            | Base asynchronous event with `Void` key type    |
+| `CustomCancellableEvent`      | Synchronous event with cancellation and reason  |
 | `CustomCancellableAsyncEvent` | Asynchronous event with cancellation and reason |
 
 ---
 
 ## Command Events
 
-| Event | Fired When |
-|---|---|
-| `CommandExecuteEvent` | Any command or subcommand is about to execute |
+| Event                     | Fired When                                            |
+|---------------------------|-------------------------------------------------------|
+| `CommandExecuteEvent`     | Any command or subcommand is about to execute         |
 | `CommandTabCompleteEvent` | Any command or subcommand tab completion is requested |
 
 All events are cancellable. Cancelling an execute event prevents execution; cancelling a tab complete event returns an empty list.
@@ -550,27 +622,27 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 
 ## Sidebar Events
 
-| Event | Fired When |
-|---|---|
+| Event                | Fired When                                 |
+|----------------------|--------------------------------------------|
 | `SidebarUpdateEvent` | A sidebar update is requested for a player |
 
 ---
 
 ## Team Events
 
-| Event | Fired When |
-|---|---|
+| Event             | Fired When                                            |
+|-------------------|-------------------------------------------------------|
 | `TeamUpdateEvent` | A team prefix/suffix update is requested for a player |
 
 ---
 
 ## Interfaces
 
-| Interface | Description |
-|---|---|
-| `SpigotPlugin` | Root plugin with automatic Bukkit registration callbacks |
-| `SharedCommand` | Shared contract between commands and subcommands — sender validation, permission, execution, and tab-complete |
-| `IBaseCommand` | Command contract with subcommand management |
-| `Sidebar` | Contract for a priority-sorted sidebar implementation |
-| `Team` | Contract for a priority-sorted, per-viewer team prefix/suffix implementation |
-| `ICustomCancellableEvent` | Cancellable event with reason support |
+| Interface                 | Description                                                                                                   |
+|---------------------------|---------------------------------------------------------------------------------------------------------------|
+| `SpigotPlugin`            | Root plugin with automatic Bukkit registration callbacks                                                      |
+| `SharedCommand`           | Shared contract between commands and subcommands — sender validation, permission, execution, and tab-complete |
+| `IBaseCommand`            | Command contract with subcommand management                                                                   |
+| `Sidebar`                 | Contract for a priority-sorted sidebar implementation                                                         |
+| `Team`                    | Contract for a priority-sorted, per-viewer team prefix/suffix implementation                                  |
+| `ICustomCancellableEvent` | Cancellable event with reason support                                                                         |
