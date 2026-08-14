@@ -6,6 +6,7 @@ import lombok.experimental.UtilityClass;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -24,6 +25,9 @@ import java.util.UUID;
  *
  * <p>Both the message body and the prefix accept either a {@link String} (deserialized as MiniMessage)
  * or a pre-built {@link Component}.</p>
+ *
+ * <p>Bodies passed as a {@link String} receive a base color where none was specified; bodies passed as
+ * a pre-built {@link Component} are sent untouched, so any styling must already be applied to them.</p>
  */
 @UtilityClass
 public class UtilMessage {
@@ -31,34 +35,44 @@ public class UtilMessage {
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     /**
-     * The {@link NamedTextColor} used for the prefix portion of messages.
+     * The {@link TextColor} used for the prefix portion of messages.
      *
      * <p>Defaults to {@link NamedTextColor#BLUE}.</p>
      */
     @Getter
     @Setter
-    private static NamedTextColor prefixNamedTextColor = NamedTextColor.BLUE;
+    private static TextColor prefixTextColor = NamedTextColor.BLUE;
 
     /**
-     * The {@link NamedTextColor} applied to the message body when a prefix is present.
+     * The {@link TextColor} applied to the message body when a prefix is present.
+     *
+     * <p>Only applied to bodies deserialized from a MiniMessage {@link String}, and only where the
+     * body did not specify its own color.</p>
      *
      * <p>Defaults to {@link NamedTextColor#GRAY}.</p>
      */
     @Getter
     @Setter
-    private static NamedTextColor messageNamedTextColor = NamedTextColor.GRAY;
+    private static TextColor messageTextColor = NamedTextColor.GRAY;
 
     /**
-     * The {@link NamedTextColor} used as a reset/default color.
+     * The {@link TextColor} used as a reset/default color, applied to the message body when no prefix
+     * is present.
+     *
+     * <p>Only applied to bodies deserialized from a MiniMessage {@link String}, and only where the
+     * body did not specify its own color.</p>
      *
      * <p>Defaults to {@link NamedTextColor#WHITE}.</p>
      */
     @Getter
     @Setter
-    private static NamedTextColor resetNamedTextColor = NamedTextColor.WHITE;
+    private static TextColor resetTextColor = NamedTextColor.WHITE;
 
     /**
      * Whether broadcasts should also be sent to the server console.
+     *
+     * <p>Applies to the {@code broadcast} methods only; direct {@code message} calls are never
+     * mirrored to the console.</p>
      *
      * <p>Defaults to {@code false}.</p>
      */
@@ -69,6 +83,9 @@ public class UtilMessage {
     /**
      * The format string used to construct the prefix text.
      * Must contain a single {@code %s} placeholder for the prefix name.
+     *
+     * <p>Applies only to prefixes supplied as a {@link String}; a pre-built {@link Component} prefix
+     * is used verbatim.</p>
      *
      * <p>Defaults to {@code "[%s] "}.</p>
      */
@@ -121,31 +138,32 @@ public class UtilMessage {
     /**
      * Builds a prefix {@link Component} from the configured {@link #prefixFormat} using the given color.
      *
-     * @param namedTextColor the color to apply to the prefix
-     * @param prefix         the prefix label, or {@code null} for an empty component
+     * @param textColor the color to apply to the prefix
+     * @param prefix    the prefix label, or {@code null} for an empty component
      * @return the formatted prefix component
      */
-    public static Component resolvePrefix(final NamedTextColor namedTextColor, final String prefix) {
+    public static Component resolvePrefix(final TextColor textColor, final String prefix) {
         if (prefix == null) {
             return Component.empty();
         }
 
-        return Component.text(prefixFormat.formatted(prefix), namedTextColor);
+        return Component.text(prefixFormat.formatted(prefix), textColor);
     }
 
     /**
      * Builds a prefix {@link Component} from the configured {@link #prefixFormat}, using the default
-     * {@link #prefixNamedTextColor}.
+     * {@link #prefixTextColor}.
      *
      * @param prefix the prefix label, or {@code null} for an empty component
      * @return the formatted prefix component
      */
     public static Component resolvePrefix(final String prefix) {
-        return resolvePrefix(prefixNamedTextColor, prefix);
+        return resolvePrefix(prefixTextColor, prefix);
     }
 
     /**
-     * Returns the given pre-built {@link Component} prefix as-is.
+     * Returns the given pre-built {@link Component} prefix as-is, without applying
+     * {@link #prefixFormat} or {@link #prefixTextColor}.
      *
      * @param prefix the pre-built prefix component, or {@code null} for an empty component
      * @return the prefix component, or {@link Component#empty()} if {@code null}
@@ -156,14 +174,14 @@ public class UtilMessage {
 
     /**
      * Deserializes a MiniMessage body and applies the appropriate base color where none was specified.
-     * Uses {@link #messageNamedTextColor} when a prefix is present, otherwise {@link #resetNamedTextColor}.
+     * Uses {@link #messageTextColor} when a prefix is present, otherwise {@link #resetTextColor}.
      *
      * @param prefixed whether a prefix is present
      * @param message  the raw MiniMessage body
      * @return the deserialized, base-colored body component
      */
     private static Component resolveBody(final boolean prefixed, final String message) {
-        return deserialize(message).colorIfAbsent(prefixed ? messageNamedTextColor : resetNamedTextColor);
+        return deserialize(message).colorIfAbsent(prefixed ? messageTextColor : resetTextColor);
     }
 
     // -----------------------------------------------------------------------
@@ -171,7 +189,7 @@ public class UtilMessage {
     // -----------------------------------------------------------------------
 
     /**
-     * Sends a pre-built {@link Component} to a single audience.
+     * Sends a pre-built {@link Component} to a single audience, unmodified.
      *
      * @param audience the target audience, or {@code null} (no-op)
      * @param message  the component to send
@@ -185,9 +203,10 @@ public class UtilMessage {
     }
 
     /**
-     * Deserializes a MiniMessage string and sends it to a single audience.
+     * Deserializes a MiniMessage string and sends it to a single audience, applying
+     * {@link #resetTextColor} where the body specified no color.
      *
-     * @param audience the target audience
+     * @param audience the target audience, or {@code null} (no-op)
      * @param message  the raw MiniMessage string
      */
     public static void message(final Audience audience, final String message) {
@@ -196,9 +215,10 @@ public class UtilMessage {
 
     /**
      * Sends a {@link Component}-prefixed, pre-built {@link Component} to a single audience.
+     * Neither part is recolored.
      *
-     * @param audience the target audience
-     * @param prefix   the pre-built prefix component
+     * @param audience the target audience, or {@code null} (no-op)
+     * @param prefix   the pre-built prefix component, or {@code null} for no prefix
      * @param message  the pre-built body component
      */
     public static void message(final Audience audience, final Component prefix, final Component message) {
@@ -207,9 +227,10 @@ public class UtilMessage {
 
     /**
      * Sends a {@link String}-prefixed, pre-built {@link Component} to a single audience.
+     * The body is not recolored.
      *
-     * @param audience the target audience
-     * @param prefix   the prefix label
+     * @param audience the target audience, or {@code null} (no-op)
+     * @param prefix   the prefix label, or {@code null} for no prefix
      * @param message  the pre-built body component
      */
     public static void message(final Audience audience, final String prefix, final Component message) {
@@ -219,7 +240,7 @@ public class UtilMessage {
     /**
      * Deserializes a MiniMessage body and sends it with a {@link Component} prefix to a single audience.
      *
-     * @param audience the target audience
+     * @param audience the target audience, or {@code null} (no-op)
      * @param prefix   the pre-built prefix component, or {@code null} for no prefix
      * @param message  the raw MiniMessage body
      */
@@ -230,7 +251,7 @@ public class UtilMessage {
     /**
      * Deserializes a MiniMessage body and sends it with a {@link String} prefix to a single audience.
      *
-     * @param audience the target audience
+     * @param audience the target audience, or {@code null} (no-op)
      * @param prefix   the prefix label, or {@code null} for no prefix
      * @param message  the raw MiniMessage body
      */
@@ -247,7 +268,7 @@ public class UtilMessage {
      * optionally ignoring specific UUIDs.
      *
      * @param players the target players
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the pre-built body component
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -266,7 +287,7 @@ public class UtilMessage {
      * optionally ignoring specific UUIDs.
      *
      * @param players the target players
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the pre-built body component
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -282,10 +303,10 @@ public class UtilMessage {
 
     /**
      * Deserializes a MiniMessage body and sends it with a {@link Component} prefix to a collection of
-     * players, optionally ignoring specific UUIDs.
+     * players, optionally ignoring specific UUIDs. The body is deserialized once per recipient.
      *
      * @param players the target players
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -301,10 +322,10 @@ public class UtilMessage {
 
     /**
      * Deserializes a MiniMessage body and sends it with a {@link String} prefix to a collection of
-     * players, optionally ignoring specific UUIDs.
+     * players, optionally ignoring specific UUIDs. The body is deserialized once per recipient.
      *
      * @param players the target players
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -324,9 +345,10 @@ public class UtilMessage {
 
     /**
      * Broadcasts a {@link Component}-prefixed, pre-built {@link Component} to all online players,
-     * optionally ignoring specific UUIDs.
+     * optionally ignoring specific UUIDs. Also sent to the console when
+     * {@link #broadcastForConsole} is enabled, regardless of {@code ignored}.
      *
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the pre-built body component
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -339,9 +361,10 @@ public class UtilMessage {
     }
 
     /**
-     * Broadcasts a {@link Component}-prefixed, pre-built {@link Component} to all online players.
+     * Broadcasts a {@link Component}-prefixed, pre-built {@link Component} to all online players,
+     * and to the console when {@link #broadcastForConsole} is enabled.
      *
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the pre-built body component
      */
     public static void broadcast(final Component prefix, final Component message) {
@@ -350,9 +373,10 @@ public class UtilMessage {
 
     /**
      * Broadcasts a {@link String}-prefixed, pre-built {@link Component} to all online players,
-     * optionally ignoring specific UUIDs.
+     * optionally ignoring specific UUIDs. Also sent to the console when
+     * {@link #broadcastForConsole} is enabled, regardless of {@code ignored}.
      *
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the pre-built body component
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -365,9 +389,10 @@ public class UtilMessage {
     }
 
     /**
-     * Broadcasts a {@link String}-prefixed, pre-built {@link Component} to all online players.
+     * Broadcasts a {@link String}-prefixed, pre-built {@link Component} to all online players,
+     * and to the console when {@link #broadcastForConsole} is enabled.
      *
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the pre-built body component
      */
     public static void broadcast(final String prefix, final Component message) {
@@ -375,7 +400,8 @@ public class UtilMessage {
     }
 
     /**
-     * Broadcasts a pre-built {@link Component} to all online players, optionally ignoring specific UUIDs.
+     * Broadcasts an unprefixed, pre-built {@link Component} to all online players, optionally ignoring
+     * specific UUIDs. Also sent to the console when {@link #broadcastForConsole} is enabled.
      *
      * @param message the component to broadcast
      * @param ignored UUIDs to skip, or {@code null} to send to all
@@ -385,7 +411,8 @@ public class UtilMessage {
     }
 
     /**
-     * Broadcasts a pre-built {@link Component} to all online players.
+     * Broadcasts an unprefixed, pre-built {@link Component} to all online players, and to the console
+     * when {@link #broadcastForConsole} is enabled.
      *
      * @param message the component to broadcast
      */
@@ -395,9 +422,10 @@ public class UtilMessage {
 
     /**
      * Deserializes and broadcasts a {@link Component}-prefixed MiniMessage string to all online players,
-     * optionally ignoring specific UUIDs.
+     * optionally ignoring specific UUIDs. Also sent to the console when
+     * {@link #broadcastForConsole} is enabled, regardless of {@code ignored}.
      *
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -410,9 +438,10 @@ public class UtilMessage {
     }
 
     /**
-     * Deserializes and broadcasts a {@link Component}-prefixed MiniMessage string to all online players.
+     * Deserializes and broadcasts a {@link Component}-prefixed MiniMessage string to all online players,
+     * and to the console when {@link #broadcastForConsole} is enabled.
      *
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      */
     public static void broadcast(final Component prefix, final String message) {
@@ -421,9 +450,10 @@ public class UtilMessage {
 
     /**
      * Deserializes and broadcasts a {@link String}-prefixed MiniMessage string to all online players,
-     * optionally ignoring specific UUIDs.
+     * optionally ignoring specific UUIDs. Also sent to the console when
+     * {@link #broadcastForConsole} is enabled, regardless of {@code ignored}.
      *
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      * @param ignored UUIDs to skip, or {@code null} to send to all
      */
@@ -436,9 +466,10 @@ public class UtilMessage {
     }
 
     /**
-     * Deserializes and broadcasts a {@link String}-prefixed MiniMessage string to all online players.
+     * Deserializes and broadcasts a {@link String}-prefixed MiniMessage string to all online players,
+     * and to the console when {@link #broadcastForConsole} is enabled.
      *
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      */
     public static void broadcast(final String prefix, final String message) {
@@ -446,7 +477,8 @@ public class UtilMessage {
     }
 
     /**
-     * Deserializes and broadcasts a MiniMessage string to all online players, optionally ignoring specific UUIDs.
+     * Deserializes and broadcasts an unprefixed MiniMessage string to all online players, optionally
+     * ignoring specific UUIDs. Also sent to the console when {@link #broadcastForConsole} is enabled.
      *
      * @param message the raw MiniMessage string
      * @param ignored UUIDs to skip, or {@code null} to send to all
@@ -456,7 +488,8 @@ public class UtilMessage {
     }
 
     /**
-     * Deserializes and broadcasts a MiniMessage string to all online players.
+     * Deserializes and broadcasts an unprefixed MiniMessage string to all online players, and to the
+     * console when {@link #broadcastForConsole} is enabled.
      *
      * @param message the raw MiniMessage string
      */
@@ -471,7 +504,7 @@ public class UtilMessage {
     /**
      * Sends a {@link Component}-prefixed, pre-built {@link Component} to the server console.
      *
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the pre-built body component
      */
     public static void log(final Component prefix, final Component message) {
@@ -481,7 +514,7 @@ public class UtilMessage {
     /**
      * Sends a {@link String}-prefixed, pre-built {@link Component} to the server console.
      *
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the pre-built body component
      */
     public static void log(final String prefix, final Component message) {
@@ -489,7 +522,7 @@ public class UtilMessage {
     }
 
     /**
-     * Sends a pre-built {@link Component} to the server console.
+     * Sends an unprefixed, pre-built {@link Component} to the server console.
      *
      * @param message the component to log
      */
@@ -500,7 +533,7 @@ public class UtilMessage {
     /**
      * Deserializes a MiniMessage body and sends it with a {@link Component} prefix to the server console.
      *
-     * @param prefix  the pre-built prefix component
+     * @param prefix  the pre-built prefix component, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      */
     public static void log(final Component prefix, final String message) {
@@ -510,7 +543,7 @@ public class UtilMessage {
     /**
      * Deserializes a MiniMessage body and sends it with a {@link String} prefix to the server console.
      *
-     * @param prefix  the prefix label
+     * @param prefix  the prefix label, or {@code null} for no prefix
      * @param message the raw MiniMessage body
      */
     public static void log(final String prefix, final String message) {
@@ -518,7 +551,7 @@ public class UtilMessage {
     }
 
     /**
-     * Deserializes a MiniMessage string and sends it to the server console.
+     * Deserializes an unprefixed MiniMessage string and sends it to the server console.
      *
      * @param message the raw MiniMessage string
      */
