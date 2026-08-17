@@ -20,7 +20,7 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - NMS utilities for direct packet sending and Adventure-to-vanilla component conversion
 - Custom event base classes with cancellation reasons
 - Compatible with Bukkit, Spigot, and Paper
-- Designed for modern Java (Java 25+)
+- Designed for modern Java (Java 21+)
 
 ---
 
@@ -46,7 +46,7 @@ Commands integrate directly into the hierarchy as Modules, and subcommands as Su
 
 ## Requirements
 
-Spigot-Plugin-Framework requires Java 25+ and a Paper API environment.
+Spigot-Plugin-Framework requires Java 21+ and a Paper API environment.
 
 ### NMS Access (paper-nms-maven-plugin)
 
@@ -57,16 +57,16 @@ Add `.paper-nms` to your `.gitignore` — it contains locally generated dependen
 After cloning, run the init goal once to generate the NMS dependency in your local `.m2` repository:
 
 ```bash
-mvn ca.bkaw:paper-nms-maven-plugin:1.4.11-SNAPSHOT:init -pl .
+mvn ca.bkaw:paper-nms-maven-plugin:1.5:init -pl .
 ```
 
 > **Note:** If `mvn` is not on your PATH, you can run it through IntelliJ's Maven tool window: expand Plugins → `paper-nms` → double-click `paper-nms:init`.
 
-> **Note:** The init goal requires your `JAVA_HOME` to point to JDK 25. If it fails with a Java version error, set it before running:
+> **Note:** The init goal requires your `JAVA_HOME` to point to JDK 21. If it fails with a Java version error, set it before running:
 > ```bash
 > # PowerShell
-> $env:JAVA_HOME = "C:\Program Files\Java\jdk-25"
-> mvn ca.bkaw:paper-nms-maven-plugin:1.4.11-SNAPSHOT:init -pl .
+> $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
+> mvn ca.bkaw:paper-nms-maven-plugin:1.5:init -pl .
 > ```
 
 The following is only needed at compile time for annotation processing:
