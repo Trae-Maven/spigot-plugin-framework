@@ -81,7 +81,7 @@ public class DefaultSuggestions {
     /**
      * Suggests the names of all online players, filtered by the current argument input.
      */
-    public static final Function<String, List<String>> ALL_PLAYERS = arg -> PLAYERS.apply(_ -> true, arg);
+    public static final Function<String, List<String>> ALL_PLAYERS = arg -> PLAYERS.apply(__ -> true, arg);
 
     /**
      * Suggests the names of all loaded worlds, filtered by the current argument input.
