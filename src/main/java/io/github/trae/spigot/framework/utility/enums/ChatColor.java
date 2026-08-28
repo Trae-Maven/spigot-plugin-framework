@@ -3,7 +3,7 @@ package io.github.trae.spigot.framework.utility.enums;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-import java.awt.*;
+import java.awt.Color;
 import java.util.HashMap;
 import java.util.Map;
 

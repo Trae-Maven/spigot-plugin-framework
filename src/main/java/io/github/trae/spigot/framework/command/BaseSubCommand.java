@@ -1,6 +1,6 @@
 package io.github.trae.spigot.framework.command;
 
-import io.github.trae.hf.SubModule;
+import io.github.trae.hf.Node;
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.spigot.framework.command.interfaces.SharedBaseCommand;
 import lombok.AllArgsConstructor;
@@ -12,9 +12,12 @@ import java.util.List;
 /**
  * Abstract base class for subcommands belonging to a {@link BaseCommand}.
  * <p>
- * Combines {@link SubModule} and {@link SharedBaseCommand} to provide a typed subcommand
- * with its own sender validation, permission check, and tab-complete logic. Subcommands
- * are registered into their parent via {@link io.github.trae.spigot.framework.command.interfaces.IBaseCommand#$addSubCommand}.
+ * Combines {@link Node} and {@link SharedBaseCommand} to provide a typed subcommand
+ * with its own sender validation, permission check, and tab-complete logic. The parent
+ * command is resolved through {@link Node#getParent()}, and subcommands are registered
+ * into it via {@link io.github.trae.spigot.framework.command.interfaces.IBaseCommand#$addSubCommand}
+ * by the plugin's component lifecycle
+ * ({@link SpigotPlugin#onComponentInitialize(Object)}), not by this class.
  *
  * @param <Plugin>        the plugin type this subcommand belongs to
  * @param <ParentCommand> the parent {@link BaseCommand} type
@@ -22,7 +25,7 @@ import java.util.List;
  */
 @AllArgsConstructor
 @Getter
-public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand extends BaseCommand<Plugin, ?, ?>, Sender extends CommandSender> implements SubModule<Plugin, ParentCommand>, SharedBaseCommand<Sender> {
+public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand extends BaseCommand<Plugin, ?, ?>, Sender extends CommandSender> implements Node<Plugin, ParentCommand>, SharedBaseCommand<Sender> {
 
     private final String label, description;
     private final List<String> aliases;
@@ -49,6 +52,6 @@ public abstract class BaseSubCommand<Plugin extends SpigotPlugin, ParentCommand 
      */
     @Override
     public String getUsage() {
-        return "%s %s".formatted(this.getModule().getUsage(), this.getLabel());
+        return "%s %s".formatted(this.getParent().getUsage(), this.getLabel());
     }
 }

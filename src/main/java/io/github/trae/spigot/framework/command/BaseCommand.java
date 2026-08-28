@@ -1,7 +1,7 @@
 package io.github.trae.spigot.framework.command;
 
 import io.github.trae.hf.Manager;
-import io.github.trae.hf.Module;
+import io.github.trae.hf.Node;
 import io.github.trae.spigot.framework.SpigotPlugin;
 import io.github.trae.spigot.framework.command.constants.DefaultSuggestions;
 import io.github.trae.spigot.framework.command.interfaces.IBaseCommand;
@@ -18,17 +18,18 @@ import java.util.Optional;
 /**
  * Abstract base class for top-level plugin commands.
  * <p>
- * Combines {@link Module}, {@link SharedBaseCommand}, and {@link IBaseCommand} to provide
- * a fully typed, self-registering command with built-in subcommand management.
- * A {@link SpigotCommandWrapper} is created automatically on construction and used
- * to bridge this command into Bukkit's command map.
+ * Combines {@link Node}, {@link SharedBaseCommand}, and {@link IBaseCommand} to provide
+ * a fully typed, self-registering command with built-in subcommand management. The command
+ * sits beneath its owning {@link Manager} in the hierarchy, which it resolves through
+ * {@link Node#getParent()}. A {@link SpigotCommandWrapper} is created automatically on
+ * construction and used to bridge this command into Bukkit's command map.
  *
  * @param <Plugin>        the plugin type this command belongs to
  * @param <SpigotManager> the manager type this command is scoped to
  * @param <Sender>        the expected {@link CommandSender} type
  */
 @Getter
-public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager extends Manager<Plugin>, Sender extends CommandSender> implements Module<Plugin, SpigotManager>, SharedBaseCommand<Sender>, IBaseCommand {
+public abstract class BaseCommand<Plugin extends SpigotPlugin, SpigotManager extends Manager<Plugin>, Sender extends CommandSender> implements Node<Plugin, SpigotManager>, SharedBaseCommand<Sender>, IBaseCommand {
 
     private final String label, description;
     private final List<String> aliases;

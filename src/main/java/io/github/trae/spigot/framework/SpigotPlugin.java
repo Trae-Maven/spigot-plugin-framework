@@ -43,10 +43,12 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
     }
 
     /**
-     * Initializes the plugin by running the hierarchy lifecycle via
-     * {@link Plugin#initializePlugin()}, then dispatching a
-     * {@link PluginInitializeEvent} to notify listeners that the
-     * plugin is fully initialized.
+     * Initializes the plugin.
+     *
+     * <p>Registers this plugin as an internal plugin first, so components resolving it
+     * during their own initialization see it, then runs the hierarchy lifecycle via
+     * {@link Plugin#initializePlugin()} and dispatches a {@link PluginInitializeEvent}
+     * to notify listeners that the plugin is fully initialized.</p>
      */
     @Override
     public void initializePlugin() {
@@ -59,8 +61,9 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
 
     /**
      * Dispatches a {@link PluginShutdownEvent} to notify listeners
-     * that the plugin is about to shut down, then runs the hierarchy
-     * teardown via {@link Plugin#shutdownPlugin()}.
+     * that the plugin is about to shut down, runs the hierarchy
+     * teardown via {@link Plugin#shutdownPlugin()}, then deregisters
+     * it as an internal plugin.
      */
     @Override
     public void shutdownPlugin() {
@@ -98,16 +101,17 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
         }
 
         if (instance instanceof final BaseSubCommand<?, ?, ?> baseSubCommand) {
-            baseSubCommand.getModule().$addSubCommand(baseSubCommand);
+            baseSubCommand.getParent().$addSubCommand(baseSubCommand);
         }
     }
 
     /**
      * Called when a component is shut down within the hierarchy.
      *
-     * <p>Delegates to {@link Plugin#onComponentShutdown(Object)} to
-     * invoke {@link io.github.trae.hf.Frame#shutdownFrame()}, then
-     * performs automatic Bukkit deregistration based on the component type:</p>
+     * <p>Performs automatic Bukkit deregistration based on the component type, then
+     * delegates to {@link Plugin#onComponentShutdown(Object)} to invoke
+     * {@link io.github.trae.hf.Frame#shutdownFrame()}, so the hook runs with the
+     * component still attached:</p>
      * <ul>
      *     <li>{@link Listener} — unregistered from all handler lists</li>
      *     <li>{@link BaseCommand} — unregistered from the server's {@link org.bukkit.command.CommandMap}</li>
@@ -127,7 +131,7 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
         }
 
         if (instance instanceof final BaseSubCommand<?, ?, ?> baseSubCommand) {
-            baseSubCommand.getModule().$removeSubCommand(baseSubCommand);
+            baseSubCommand.getParent().$removeSubCommand(baseSubCommand);
         }
 
         Plugin.super.onComponentShutdown(instance);

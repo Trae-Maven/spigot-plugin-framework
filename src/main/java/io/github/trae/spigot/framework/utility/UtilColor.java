@@ -3,7 +3,7 @@ package io.github.trae.spigot.framework.utility;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import lombok.experimental.UtilityClass;
 
-import java.awt.*;
+import java.awt.Color;
 
 /**
  * Utility class for color-related operations in chat formatting.
