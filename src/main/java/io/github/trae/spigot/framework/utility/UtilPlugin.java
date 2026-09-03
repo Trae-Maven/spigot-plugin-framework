@@ -9,6 +9,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -28,7 +29,6 @@ public class UtilPlugin {
     /**
      * Registry of framework plugins keyed by upper-cased plugin name, in registration order.
      */
-    @Getter
     private static final LinkedHashMap<String, SpigotPlugin> internalPluginMap = new LinkedHashMap<>();
 
     /**
@@ -36,6 +36,15 @@ public class UtilPlugin {
      * {@link #searchInternalPlugin(CommandSender, String, boolean, Predicate)}.
      */
     private static final InternalPluginSearchEngine INTERNAL_PLUGIN_SEARCH_ENGINE = new InternalPluginSearchEngine();
+
+    /**
+     * Returns an immutable snapshot of all registered internal plugins.
+     *
+     * @return an unmodifiable list of all {@link SpigotPlugin} instances
+     */
+    public static List<SpigotPlugin> getInternalPlugins() {
+        return List.copyOf(internalPluginMap.values());
+    }
 
     /**
      * Registers a plugin in the internal registry, replacing any existing entry under the same name.

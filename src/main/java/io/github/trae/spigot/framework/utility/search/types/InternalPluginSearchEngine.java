@@ -21,7 +21,7 @@ public class InternalPluginSearchEngine extends SpigotSearchEngine<SpigotPlugin>
      * Creates a search engine over the internal plugin registry.
      */
     public InternalPluginSearchEngine() {
-        super("Internal Plugin Search", () -> UtilPlugin.getInternalPluginMap().values());
+        super("Internal Plugin Search", UtilPlugin::getInternalPlugins);
     }
 
     /**
