@@ -104,7 +104,7 @@ public class DefaultSuggestions {
      * Suggests the names of all registered internal plugins, filtered by the current argument input.
      */
     public static final Function<String, List<String>> INTERNAL_PLUGINS = arg -> CUSTOM.apply(
-            UtilPlugin.getInternalPluginMap().values().stream().map(Plugin::getPluginName).toList(),
+            UtilPlugin.getInternalPlugins().stream().map(Plugin::getPluginName).toList(),
             arg
     );
 
