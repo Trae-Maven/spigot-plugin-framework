@@ -1,8 +1,11 @@
 package io.github.trae.spigot.framework.utility;
 
+import io.github.trae.spigot.framework.utility.search.types.OfflinePlayerSearchEngine;
+import io.github.trae.spigot.framework.utility.search.types.OnlinePlayerSearchEngine;
 import lombok.experimental.UtilityClass;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -14,9 +17,24 @@ import java.util.stream.Stream;
 
 /**
  * Utility methods for querying the state of the server.
+ *
+ * <p>Covers online and offline player lookups by unique id, exact name, and user-supplied search
+ * input, plus filtered snapshots of the online and offline player sets. Offline lookups are
+ * consistently restricted to players who have joined before, so a never-seen name or id resolves
+ * to an empty result rather than a fabricated {@link OfflinePlayer}.</p>
  */
 @UtilityClass
 public class UtilServer {
+
+    /**
+     * Search engine backing the {@code searchPlayer} helpers.
+     */
+    private static final OnlinePlayerSearchEngine ONLINE_PLAYER_SEARCH_ENGINE = new OnlinePlayerSearchEngine();
+
+    /**
+     * Search engine backing the {@code searchOfflinePlayer} helpers.
+     */
+    private static final OfflinePlayerSearchEngine OFFLINE_PLAYER_SEARCH_ENGINE = new OfflinePlayerSearchEngine();
 
     /**
      * Returns the currently online players, optionally filtered by a predicate.
@@ -42,6 +60,36 @@ public class UtilServer {
      */
     public static List<Player> getOnlinePlayers() {
         return getOnlinePlayers(null);
+    }
+
+    /**
+     * Searches the online players for the player identified by the given input.
+     *
+     * <p>An exact name match wins immediately, otherwise a single partial match is returned. An empty
+     * or ambiguous search yields an empty result and, when informing is enabled, messages the sender
+     * with the outcome.</p>
+     *
+     * @param sender    the sender to inform of the search outcome
+     * @param input     the search input
+     * @param inform    whether to message the sender when the search fails to resolve
+     * @param predicate an optional filter applied before matching, or null to consider every player
+     * @return the resolved player, or {@link Optional#empty()} if the search was empty or ambiguous
+     */
+    public static Optional<Player> searchOnlinePlayer(final CommandSender sender, final String input, final boolean inform, final Predicate<Player> predicate) {
+        return ONLINE_PLAYER_SEARCH_ENGINE.find(sender, input, inform, predicate);
+    }
+
+    /**
+     * Searches the online players for the player identified by the given input, without filtering.
+     *
+     * @param sender the sender to inform of the search outcome
+     * @param input  the search input
+     * @param inform whether to message the sender when the search fails to resolve
+     * @return the resolved player, or {@link Optional#empty()} if the search was empty or ambiguous
+     * @see #searchOnlinePlayer(CommandSender, String, boolean, Predicate)
+     */
+    public static Optional<Player> searchOnlinePlayer(final CommandSender sender, final String input, final boolean inform) {
+        return searchOnlinePlayer(sender, input, inform, null);
     }
 
     /**
@@ -122,5 +170,38 @@ public class UtilServer {
      */
     public static Optional<OfflinePlayer> getOfflinePlayerByName(final String name) {
         return Optional.ofNullable(Bukkit.getServer().getOfflinePlayerIfCached(name)).filter(OfflinePlayer::hasPlayedBefore);
+    }
+
+    /**
+     * Searches the known offline players for the player identified by the given input.
+     *
+     * <p>An exact name match wins immediately, otherwise a single partial match is returned. An empty
+     * or ambiguous search yields an empty result and, when informing is enabled, messages the sender
+     * with the outcome.</p>
+     *
+     * @param sender    the sender to inform of the search outcome
+     * @param input     the search input
+     * @param inform    whether to message the sender when the search fails to resolve
+     * @param predicate an optional filter applied before matching, or null to consider every player
+     * @return the resolved offline player, or {@link Optional#empty()} if the search was empty or
+     * ambiguous
+     */
+    public static Optional<OfflinePlayer> searchOfflinePlayer(final CommandSender sender, final String input, final boolean inform, final Predicate<OfflinePlayer> predicate) {
+        return OFFLINE_PLAYER_SEARCH_ENGINE.find(sender, input, inform, predicate);
+    }
+
+    /**
+     * Searches the known offline players for the player identified by the given input, without
+     * filtering.
+     *
+     * @param sender the sender to inform of the search outcome
+     * @param input  the search input
+     * @param inform whether to message the sender when the search fails to resolve
+     * @return the resolved offline player, or {@link Optional#empty()} if the search was empty or
+     * ambiguous
+     * @see #searchOfflinePlayer(CommandSender, String, boolean, Predicate)
+     */
+    public static Optional<OfflinePlayer> searchOfflinePlayer(final CommandSender sender, final String input, final boolean inform) {
+        return searchOfflinePlayer(sender, input, inform, null);
     }
 }
