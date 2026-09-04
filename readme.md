@@ -141,7 +141,7 @@ public class CorePlugin extends SpigotPlugin {
 Extend `BaseCommand` with the appropriate sender type. The second type parameter names the owning Manager, which the command resolves through `getParent()`. Permission is passed via the constructor:
 
 ```java
-@Component
+@Singleton
 public class AccountCommand extends BaseCommand<CorePlugin, AccountManager, CommandSender> {
 
     public AccountCommand() {
@@ -165,7 +165,7 @@ public class AccountCommand extends BaseCommand<CorePlugin, AccountManager, Comm
 The second type parameter names the parent command. Subcommands are attached to that parent automatically as each component is initialized:
 
 ```java
-@Component
+@Singleton
 public class AdminSubCommand extends BaseSubCommand<CorePlugin, AccountCommand, Player> {
 
     public AdminSubCommand() {
@@ -286,7 +286,7 @@ The framework provides a packet-based sidebar (scoreboard) system with priority-
 Extend `AbstractSidebarManager` in your plugin and register it as a service:
 
 ```java
-@Service
+@Singleton
 public class SidebarManager extends AbstractSidebarManager<CorePlugin> {}
 ```
 
@@ -296,7 +296,7 @@ Implement `Sidebar` and register it as a component. The manager discovers all im
 
 ```java
 @AllArgsConstructor
-@Component
+@Singleton
 public class HubSidebar implements Sidebar {
 
     private final PlayerManager playerManager;
@@ -358,7 +358,7 @@ Lower priority always wins. When the lowest-numbered sidebar becomes ineligible,
 
 ```java
 @AllArgsConstructor
-@Component
+@Singleton
 public class FactionsSidebar implements Sidebar {
 
     private final FactionManager factionManager;
@@ -413,7 +413,7 @@ The framework provides a packet-based team system for per-viewer prefix/suffix r
 Extend `AbstractTeamManager` in your plugin and register it as a service:
 
 ```java
-@Service
+@Singleton
 public class TeamManager extends AbstractTeamManager<CorePlugin> {}
 ```
 
@@ -423,7 +423,7 @@ Implement `Team` and register it as a component. Lower priority teams win when m
 
 ```java
 @AllArgsConstructor
-@Component
+@Singleton
 public class RankTeam implements Team {
 
     private final PlayerManager playerManager;
@@ -449,7 +449,7 @@ public class RankTeam implements Team {
 
 ```java
 @AllArgsConstructor
-@Component
+@Singleton
 public class FactionsTeam implements Team {
 
     private final FactionsManager factionsManager;
