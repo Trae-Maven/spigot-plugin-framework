@@ -1,10 +1,10 @@
 package io.github.trae.spigot.framework.item;
 
+import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.utility.UtilItemStack;
 import io.github.trae.spigot.framework.utility.UtilServer;
-import lombok.Getter;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -23,13 +23,17 @@ import java.util.concurrent.TimeUnit;
  * its material. {@link #apply(ItemStack)} uses the first to recognise a stack this framework
  * produced and the second to convert a vanilla stack into its custom counterpart.
  * <p>
- * The registry is populated by {@link ItemApplyListener} at server load, which is also where stack
- * reconciliation is wired into the pickup, crafting, smelting, and join flows.
- * {@link ItemActivateListener} reads the same registry to route interactions to
+ * The registry populates itself on first use rather than at a fixed point in startup, so a lookup
+ * is correct whenever it happens without the manager depending on any particular plugin's enable
+ * order. {@link ItemApplyListener} drives reconciliation from the pickup, crafting, smelting, and
+ * join flows, and {@link ItemActivateListener} reads the same registry to route interactions to
  * {@link Activatable} items. A scheduler sweeps online inventories periodically so stacks left
  * untouched are still brought up to date after an item's definition changes.
+ * <p>
+ * Because population happens once, an item registered with the injector after the first lookup is
+ * not picked up. Items are declared as components and constructed during their application's boot,
+ * so this only matters for a plugin enabled well after the server has started.
  */
-@Getter
 @Singleton
 public class ItemManager {
 
@@ -44,6 +48,35 @@ public class ItemManager {
     private final Map<Material, CustomItem> obtainableItemMap = new HashMap<>();
 
     /**
+     * Whether the registry has been built. Set before the scan runs, so a lookup performed from
+     * within it cannot recurse.
+     */
+    private boolean populated;
+
+    /**
+     * Builds both lookups from every {@link CustomItem} the injector knows about, once.
+     * <p>
+     * Deferring this to first use rather than binding it to a startup event keeps the manager
+     * independent of plugin enable order: whichever lookup happens first sees every item registered
+     * by that point.
+     */
+    private void populateIfNecessary() {
+        if (this.populated) {
+            return;
+        }
+
+        this.populated = true;
+
+        for (final CustomItem customItem : InjectorApi.getAll(CustomItem.class)) {
+            this.identifierItemMap.put(customItem.getIdentifier(), customItem);
+
+            if (customItem.naturallyObtainable()) {
+                this.obtainableItemMap.put(customItem.getMaterial(), customItem);
+            }
+        }
+    }
+
+    /**
      * Periodic sweep reconciling every online player's inventory.
      * <p>
      * The event handlers cover stacks as they enter an inventory, so this catches the remaining
@@ -55,22 +88,28 @@ public class ItemManager {
     }
 
     /**
-     * Returns the item registered under the given identifier.
+     * Returns the item registered under the given identifier, building the registry first if this
+     * is the first lookup.
      *
      * @param identifier the identifier to look up
      * @return an {@link Optional} containing the item, or empty if none is registered
      */
     public final Optional<CustomItem> getItemByIdentifier(final String identifier) {
+        this.populateIfNecessary();
+
         return Optional.ofNullable(this.identifierItemMap.get(identifier));
     }
 
     /**
-     * Returns the naturally obtainable item registered under the given material.
+     * Returns the naturally obtainable item registered under the given material, building the
+     * registry first if this is the first lookup.
      *
      * @param material the material to look up
      * @return an {@link Optional} containing the item, or empty if none is registered
      */
     public final Optional<CustomItem> getObtainableItemByMaterial(final Material material) {
+        this.populateIfNecessary();
+
         return Optional.ofNullable(this.obtainableItemMap.get(material));
     }
 

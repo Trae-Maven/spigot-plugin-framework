@@ -1,6 +1,5 @@
 package io.github.trae.spigot.framework.item;
 
-import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.type.component.Singleton;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Item;
@@ -11,43 +10,17 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.server.ServerLoadEvent;
 import org.bukkit.inventory.CraftingInventory;
 
 /**
- * Populates the {@link ItemManager} registry at server load and reconciles stacks at every point
- * one enters a player's possession, delegating all registry and stack work to the manager.
+ * Reconciles stacks at every point one enters a player's possession, delegating all stack work to
+ * {@link ItemManager}.
  */
 @AllArgsConstructor
 @Singleton
 public class ItemApplyListener implements Listener {
 
     private final ItemManager itemManager;
-
-    /**
-     * Registers every {@link CustomItem} discovered by the dependency injector under its identifier,
-     * and additionally under its material when it declares
-     * {@link CustomItem#naturallyObtainable()}.
-     * <p>
-     * Only the initial startup load is handled; a reload does not re-register, as the items are
-     * already present.
-     *
-     * @param event the server load event
-     */
-    @EventHandler(priority = EventPriority.MONITOR)
-    public final void onServerLoad(final ServerLoadEvent event) {
-        if (event.getType() != ServerLoadEvent.LoadType.STARTUP) {
-            return;
-        }
-
-        for (final CustomItem customItem : InjectorApi.getAll(CustomItem.class)) {
-            this.itemManager.getIdentifierItemMap().put(customItem.getIdentifier(), customItem);
-
-            if (customItem.naturallyObtainable()) {
-                this.itemManager.getObtainableItemMap().put(customItem.getMaterial(), customItem);
-            }
-        }
-    }
 
     /**
      * Reconciles a dropped stack as it is picked up, so an item obtained from the world arrives in
