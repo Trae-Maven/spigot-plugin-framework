@@ -50,6 +50,32 @@ public abstract class Item {
     }
 
     /**
+     * Applies any meta-specific options this item needs, after the display options have been
+     * written. Does nothing by default.
+     * <p>
+     * This is the general-purpose hook for anything the declarative description does not cover:
+     * cast the meta to the type the material actually produces and set what you need. It exists
+     * separately from {@link #stamp(ItemMeta)} because {@link CustomItem} marks that method final
+     * to write its identifier and version, leaving subclasses no way to touch the meta otherwise.
+     *
+     * <pre>{@code
+     * @Override
+     * protected void editMeta(final ItemMeta itemMeta) {
+     *     if (itemMeta instanceof final LeatherArmorMeta leatherArmorMeta) {
+     *         leatherArmorMeta.setColor(Color.fromRGB(0x228B22));
+     *     }
+     * }
+     * }</pre>
+     *
+     * <p>Running last means an option set here overrides the equivalent display option, so an item
+     * setting a display name in both places keeps the one written here.</p>
+     *
+     * @param itemMeta the meta being built
+     */
+    protected void editMeta(final ItemMeta itemMeta) {
+    }
+
+    /**
      * Returns whether every {@link ItemFlag} is applied, hiding attribute modifiers, enchantments,
      * and similar generated tooltip lines. Defaults to {@code false}.
      *
@@ -198,6 +224,9 @@ public abstract class Item {
     private void applyItemMeta(final ItemMeta itemMeta) {
         // Stamp
         this.stamp(itemMeta);
+
+        // Edit Meta
+        this.editMeta(itemMeta);
 
         // Display Name
         if (this.getDisplayName() != null) {

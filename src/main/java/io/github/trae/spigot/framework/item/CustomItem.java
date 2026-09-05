@@ -21,10 +21,11 @@ import java.util.List;
  * find the owning item and compares the version to decide whether the stack is stale, replacing it
  * when the definition has since changed.
  * <p>
- * Subclasses are discovered automatically by {@link ItemListener} via the dependency injector and
- * registered under their identifier. An item declaring {@link #naturallyObtainable()} is also
+ * Subclasses are discovered automatically by {@link ItemApplyListener} via the dependency injector
+ * and registered under their identifier. An item declaring {@link #naturallyObtainable()} is also
  * registered under its material, so any vanilla stack of that type a player obtains is converted
- * into the custom item.
+ * into the custom item. A subclass additionally implementing {@link Activatable} gains a click
+ * action, routed by {@link ItemActivateListener}.
  */
 public abstract class CustomItem extends Item {
 
@@ -101,7 +102,7 @@ public abstract class CustomItem extends Item {
     }
 
     /**
-     * Returns whether players obtain this item through normal gameplay — mining, crafting, smelting,
+     * Returns whether players obtain this item through normal gameplay: mining, crafting, smelting,
      * or picking it up. When {@code true}, the item is registered under its material and any vanilla
      * stack of that type is converted into this item on the way into a player's inventory. Defaults
      * to {@code false}.
@@ -113,8 +114,8 @@ public abstract class CustomItem extends Item {
     }
 
     /**
-     * Returns the values the version hash is computed from — every part of the description that
-     * changes what the stack should look like.
+     * Returns the values the version hash is computed from, meaning every part of the description
+     * that changes what the stack should look like.
      * <p>
      * Changing any of them changes the hash, which marks every existing stack as outdated and causes
      * {@link ItemManager#apply(ItemStack)} to replace it. Override to add subclass state that the

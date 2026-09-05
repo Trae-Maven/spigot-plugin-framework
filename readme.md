@@ -19,6 +19,7 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Tablist system with priority resolution for per-player header and footer content
 - Packet-based team system with per-viewer prefix and suffix resolution, giving relation-aware nametag colours through priority-sorted `Team` subclasses
 - Declarative item system with identity stamping and automatic version reconciliation, so stacks in player inventories update themselves when the definition changes
+- Opt-in item activation, so a custom item gains a click action with its own gate, cancellable events, and control over the vanilla behaviour it replaces
 - Inventory window system with slot-bound buttons, open and close gating, and full click and drag protection
 - NMS utilities for direct packet sending and Adventure-to-vanilla component conversion
 - Custom event base classes with cancellation reasons
@@ -173,7 +174,7 @@ public class CorePlugin extends SpigotPlugin {
 
 | Package | Provides |
 |---|---|
-| `io.github.trae.spigot.framework.item` | `ItemManager`, `ItemListener` |
+| `io.github.trae.spigot.framework.item` | `ItemManager`, `ItemApplyListener`, `ItemActivateListener` |
 | `io.github.trae.spigot.framework.window` | `WindowManager`, `WindowListener` |
 | `io.github.trae.spigot.framework.sidebar` | `SidebarManager`, `SidebarListener` |
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
@@ -390,7 +391,7 @@ final ItemStack itemStack = new BackIcon().create();
 
 ### Defining a Custom Item
 
-Extend `CustomItem` and register it as a component. `ItemListener` discovers every subclass through the dependency injector at server load and registers it under its identifier:
+Extend `CustomItem` and register it as a component. `ItemApplyListener` discovers every subclass through the dependency injector at server load and registers it under its identifier:
 
 ```java
 @Singleton
@@ -412,7 +413,11 @@ public class MinersPickaxe extends CustomItem {
 
     @Override
     protected List<String> getLore() {
-        return List.of("Mines a little faster than it should.", "", "Right-Click to toggle vein mining.");
+        return List.of(
+                "Mines a little faster than it should.",
+                "",
+                "Right-Click to toggle vein mining."
+        );
     }
 
     @Override
@@ -440,20 +445,20 @@ final ItemStack converted = minersPickaxe.create(existingItemStack);
 
 ### Typed Meta
 
-Override `stamp(ItemMeta)` to write persistent data, or cast within it for meta-specific options:
+Override `editMeta(ItemMeta)` for anything the declarative description does not cover. Cast the meta to the type the material actually produces and set what you need:
 
 ```java
 @Override
-protected void stamp(final ItemMeta itemMeta) {
-    super.stamp(itemMeta);
-
+protected void editMeta(final ItemMeta itemMeta) {
     if (itemMeta instanceof final LeatherArmorMeta leatherArmorMeta) {
         leatherArmorMeta.setColor(org.bukkit.Color.fromRGB(0x228B22));
     }
 }
 ```
 
-> **Note:** `CustomItem` marks `stamp` final, since it uses it to write the identifier and version. Subclasses of `CustomItem` needing meta-specific options should apply them after `create` returns.
+It runs after the display options, so an option set here overrides the equivalent one, and an item writing a display name in both places keeps the one written here.
+
+> **Note:** `editMeta` exists separately from `stamp(ItemMeta)` because `CustomItem` marks that method final to write its identifier and version, leaving subclasses no other way to reach the meta. Anything set here is also invisible to the version hash, so fold the state behind it into `generateVersionEntries()` if existing stacks should be reconciled when it changes.
 
 ### Naturally Obtainable Items
 
@@ -490,6 +495,121 @@ public class RawIron extends CustomItem {
 ```
 
 Only one item may claim a given material. Registering two throws at server load.
+
+### Activatable Items
+
+An item implementing `Activatable` gains a click action. `ItemActivateListener` resolves the item behind the clicked stack and calls `onActivate` once the click has passed the item's own gate and the cancellable `ItemPreActivateEvent`:
+
+```java
+@Singleton
+public class MinersPickaxe extends CustomItem implements Activatable {
+
+    public MinersPickaxe() {
+        super(Material.IRON_PICKAXE, "miners_pickaxe");
+    }
+
+    @Override
+    public void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+        if (activateType != ActivateType.RIGHT_CLICK) {
+            return;
+        }
+
+        UtilMessage.message(player, "Items", "Vein mining <green>enabled</green>.");
+    }
+
+    @Override
+    protected Color getColor() {
+        return ChatColor.AQUA.getColor();
+    }
+
+    @Override
+    protected String getDisplayName() {
+        return "Miner's Pickaxe";
+    }
+
+    @Override
+    protected List<String> getLore() {
+        return List.of(
+                "Mines a little faster than it should.",
+                "",
+                "Right-Click to toggle vein mining."
+        );
+    }
+}
+```
+
+The capability is opt-in per item rather than a hook every custom item overrides, so an item that does not implement the interface is never invoked.
+
+### Activation Types
+
+`ActivateType` groups the vanilla actions that mean the same thing to an item, so an implementation reacts to a left click without caring whether the player was aiming at a block or at air:
+
+| Type | Covers |
+|---|---|
+| `LEFT_CLICK` | `LEFT_CLICK_AIR`, `LEFT_CLICK_BLOCK` |
+| `RIGHT_CLICK` | `RIGHT_CLICK_AIR`, `RIGHT_CLICK_BLOCK` |
+
+Actions with no matching type, such as physical pressure plate triggers, activate nothing. Only the main hand is handled, since the interaction event fires once per hand and an item would otherwise activate twice.
+
+Branch on the type when an item does different things per click:
+
+```java
+@Override
+public void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    switch (activateType) {
+        case LEFT_CLICK -> this.cycleMode(player);
+        case RIGHT_CLICK -> this.fire(player, itemStack);
+    }
+}
+```
+
+### Gating an Activation
+
+`canActivate` is the item-level check, evaluated before the pre-activate event, for conditions the item itself owns such as a cooldown or a durability threshold:
+
+```java
+@Override
+public boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    if (activateType != ActivateType.RIGHT_CLICK) {
+        return false;
+    }
+
+    return !this.cooldownManager.hasCooldown(player, "Vein Mine");
+}
+```
+
+`ItemPreActivateEvent` is the system-level equivalent, for conditions external to the item such as a region restriction or a global lockdown:
+
+```java
+@EventHandler
+public void onItemPreActivate(final ItemPreActivateEvent event) {
+    if (this.regionManager.isInSafezone(event.getPlayer())) {
+        event.setCancelledWithReason("You cannot use items here.");
+    }
+}
+```
+
+`ItemPostActivateEvent` fires after a successful activation, for recording a cooldown or a statistic. It is not cancellable, and never fires for an activation that was refused.
+
+### Suppressing Vanilla Behaviour
+
+An activation runs alongside whatever the material and the clicked block would normally do. Return `Event.Result.DENY` from either hook to suppress that:
+
+```java
+// Stop the material's own use, such as a right-clickable food item being eaten
+@Override
+public Event.Result useItemInHand(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    return Event.Result.DENY;
+}
+
+// Stop the clicked block responding, such as a chest opening
+@Override
+public Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    return Event.Result.DENY;
+}
+```
+
+Both default to `Event.Result.DEFAULT`, leaving vanilla behaviour untouched.
 
 ### Versioning and Reconciliation
 
@@ -1064,6 +1184,17 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 
 ---
 
+## Item Events
+
+| Event | Fired When |
+|---|---|
+| `ItemPreActivateEvent` | A player activated an item, before the item's action runs |
+| `ItemPostActivateEvent` | An item's activation has run |
+
+`ItemPreActivateEvent` is cancellable, and cancelling suppresses the activation entirely. `ItemPostActivateEvent` is not, since the action has already happened, and only fires for an activation that actually ran.
+
+---
+
 ## Window Events
 
 | Event | Fired When |
@@ -1108,4 +1239,5 @@ All three are cancellable. Cancelling an open aborts it, cancelling a close re-o
 | `Node` | Typed parent access for commands and subcommands (provided by Hierarchy-Framework) |
 | `SharedBaseCommand` | Shared contract between commands and subcommands: sender validation, permission, execution, and tab-complete |
 | `IBaseCommand` | Command contract with subcommand management |
+| `Activatable` | Capability a `CustomItem` implements to gain a click action |
 | `ICustomCancellableEvent` | Cancellable event with reason support |

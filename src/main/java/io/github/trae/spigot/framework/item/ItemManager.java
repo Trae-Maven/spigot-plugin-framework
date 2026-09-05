@@ -23,10 +23,11 @@ import java.util.concurrent.TimeUnit;
  * its material. {@link #apply(ItemStack)} uses the first to recognise a stack this framework
  * produced and the second to convert a vanilla stack into its custom counterpart.
  * <p>
- * The registry is populated by {@link ItemListener} at server load, which is also where the stack
- * reconciliation is wired into player, crafting, and smelting events. A scheduler sweeps online
- * inventories periodically so stacks left untouched are still brought up to date after an item's
- * definition changes.
+ * The registry is populated by {@link ItemApplyListener} at server load, which is also where stack
+ * reconciliation is wired into the pickup, crafting, smelting, and join flows.
+ * {@link ItemActivateListener} reads the same registry to route interactions to
+ * {@link Activatable} items. A scheduler sweeps online inventories periodically so stacks left
+ * untouched are still brought up to date after an item's definition changes.
  */
 @Getter
 @Singleton
@@ -74,6 +75,21 @@ public class ItemManager {
     }
 
     /**
+     * Returns the item that produced the given stack, resolved from the identifier stamped into its
+     * persistent data.
+     * <p>
+     * A stack this framework never produced carries no identifier and resolves to empty, as does one
+     * whose identifier names an item that is no longer registered.
+     *
+     * @param itemStack the stack to resolve, may be {@code null}
+     * @return an {@link Optional} containing the owning item, or empty if the stack carries no known
+     * identifier
+     */
+    public final Optional<CustomItem> getItemByItemStack(final ItemStack itemStack) {
+        return UtilItemStack.getPersistentData(itemStack, CustomItem.IDENTIFIER_KEY, PersistentDataType.STRING).flatMap(this::getItemByIdentifier);
+    }
+
+    /**
      * Reconciles a stack against the registry and returns the stack that should take its place.
      * <p>
      * A stack carrying a known identifier is replaced when its version is outdated, and returned
@@ -90,7 +106,7 @@ public class ItemManager {
     public final ItemStack apply(final ItemStack itemStack) {
         if (itemStack != null && !itemStack.isEmpty()) {
             // Identifier Check
-            final CustomItem identifierItem = UtilItemStack.getPersistentData(itemStack, CustomItem.IDENTIFIER_KEY, PersistentDataType.STRING).flatMap(this::getItemByIdentifier).orElse(null);
+            final CustomItem identifierItem = this.getItemByItemStack(itemStack).orElse(null);
             if (identifierItem != null) {
                 return identifierItem.isOutdatedByItemStack(itemStack) ? identifierItem.update(itemStack) : itemStack;
             }

@@ -20,7 +20,7 @@ import org.bukkit.inventory.CraftingInventory;
  */
 @AllArgsConstructor
 @Singleton
-public class ItemListener implements Listener {
+public class ItemApplyListener implements Listener {
 
     private final ItemManager itemManager;
 
