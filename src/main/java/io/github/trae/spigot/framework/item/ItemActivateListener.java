@@ -40,7 +40,7 @@ public class ItemActivateListener implements Listener {
      *
      * @param event the interaction event
      */
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerInteract(final PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
