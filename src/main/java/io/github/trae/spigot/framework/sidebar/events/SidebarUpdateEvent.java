@@ -1,6 +1,7 @@
 package io.github.trae.spigot.framework.sidebar.events;
 
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
+import io.github.trae.spigot.framework.sidebar.SidebarListener;
 import lombok.Getter;
 import org.bukkit.entity.Player;
 
@@ -8,10 +9,9 @@ import org.bukkit.entity.Player;
  * Fired to request a sidebar refresh for a player.
  * <p>
  * Dispatched via {@link io.github.trae.spigot.framework.utility.UtilEvent} and handled by
- * {@link io.github.trae.spigot.framework.sidebar.AbstractSidebarManager}. When the
- * {@link #identifier} is {@code null}, the player's active sidebar is re-resolved and refreshed.
- * When an identifier is supplied, the update is only applied if the player's active sidebar
- * matches that identifier.
+ * {@link SidebarListener}. When the {@link #identifier} is {@code null}, the player's active
+ * sidebar is re-resolved and refreshed. When an identifier is supplied, the update is only applied
+ * if the player's active sidebar matches that identifier.
  * <p>
  * Fired asynchronously, as the manager's scheduler dispatches it off the main thread.
  */

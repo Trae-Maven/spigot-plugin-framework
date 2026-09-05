@@ -76,7 +76,7 @@ public class UtilEvent {
             throw new IllegalArgumentException("Event cannot be null.");
         }
 
-        if (!(event.isAsynchronous())) {
+        if (!event.isAsynchronous()) {
             throw new IllegalStateException("Cannot dispatch synchronous event asynchronously.");
         }
 
@@ -156,7 +156,7 @@ public class UtilEvent {
             throw new IllegalArgumentException("Event cannot be null.");
         }
 
-        if (!(event.isAsynchronous())) {
+        if (!event.isAsynchronous()) {
             throw new IllegalStateException("Cannot supply synchronous event asynchronously.");
         }
 

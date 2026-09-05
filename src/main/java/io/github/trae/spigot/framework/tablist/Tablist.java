@@ -1,58 +1,62 @@
 package io.github.trae.spigot.framework.tablist;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 
 /**
- * A tab list header/footer provider, discovered via the dependency injector and resolved per player
- * by the tablist manager.
+ * Represents the header and footer text displayed above and below the player list.
  * <p>
- * When multiple tablists are registered, the one with the lowest {@link #getPriority()} that passes
- * both display checks is the one shown. Header and footer are supplied as raw strings and
- * deserialized by the manager, so they may carry markup and dynamic placeholders that are
- * re-evaluated each update.
+ * Subclasses are discovered automatically by {@link TablistManager} via the dependency injector.
+ * When multiple tablists are eligible for a player, the one with the lowest {@link #priority}
+ * is displayed. Both {@link #canDisplay()} (global) and {@link #canDisplay(Player)} (per-player)
+ * must return {@code true} for a tablist to be eligible.
  */
-public interface Tablist {
+@AllArgsConstructor
+@Getter
+public abstract class Tablist {
 
     /**
-     * Returns this tablist's priority. Lower values win when several tablists are eligible for the
-     * same player.
-     *
-     * @return the priority, lower being higher precedence
+     * The priority of this tablist. Lower values win: the eligible tablist with the lowest
+     * priority is the one displayed.
      */
-    int getPriority();
+    private final int priority;
 
     /**
-     * Returns the raw header string, deserialized by the manager before being sent.
+     * Returns whether this tablist is allowed to display globally, irrespective of any specific
+     * player (e.g. gated behind a world event or server state). Defaults to {@code true}.
      *
-     * @return the header content
+     * @return {@code true} if the tablist may display globally
      */
-    String getHeader();
-
-    /**
-     * Returns the raw footer string, deserialized by the manager before being sent.
-     *
-     * @return the footer content
-     */
-    String getFooter();
-
-    /**
-     * Global gate controlling whether this tablist is eligible at all, independent of any specific
-     * player. Defaults to {@code true}.
-     *
-     * @return {@code true} if this tablist may be displayed
-     */
-    default boolean canDisplay() {
+    protected boolean canDisplay() {
         return true;
     }
 
     /**
-     * Per-player gate controlling whether this tablist is eligible for the given player. Defaults to
-     * {@code true}.
+     * Returns whether this tablist is allowed to display for the given player (e.g. gated behind
+     * faction membership or rank). Defaults to {@code true}.
      *
-     * @param player the player the tablist would be shown to
-     * @return {@code true} if this tablist may be displayed to the player
+     * @param player the player to check
+     * @return {@code true} if the tablist may display for the player
      */
-    default boolean canDisplay(final Player player) {
+    protected boolean canDisplay(final Player player) {
         return true;
     }
+
+    /**
+     * Returns the header component rendered above the player list for the given player.
+     *
+     * @param player the player the tablist is rendered for
+     * @return the header component
+     */
+    protected abstract Component getHeader(final Player player);
+
+    /**
+     * Returns the footer component rendered below the player list for the given player.
+     *
+     * @param player the player the tablist is rendered for
+     * @return the footer component
+     */
+    protected abstract Component getFooter(final Player player);
 }

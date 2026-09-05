@@ -1,6 +1,7 @@
 package io.github.trae.spigot.framework.team.events;
 
 import io.github.trae.spigot.framework.event.CustomEvent;
+import io.github.trae.spigot.framework.team.TeamListener;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -9,10 +10,9 @@ import org.bukkit.entity.Player;
  * Fired to request a team refresh for a player across all viewers.
  * <p>
  * Dispatched via {@link io.github.trae.spigot.framework.utility.UtilEvent} and handled by
- * {@link io.github.trae.spigot.framework.team.AbstractTeamManager}. When the {@link #identifier}
- * is {@code null}, the player's team is re-resolved and pushed to every viewer (or removed if no
- * team is eligible). When an identifier is supplied, the update is only applied for viewers whose
- * eligible team matches that identifier.
+ * {@link TeamListener}. When the {@link #identifier} is {@code null}, the player's team is
+ * re-resolved and pushed to every viewer (or removed if no team is eligible). When an identifier is
+ * supplied, the update is only applied for viewers whose eligible team matches that identifier.
  */
 @AllArgsConstructor
 @Getter

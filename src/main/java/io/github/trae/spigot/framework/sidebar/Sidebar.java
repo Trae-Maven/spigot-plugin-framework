@@ -1,5 +1,7 @@
 package io.github.trae.spigot.framework.sidebar;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 
@@ -9,28 +11,26 @@ import java.util.List;
  * Represents a sidebar (scoreboard objective in the {@code SIDEBAR} display slot) that can be
  * shown to a player.
  * <p>
- * Implementations are discovered automatically by {@link AbstractSidebarManager} via the
- * dependency injector. When multiple sidebars are eligible for a player, the one with the
- * lowest {@link #getPriority()} is displayed. Both {@link #canDisplay()} (global) and
- * {@link #canDisplay(Player)} (per-player) must return {@code true} for a sidebar to be eligible.
+ * Subclasses are discovered automatically by {@link SidebarManager} via the dependency injector.
+ * When multiple sidebars are eligible for a player, the one with the lowest {@link #priority}
+ * is displayed. Both {@link #canDisplay()} (global) and {@link #canDisplay(Player)} (per-player)
+ * must return {@code true} for a sidebar to be eligible.
  */
-public interface Sidebar {
+@AllArgsConstructor
+@Getter
+public abstract class Sidebar {
 
     /**
-     * Returns the unique identifier for this sidebar, used as the scoreboard objective name
-     * and for matching scoped {@link io.github.trae.spigot.framework.sidebar.events.SidebarUpdateEvent}s.
-     *
-     * @return the sidebar identifier
+     * The unique identifier for this sidebar, used as the scoreboard objective name and for
+     * matching scoped {@link io.github.trae.spigot.framework.sidebar.events.SidebarUpdateEvent}s.
      */
-    String getIdentifier();
+    private final String identifier;
 
     /**
-     * Returns the priority of this sidebar. Lower values win — the eligible sidebar with the
-     * lowest priority is the one displayed.
-     *
-     * @return the sidebar priority
+     * The priority of this sidebar. Lower values win: the eligible sidebar with the lowest
+     * priority is the one displayed.
      */
-    int getPriority();
+    private final int priority;
 
     /**
      * Returns whether this sidebar is allowed to display globally, irrespective of any specific
@@ -38,7 +38,7 @@ public interface Sidebar {
      *
      * @return {@code true} if the sidebar may display globally
      */
-    default boolean canDisplay() {
+    protected boolean canDisplay() {
         return true;
     }
 
@@ -49,7 +49,7 @@ public interface Sidebar {
      * @param player the player to check
      * @return {@code true} if the sidebar may display for the player
      */
-    default boolean canDisplay(final Player player) {
+    protected boolean canDisplay(final Player player) {
         return true;
     }
 
@@ -60,7 +60,7 @@ public interface Sidebar {
      *
      * @return {@code true} if the title never changes after creation
      */
-    default boolean isStaticTitle() {
+    protected boolean isStaticTitle() {
         return true;
     }
 
@@ -70,7 +70,7 @@ public interface Sidebar {
      * @param player the player the sidebar is rendered for
      * @return the title component
      */
-    Component getTitle(final Player player);
+    protected abstract Component getTitle(final Player player);
 
     /**
      * Returns the line components rendered top-to-bottom for the given player. The manager diffs
@@ -79,5 +79,5 @@ public interface Sidebar {
      * @param player the player the sidebar is rendered for
      * @return the ordered list of line components
      */
-    List<Component> getLines(final Player player);
+    protected abstract List<Component> getLines(final Player player);
 }

@@ -139,12 +139,12 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
      * @return {@code true} if the command was executed successfully, {@code false} otherwise
      */
     default boolean $execute(final CommandSender commandSender, final String[] args) {
-        if (!(this.isValidSender(commandSender))) {
+        if (!this.isValidSender(commandSender)) {
             UtilMessage.message(commandSender, "Command", "Invalid Command Sender!");
             return false;
         }
 
-        if (!(this.hasPermission(commandSender))) {
+        if (!this.hasPermission(commandSender)) {
             UtilMessage.message(commandSender, "Permissions", "You do not have permission to execute this command!");
             return false;
         }
@@ -173,11 +173,11 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
      * @return a list of suggestions, or an empty list if blocked
      */
     default List<String> $getTabComplete(final CommandSender commandSender, final String[] args) {
-        if (!(this.isValidSender(commandSender))) {
+        if (!this.isValidSender(commandSender)) {
             return Collections.emptyList();
         }
 
-        if (!(this.hasPermission(commandSender))) {
+        if (!this.hasPermission(commandSender)) {
             return Collections.emptyList();
         }
 

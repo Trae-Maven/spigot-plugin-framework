@@ -1,61 +1,58 @@
 package io.github.trae.spigot.framework.team;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import net.kyori.adventure.text.Component;
 import net.minecraft.ChatFormatting;
 import org.bukkit.entity.Player;
 
 /**
- * Represents a team applied to a player and rendered individually for each viewer, used to drive
- * nametag prefixes, suffixes, and other scoreboard-team options.
+ * Represents the nametag decoration applied to a player as seen by a specific viewer.
  * <p>
- * Implementations are discovered automatically by {@link AbstractTeamManager} via the dependency
- * injector. When multiple teams are eligible for a player/viewer pair, the one with the lowest
- * {@link #getPriority()} is applied. Both {@link #canDisplay()} (global) and
+ * Subclasses are discovered automatically by {@link TeamManager} via the dependency injector.
+ * Resolution happens per player/viewer pair, so the same target player can present different
+ * decorations to different viewers. When multiple teams are eligible for a pair, the one with the
+ * lowest {@link #priority} is applied. Both {@link #canDisplay()} (global) and
  * {@link #canDisplay(Player, Player)} (per-pair) must return {@code true} for a team to be eligible.
  * <p>
- * Because resolution is per-pair, the same target player can present different prefixes/suffixes
- * to different viewers — for example showing relation-based coloring (ally, enemy, neutral).
- * <p>
- * All option accessors return {@code null} by default, in which case the corresponding option is
- * left at its {@link net.minecraft.world.scores.PlayerTeam} default rather than being overridden.
+ * Every option hook returns {@code null} by default, which leaves the corresponding
+ * {@link net.minecraft.world.scores.PlayerTeam} value at its default rather than overriding it.
  */
-public interface Team {
+@AllArgsConstructor
+@Getter
+public abstract class Team {
 
     /**
-     * Returns the unique identifier for this team, used for matching scoped
+     * The unique identifier for this team, used for matching scoped
      * {@link io.github.trae.spigot.framework.team.events.TeamUpdateEvent}s.
-     *
-     * @return the team identifier
      */
-    String getIdentifier();
+    private final String identifier;
 
     /**
-     * Returns the priority of this team. Lower values win — the eligible team with the lowest
-     * priority is the one applied.
-     *
-     * @return the team priority
+     * The priority of this team. Lower values win: the eligible team with the lowest priority is
+     * the one applied.
      */
-    int getPriority();
+    private final int priority;
 
     /**
-     * Returns whether this team is allowed to apply globally, irrespective of any specific
-     * player/viewer pair (e.g. gated behind a world event or server state). Defaults to {@code true}.
+     * Returns whether this team is allowed to apply globally, irrespective of any specific pair
+     * (e.g. gated behind a world event or server state). Defaults to {@code true}.
      *
      * @return {@code true} if the team may apply globally
      */
-    default boolean canDisplay() {
+    protected boolean canDisplay() {
         return true;
     }
 
     /**
-     * Returns whether this team is allowed to apply for the given player as seen by the given
-     * viewer (e.g. gated behind faction membership). Defaults to {@code true}.
+     * Returns whether this team is allowed to apply for the given player/viewer pair (e.g. gated
+     * behind a relation between the two). Defaults to {@code true}.
      *
-     * @param player the target player the team is applied to
-     * @param viewer the viewer the team is rendered for
-     * @return {@code true} if the team may apply for this pair
+     * @param player the target player
+     * @param viewer the viewer
+     * @return {@code true} if the team may apply for the pair
      */
-    default boolean canDisplay(final Player player, final Player viewer) {
+    protected boolean canDisplay(final Player player, final Player viewer) {
         return true;
     }
 
@@ -66,7 +63,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the display name component, or {@code null}
      */
-    default Component getDisplayName(final Player player, final Player viewer) {
+    protected Component getDisplayName(final Player player, final Player viewer) {
         return null;
     }
 
@@ -78,7 +75,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the prefix component, or {@code null}
      */
-    default Component getPrefix(final Player player, final Player viewer) {
+    protected Component getPrefix(final Player player, final Player viewer) {
         return null;
     }
 
@@ -90,7 +87,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the suffix component, or {@code null}
      */
-    default Component getSuffix(final Player player, final Player viewer) {
+    protected Component getSuffix(final Player player, final Player viewer) {
         return null;
     }
 
@@ -102,7 +99,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the friendly-fire flag, or {@code null}
      */
-    default Boolean allowFriendlyFire(final Player player, final Player viewer) {
+    protected Boolean allowFriendlyFire(final Player player, final Player viewer) {
         return null;
     }
 
@@ -114,7 +111,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the see-friendly-invisibles flag, or {@code null}
      */
-    default Boolean seeFriendlyInvisibles(final Player player, final Player viewer) {
+    protected Boolean seeFriendlyInvisibles(final Player player, final Player viewer) {
         return null;
     }
 
@@ -125,7 +122,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the nametag visibility, or {@code null}
      */
-    default net.minecraft.world.scores.Team.Visibility getNameTagVisibility(final Player player, final Player viewer) {
+    protected net.minecraft.world.scores.Team.Visibility getNameTagVisibility(final Player player, final Player viewer) {
         return null;
     }
 
@@ -136,7 +133,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the death message visibility, or {@code null}
      */
-    default net.minecraft.world.scores.Team.Visibility getDeathMessageVisibility(final Player player, final Player viewer) {
+    protected net.minecraft.world.scores.Team.Visibility getDeathMessageVisibility(final Player player, final Player viewer) {
         return null;
     }
 
@@ -147,7 +144,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the collision rule, or {@code null}
      */
-    default net.minecraft.world.scores.Team.CollisionRule getCollisionRule(final Player player, final Player viewer) {
+    protected net.minecraft.world.scores.Team.CollisionRule getCollisionRule(final Player player, final Player viewer) {
         return null;
     }
 
@@ -159,7 +156,7 @@ public interface Team {
      * @param viewer the viewer
      * @return the team color, or {@code null}
      */
-    default ChatFormatting getColor(final Player player, final Player viewer) {
+    protected ChatFormatting getColor(final Player player, final Player viewer) {
         return null;
     }
 }
