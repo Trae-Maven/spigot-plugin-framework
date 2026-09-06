@@ -31,7 +31,7 @@ import java.util.UUID;
  * activation only ever starts a channel, and the tick owns every way one ends. Subclasses implement
  * {@link #onChannel(Player, ItemStack)} and override the start, stop, and gate hooks as needed.
  */
-public abstract class ChannelActivableCustomItem extends ActivatableCustomItem {
+public abstract class ChannelCustomItem extends ActivatableCustomItem {
 
     /**
      * The players currently channelling this item, by identifier.
@@ -49,7 +49,7 @@ public abstract class ChannelActivableCustomItem extends ActivatableCustomItem {
      * @param material   the material every stack is created with
      * @param identifier the unique identifier to register and stamp under
      */
-    protected ChannelActivableCustomItem(final Material material, final String identifier) {
+    protected ChannelCustomItem(final Material material, final String identifier) {
         super(material, identifier);
     }
 

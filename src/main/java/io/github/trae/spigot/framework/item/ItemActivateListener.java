@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.item;
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.item.enums.ActivateType;
+import io.github.trae.spigot.framework.item.events.ItemChannelEvent;
 import io.github.trae.spigot.framework.item.events.ItemPostActivateEvent;
 import io.github.trae.spigot.framework.item.events.ItemPreActivateEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
@@ -90,9 +91,14 @@ public class ItemActivateListener implements Listener {
      * Ticks every active channel, ending the ones whose conditions no longer hold.
      * <p>
      * A channel survives the tick only while the player is online, still holding the item that
-     * started it, still blocking, and still passing {@code canChannel}. Failing any of those ends
-     * the channel and fires {@code onStop}, so a player who logs out, swaps items, or lowers their
-     * shield leaves cleanly without the item having to watch for it.
+     * started it, still holding the use action, not vetoed by a cancelled {@link ItemChannelEvent},
+     * and still passing {@code canChannel}. Failing any of those ends the channel and fires
+     * {@code onStop}, so a player who logs out, swaps items, or lets go leaves cleanly without the
+     * item having to watch for it.
+     * <p>
+     * The hold is read from {@code isHandRaised} rather than {@code isBlocking}, since blocking only
+     * becomes true after the item's block delay has elapsed, which is at least a tick after the
+     * activation that started the channel.
      * <p>
      * Ending a channel here is also what keeps the active set bounded: nothing else removes a
      * player, so an entry that outlived its conditions would otherwise stay forever and report the
@@ -101,24 +107,29 @@ public class ItemActivateListener implements Listener {
     @Scheduler(period = 50, unit = TimeUnit.MILLISECONDS)
     public final void onScheduler() {
         for (final CustomItem item : this.itemManager.getItems()) {
-            if (!(item instanceof final ChannelActivableCustomItem channelActivableCustomItem)) {
+            if (!(item instanceof final ChannelCustomItem channelCustomItem)) {
                 continue;
             }
 
-            channelActivableCustomItem.getActiveChannelSet().removeIf(uuid -> {
+            channelCustomItem.getActiveChannelSet().removeIf(uuid -> {
                 final Player player = UtilServer.getOnlinePlayerById(uuid).orElse(null);
-                if (player == null || player.isDead() || !player.isValid()) {
+                if (player == null) {
                     return true;
                 }
 
                 final ItemStack itemStack = player.getInventory().getItemInMainHand();
 
-                if (!channelActivableCustomItem.isSimilarByIdentifier(itemStack) || !player.isHandRaised() || !channelActivableCustomItem.canChannel(player, itemStack)) {
-                    channelActivableCustomItem.onStop(player, itemStack);
+                if (!channelCustomItem.isSimilarByIdentifier(itemStack) || !player.isHandRaised()) {
+                    channelCustomItem.onStop(player, itemStack);
                     return true;
                 }
 
-                channelActivableCustomItem.onChannel(player, itemStack);
+                if (UtilEvent.supply(new ItemChannelEvent(channelCustomItem, player, itemStack)).isCancelled() || !channelCustomItem.canChannel(player, itemStack)) {
+                    channelCustomItem.onStop(player, itemStack);
+                    return true;
+                }
+
+                channelCustomItem.onChannel(player, itemStack);
                 return false;
             });
         }
