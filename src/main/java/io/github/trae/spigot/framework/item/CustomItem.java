@@ -136,7 +136,9 @@ public abstract class CustomItem extends Item {
                 UtilString.pair("Model", this.getModel() != null ? this.getModel().asString() : ""),
                 UtilString.pair("Tooltip-Style", this.getTooltipStyle() != null ? this.getTooltipStyle().asString() : ""),
                 UtilString.pair("Hide-Attributes", Boolean.toString(this.hideAttributes())),
-                UtilString.pair("Naturally-Obtainable", Boolean.toString(this.naturallyObtainable()))
+                UtilString.pair("Naturally-Obtainable", Boolean.toString(this.naturallyObtainable())),
+                UtilString.pair("Style-Name", this.getStyle() != null ? this.getStyle().getName() : ""),
+                UtilString.pair("Style-Tag", this.getStyle() != null ? this.getStyle().getTag() : "")
         );
     }
 
