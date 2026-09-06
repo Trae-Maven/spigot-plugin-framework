@@ -565,7 +565,7 @@ public void onActivate(final Player player, final ItemStack itemStack, final Act
 
 ### Gating an Activation
 
-`canActivate` is the item-level check, evaluated before the pre-activate event, for conditions the item itself owns such as a cooldown or a durability threshold:
+`canActivate` is the item-level check, evaluated after the pre-activate event, for conditions the item itself owns such as a cooldown or a durability threshold:
 
 ```java
 @Override
@@ -604,12 +604,19 @@ public Event.Result useItemInHand(final Player player, final ItemStack itemStack
 
 // Stop the clicked block responding, such as a chest opening
 @Override
-public Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+public Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final Block block, final ActivateType activateType) {
     return Event.Result.DENY;
 }
 ```
 
-Both default to `Event.Result.DEFAULT`, leaving vanilla behaviour untouched.
+Both default to `Event.Result.DEFAULT`, leaving vanilla behaviour untouched. The block is passed so the decision can depend on what was clicked, and is `null` when the player clicked air:
+
+```java
+@Override
+public Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final Block block, final ActivateType activateType) {
+    return block != null && block.getType() == Material.CHEST ? Event.Result.DENY : Event.Result.DEFAULT;
+}
+```
 
 ### Versioning and Reconciliation
 
@@ -768,7 +775,9 @@ protected void onClick(final Player player, final ClickType clickType) {
 | `onClose(Player)` | Called after the player closed it and tracking entries were dropped |
 | `Button#canClick(Player, ClickType)` | Returning `false` suppresses the button's action |
 
-`canOpen`, `canClose`, and `canClick` are the window-level checks, for conditions the window or button itself owns. `WindowOpenEvent`, `WindowCloseEvent`, and `ButtonClickEvent` are the system-level equivalents, for conditions external to it, such as a world restriction or a global lockdown.
+`canOpen`, `canClose`, and `canClick` are the window-level checks, for conditions the window or button itself owns. `WindowOpenEvent`, `WindowCloseEvent`, `WindowClickEvent`, and `ButtonPreClickEvent` are the system-level equivalents, for conditions external to it, such as a world restriction or a global lockdown.
+
+Clicks pass three gates, coarsest first: `WindowClickEvent` suppresses every button in the window at once, `ButtonPreClickEvent` suppresses one, and `canClick` is the button's own. Rate-limiting belongs in a `ButtonPreClickEvent` listener, since the framework throttles nothing itself.
 
 ### Sub-Windows and Back Buttons
 
@@ -793,10 +802,6 @@ public class SettingsWindow extends Window {
 ```
 
 `BackButton` is provided by the framework in `io.github.trae.spigot.framework.window.types.buttons`, with a default icon or one you supply.
-
-### Click Cooldowns
-
-`WindowManager` exposes `addCooldown` and `hasCooldown` as no-op hooks, so button clicks are unthrottled by default. A plugin wanting rate-limiting subclasses the manager and implements them. The cooldown is only recorded for a click that actually ran, so a refused click does not throttle the next attempt.
 
 ### Querying
 
@@ -1201,9 +1206,11 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 |---|---|
 | `WindowOpenEvent` | A window is about to be rendered and shown to a player |
 | `WindowCloseEvent` | A player closed a window, before its tracking entries are dropped |
-| `ButtonClickEvent` | A player clicked a button, before the button's action runs |
+| `WindowClickEvent` | A player clicked a window, before the click is resolved to a button |
+| `ButtonPreClickEvent` | A player clicked a button, before the button's action runs |
+| `ButtonPostClickEvent` | A button's action has run |
 
-All three are cancellable. Cancelling an open aborts it, cancelling a close re-opens the window a tick later, and cancelling a click suppresses the button's action.
+All but the last are cancellable. Cancelling an open aborts it, cancelling a close re-opens the window a tick later, cancelling a window click suppresses every button in that window, and cancelling a button click suppresses that one action. `ButtonPostClickEvent` only fires for a click that actually ran.
 
 ---
 

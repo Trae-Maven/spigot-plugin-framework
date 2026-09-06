@@ -51,8 +51,7 @@ public abstract class Button {
 
     /**
      * Performs this button's action. Called only once the click has passed the
-     * {@link io.github.trae.spigot.framework.window.events.WindowClickEvent}, the
-     * {@link io.github.trae.spigot.framework.window.events.ButtonPreClickEvent}, and
+     * {@link io.github.trae.spigot.framework.window.events.ButtonPreClickEvent} and
      * {@link #canClick(Player, ClickType)}.
      * <p>
      * The underlying inventory click is always cancelled before this runs, so the stack itself never

@@ -5,7 +5,6 @@ import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilTask;
 import io.github.trae.spigot.framework.window.events.ButtonPostClickEvent;
 import io.github.trae.spigot.framework.window.events.ButtonPreClickEvent;
-import io.github.trae.spigot.framework.window.events.WindowClickEvent;
 import io.github.trae.spigot.framework.window.events.WindowCloseEvent;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Player;
@@ -121,9 +120,8 @@ public class WindowListener implements Listener {
      * shift-clicks from the player's own inventory, so nothing can be moved into or out of a window
      * regardless of which half was clicked.
      * <p>
-     * Three gates stand between the click and {@link Button#onClick(Player, ClickType)}, coarsest
-     * first: the {@link WindowClickEvent}, which suppresses every button in the window at once; the
-     * {@link ButtonPreClickEvent}, which suppresses one; and
+     * Two gates stand between the click and {@link Button#onClick(Player, ClickType)}: the
+     * {@link ButtonPreClickEvent}, for conditions external to the button, and
      * {@link Button#canClick(Player, ClickType)}, which the button owns. A
      * {@link ButtonPostClickEvent} follows a click that ran.
      *
@@ -148,10 +146,6 @@ public class WindowListener implements Listener {
         event.setCancelled(true);
 
         if (!inventory.equals(event.getClickedInventory())) {
-            return;
-        }
-
-        if (UtilEvent.supply(new WindowClickEvent(window, player)).isCancelled()) {
             return;
         }
 

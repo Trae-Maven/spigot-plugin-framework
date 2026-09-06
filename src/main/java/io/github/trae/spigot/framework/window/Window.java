@@ -8,6 +8,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -48,6 +49,19 @@ public abstract class Window implements InventoryHolder {
      */
     protected Window(final Component title, final int rows) {
         this.inventory = Bukkit.getServer().createInventory(this, rows * 9, title);
+    }
+
+    /**
+     * Returns every button currently placed in this window.
+     * <p>
+     * The list is an immutable copy taken at call time, so it neither reflects a later
+     * {@link #render(Player)} nor allows the window's buttons to be changed through it. Order is the
+     * map's iteration order, not slot order.
+     *
+     * @return the buttons currently placed, in no meaningful order
+     */
+    public final List<Button> getButtons() {
+        return List.copyOf(this.buttonMap.values());
     }
 
     /**

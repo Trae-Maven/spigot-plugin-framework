@@ -14,9 +14,8 @@ import org.bukkit.entity.Player;
  * since the action has already happened: this is for reacting to a click that succeeded, such as
  * logging it or recording a statistic.
  * <p>
- * Only fires for a click that actually ran, so an attempt refused by
- * {@link Button#canClick(Player, org.bukkit.event.inventory.ClickType)}, by a cancelled
- * {@link ButtonPreClickEvent}, or by the click cooldown produces no post event.
+ * Only fires for a click that actually ran, so an attempt refused by {@code canClick} or by a
+ * cancelled {@link ButtonPreClickEvent} produces no post event.
  */
 @AllArgsConstructor
 @Getter
