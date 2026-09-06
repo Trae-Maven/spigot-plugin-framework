@@ -1,8 +1,6 @@
 package io.github.trae.spigot.framework.item;
 
-import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
-import io.github.trae.spigot.framework.utility.UtilServer;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Item;
 import org.bukkit.event.EventHandler;
@@ -17,8 +15,6 @@ import org.bukkit.inventory.BlockInventoryHolder;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.Inventory;
 
-import java.util.concurrent.TimeUnit;
-
 /**
  * Reconciles stacks wherever one enters a player's possession or an inventory they open, delegating
  * all stack work to {@link ItemManager}.
@@ -28,17 +24,6 @@ import java.util.concurrent.TimeUnit;
 public class ItemApplyListener implements Listener {
 
     private final ItemManager itemManager;
-
-    /**
-     * Periodic sweep reconciling every online player's inventory.
-     * <p>
-     * The event handlers cover stacks as they enter an inventory, so this catches the remaining
-     * case: a stack sitting untouched when an item's definition changes at runtime.
-     */
-    @Scheduler(period = 30, unit = TimeUnit.SECONDS)
-    public final void onScheduler() {
-        UtilServer.getOnlinePlayers().forEach(player -> this.itemManager.updateInventory(player.getInventory()));
-    }
 
     /**
      * Reconciles a dropped stack as it is picked up, so an item obtained from the world arrives in
