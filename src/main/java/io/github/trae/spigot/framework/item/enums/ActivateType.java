@@ -1,5 +1,6 @@
 package io.github.trae.spigot.framework.item.enums;
 
+import io.github.trae.spigot.framework.item.ActivatableCustomItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.event.block.Action;
@@ -10,8 +11,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The kinds of interaction that activate an {@link io.github.trae.spigot.framework.item.Activatable}
- * item.
+ * The kinds of interaction that activate an
+ * {@link ActivatableCustomItem}.
  * <p>
  * Each constant groups the vanilla {@link Action}s that mean the same thing to an item, so an
  * implementation reacts to a left click without caring whether the player was aiming at a block or

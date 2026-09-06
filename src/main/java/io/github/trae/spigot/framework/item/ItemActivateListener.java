@@ -1,10 +1,12 @@
 package io.github.trae.spigot.framework.item;
 
+import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.item.enums.ActivateType;
 import io.github.trae.spigot.framework.item.events.ItemPostActivateEvent;
 import io.github.trae.spigot.framework.item.events.ItemPreActivateEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
+import io.github.trae.spigot.framework.utility.UtilServer;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -14,13 +16,16 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.concurrent.TimeUnit;
+
 /**
- * Routes player interactions to the {@link Activatable} item behind the clicked stack.
+ * Routes player interactions to the {@link ActivatableCustomItem} behind the clicked stack, and
+ * ticks any channel those activations started.
  * <p>
- * A click reaches {@link Activatable#onActivate} only after resolving to a registered item that
- * implements the interface, surviving a cancellable {@link ItemPreActivateEvent}, and passing
- * {@link Activatable#canActivate}. Anything else is left entirely alone, so vanilla items and custom
- * items without the capability behave normally.
+ * A click reaches the item's own {@code onActivate} only after resolving to a registered item of
+ * that type, surviving a cancellable {@link ItemPreActivateEvent}, and passing the item's own
+ * {@code canActivate}. Anything else is left entirely alone, so vanilla items and custom items
+ * without the capability behave normally.
  */
 @AllArgsConstructor
 @Singleton
@@ -45,7 +50,7 @@ public class ItemActivateListener implements Listener {
      * @param event the interaction event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPlayerInteract(final PlayerInteractEvent event) {
+    public final void onPlayerInteract(final PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
@@ -57,27 +62,65 @@ public class ItemActivateListener implements Listener {
 
         ActivateType.getByAction(event.getAction()).ifPresent(activateType -> {
             this.itemManager.getItemByItemStack(itemStack).ifPresent(item -> {
-                if (!(item instanceof final Activatable activatable)) {
+                if (!(item instanceof final ActivatableCustomItem activatableCustomItem)) {
                     return;
                 }
 
                 final Player player = event.getPlayer();
 
-                if (UtilEvent.supply(new ItemPreActivateEvent(item, player, itemStack, activateType)).isCancelled()) {
+                if (UtilEvent.supply(new ItemPreActivateEvent(activatableCustomItem, player, itemStack, activateType)).isCancelled()) {
                     return;
                 }
 
-                if (!activatable.canActivate(player, itemStack, activateType)) {
+                if (!activatableCustomItem.canActivate(player, itemStack, activateType)) {
                     return;
                 }
 
-                event.setUseItemInHand(activatable.useItemInHand(player, itemStack, activateType));
-                event.setUseInteractedBlock(activatable.useInteractedBlock(player, itemStack, event.getClickedBlock(), activateType));
+                event.setUseItemInHand(activatableCustomItem.useItemInHand(player, itemStack, activateType));
+                event.setUseInteractedBlock(activatableCustomItem.useInteractedBlock(player, itemStack, event.getClickedBlock(), activateType));
 
-                activatable.onActivate(player, itemStack, activateType);
+                activatableCustomItem.onActivate(player, itemStack, activateType);
 
-                UtilEvent.dispatch(new ItemPostActivateEvent(item, player, itemStack, activateType));
+                UtilEvent.dispatch(new ItemPostActivateEvent(activatableCustomItem, player, itemStack, activateType));
             });
         });
+    }
+
+    /**
+     * Ticks every active channel, ending the ones whose conditions no longer hold.
+     * <p>
+     * A channel survives the tick only while the player is online, still holding the item that
+     * started it, still blocking, and still passing {@code canChannel}. Failing any of those ends
+     * the channel and fires {@code onStop}, so a player who logs out, swaps items, or lowers their
+     * shield leaves cleanly without the item having to watch for it.
+     * <p>
+     * Ending a channel here is also what keeps the active set bounded: nothing else removes a
+     * player, so an entry that outlived its conditions would otherwise stay forever and report the
+     * player as channelling long after they stopped.
+     */
+    @Scheduler(period = 50, unit = TimeUnit.MILLISECONDS)
+    public final void onScheduler() {
+        for (final CustomItem item : this.itemManager.getItems()) {
+            if (!(item instanceof final ChannelActivableCustomItem channelActivableCustomItem)) {
+                continue;
+            }
+
+            channelActivableCustomItem.getActiveChannelSet().removeIf(uuid -> {
+                final Player player = UtilServer.getOnlinePlayerById(uuid).orElse(null);
+                if (player == null || player.isDead() || !player.isValid()) {
+                    return true;
+                }
+
+                final ItemStack itemStack = player.getInventory().getItemInMainHand();
+
+                if (!channelActivableCustomItem.isSimilarByIdentifier(itemStack) || !player.isHandRaised() || !channelActivableCustomItem.canChannel(player, itemStack)) {
+                    channelActivableCustomItem.onStop(player, itemStack);
+                    return true;
+                }
+
+                channelActivableCustomItem.onChannel(player, itemStack);
+                return false;
+            });
+        }
     }
 }

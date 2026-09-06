@@ -1,10 +1,8 @@
 package io.github.trae.spigot.framework.item;
 
 import io.github.trae.di.InjectorApi;
-import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.utility.UtilItemStack;
-import io.github.trae.spigot.framework.utility.UtilServer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -12,9 +10,9 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Holds the registry of {@link CustomItem}s and reconciles stacks against it.
@@ -27,8 +25,9 @@ import java.util.concurrent.TimeUnit;
  * is correct whenever it happens without the manager depending on any particular plugin's enable
  * order. {@link ItemApplyListener} drives reconciliation from the pickup, crafting, smelting, and
  * join flows, and {@link ItemActivateListener} reads the same registry to route interactions to
- * {@link Activatable} items. A scheduler sweeps online inventories periodically so stacks left
- * untouched are still brought up to date after an item's definition changes.
+ * {@link ActivatableCustomItem} items. A scheduler sweeps
+ * online inventories periodically so stacks left untouched are still brought up to date after an
+ * item's definition changes.
  * <p>
  * Because population happens once, an item registered with the injector after the first lookup is
  * not picked up. Items are declared as components and constructed during their application's boot,
@@ -76,15 +75,8 @@ public class ItemManager {
         }
     }
 
-    /**
-     * Periodic sweep reconciling every online player's inventory.
-     * <p>
-     * The event handlers cover stacks as they enter an inventory, so this catches the remaining
-     * case: a stack sitting untouched when an item's definition changes at runtime.
-     */
-    @Scheduler(period = 30, unit = TimeUnit.SECONDS)
-    public final void onScheduler() {
-        UtilServer.getOnlinePlayers().forEach(this::updatePlayerInventory);
+    public final List<CustomItem> getItems() {
+        return List.copyOf(this.identifierItemMap.values());
     }
 
     /**

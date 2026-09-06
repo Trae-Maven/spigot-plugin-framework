@@ -6,11 +6,14 @@ import io.github.trae.utilities.UtilString;
 import lombok.Getter;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * An {@link Item} that stamps its identity onto every stack it produces, so the stack can be
@@ -24,8 +27,9 @@ import java.util.List;
  * Subclasses are discovered automatically by {@link ItemApplyListener} via the dependency injector
  * and registered under their identifier. An item declaring {@link #naturallyObtainable()} is also
  * registered under its material, so any vanilla stack of that type a player obtains is converted
- * into the custom item. A subclass additionally implementing {@link Activatable} gains a click
- * action, routed by {@link ItemActivateListener}.
+ * into the custom item. Extend
+ * {@link ActivatableCustomItem} instead of this class for
+ * an item that also does something when clicked, routed by {@link ItemActivateListener}.
  */
 public abstract class CustomItem extends Item {
 
@@ -163,5 +167,22 @@ public abstract class CustomItem extends Item {
         return UtilItemStack.getPersistentData(itemStack, VERSION_KEY, PersistentDataType.STRING)
                 .map(version -> !this.getVersion().equals(version))
                 .orElse(true);
+    }
+
+    /**
+     * Returns whether the entity is holding this item in its main hand, matching on the stamped
+     * identifier rather than material or meta.
+     * <p>
+     * Only the main hand is checked, and an entity with no equipment at all resolves to
+     * {@code false}.
+     *
+     * @param livingEntity the entity to check
+     * @return {@code true} if the entity's main hand holds a stack this item produced
+     */
+    public final boolean isHolding(final LivingEntity livingEntity) {
+        return Optional.ofNullable(livingEntity.getEquipment())
+                .map(EntityEquipment::getItemInMainHand)
+                .map(this::isSimilarByIdentifier)
+                .orElse(false);
     }
 }

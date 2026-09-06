@@ -1,5 +1,8 @@
 package io.github.trae.spigot.framework.item;
 
+import io.github.trae.spigot.framework.item.events.ItemMetaUpdateEvent;
+import io.github.trae.spigot.framework.item.events.ItemStackUpdateEvent;
+import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilMessage;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import lombok.AccessLevel;
@@ -69,6 +72,10 @@ public abstract class Item {
      *
      * <p>Running last means an option set here overrides the equivalent display option, so an item
      * setting a display name in both places keeps the one written here.</p>
+     *
+     * <p>Anything that lives on the stack rather than the meta, a data component in particular,
+     * belongs in an {@link ItemStackUpdateEvent} listener instead, since the meta write that follows
+     * this hook would discard it.</p>
      *
      * @param itemMeta the meta being built
      */
@@ -144,6 +151,11 @@ public abstract class Item {
 
     /**
      * Creates a new stack of this item at the given amount and durability.
+     * <p>
+     * Two events are dispatched as the stack is built: an {@link ItemMetaUpdateEvent} from inside the
+     * meta edit, for listeners writing to the meta, and an {@link ItemStackUpdateEvent} once that
+     * edit has been applied, for listeners writing to the stack itself. The order matters, since
+     * applying a meta replaces the stack's whole component set.
      *
      * @param amount     the stack size
      * @param durability the damage value, applied only when positive and the meta is
@@ -159,7 +171,11 @@ public abstract class Item {
             }
 
             this.applyItemMeta(itemMeta);
+
+            UtilEvent.dispatch(new ItemMetaUpdateEvent(this, itemMeta));
         });
+
+        UtilEvent.dispatch(new ItemStackUpdateEvent(this, itemStack));
 
         return itemStack;
     }
@@ -202,6 +218,10 @@ public abstract class Item {
      * <p>
      * Returns a new stack rather than editing in place, so callers can tell by reference whether
      * anything changed.
+     * <p>
+     * Dispatches the same {@link ItemMetaUpdateEvent} and {@link ItemStackUpdateEvent} pair as
+     * {@link #create(int, int)}, so a listener applies to a reconciled stack exactly as it does to a
+     * fresh one.
      *
      * @param itemStack the stack to update
      * @return the updated stack
@@ -209,7 +229,13 @@ public abstract class Item {
     public final ItemStack update(final ItemStack itemStack) {
         final ItemStack newItemStack = itemStack.withType(this.getMaterial());
 
-        newItemStack.editMeta(this::applyItemMeta);
+        newItemStack.editMeta(itemMeta -> {
+            this.applyItemMeta(itemMeta);
+
+            UtilEvent.dispatch(new ItemMetaUpdateEvent(this, itemMeta));
+        });
+
+        UtilEvent.dispatch(new ItemStackUpdateEvent(this, newItemStack));
 
         return newItemStack;
     }

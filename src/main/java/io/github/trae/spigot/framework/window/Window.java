@@ -80,7 +80,7 @@ public abstract class Window implements InventoryHolder {
      * @param slot the slot to look up
      * @return an {@link Optional} containing the button, or empty if the slot holds none
      */
-    public final Optional<Button> getButtonBySlot(final int slot) {
+    protected final Optional<Button> getButtonBySlot(final int slot) {
         return Optional.ofNullable(this.buttonMap.get(slot));
     }
 
@@ -121,7 +121,7 @@ public abstract class Window implements InventoryHolder {
      *
      * @param player the player the window was opened for
      */
-    public void onOpen(final Player player) {
+    protected void onOpen(final Player player) {
     }
 
     /**
@@ -130,7 +130,7 @@ public abstract class Window implements InventoryHolder {
      *
      * @param player the player who closed the window
      */
-    public void onClose(final Player player) {
+    protected void onClose(final Player player) {
     }
 
     /**
@@ -152,7 +152,7 @@ public abstract class Window implements InventoryHolder {
      * @param player the player attempting to close
      * @return {@code true} if the close may proceed
      */
-    public boolean canClose(final Player player) {
+    protected boolean canClose(final Player player) {
         return true;
     }
 

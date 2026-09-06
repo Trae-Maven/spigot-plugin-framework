@@ -1,8 +1,7 @@
 package io.github.trae.spigot.framework.item.events;
 
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
-import io.github.trae.spigot.framework.item.Activatable;
-import io.github.trae.spigot.framework.item.CustomItem;
+import io.github.trae.spigot.framework.item.ActivatableCustomItem;
 import io.github.trae.spigot.framework.item.enums.ActivateType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -17,8 +16,8 @@ import org.bukkit.inventory.ItemStack;
  * declares are applied.
  * <p>
  * This is the system-level gate, for conditions external to the item, such as a region restriction
- * or a global lockdown. A condition the item owns belongs in
- * {@link Activatable#canActivate(Player, ItemStack, ActivateType)} instead, which is checked first.
+ * or a global lockdown. A condition the item owns belongs in the item's own {@code canActivate}
+ * instead, which is checked after this event.
  */
 @AllArgsConstructor
 @Getter
@@ -27,7 +26,7 @@ public class ItemPreActivateEvent extends CustomCancellableEvent {
     /**
      * The item being activated.
      */
-    private final CustomItem item;
+    private final ActivatableCustomItem item;
 
     /**
      * The player activating it.
