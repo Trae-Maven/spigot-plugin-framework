@@ -10,15 +10,18 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.inventory.BlockInventoryHolder;
 import org.bukkit.inventory.CraftingInventory;
+import org.bukkit.inventory.Inventory;
 
 import java.util.concurrent.TimeUnit;
 
 /**
- * Reconciles stacks at every point one enters a player's possession, delegating all stack work to
- * {@link ItemManager}.
+ * Reconciles stacks wherever one enters a player's possession or an inventory they open, delegating
+ * all stack work to {@link ItemManager}.
  */
 @AllArgsConstructor
 @Singleton
@@ -34,7 +37,7 @@ public class ItemApplyListener implements Listener {
      */
     @Scheduler(period = 30, unit = TimeUnit.SECONDS)
     public final void onScheduler() {
-        UtilServer.getOnlinePlayers().forEach(this.itemManager::updatePlayerInventory);
+        UtilServer.getOnlinePlayers().forEach(player -> this.itemManager.updateInventory(player.getInventory()));
     }
 
     /**
@@ -88,7 +91,31 @@ public class ItemApplyListener implements Listener {
      * @param event the player join event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerJoin(final PlayerJoinEvent event) {
-        this.itemManager.updatePlayerInventory(event.getPlayer());
+    public final void onPlayerJoin(final PlayerJoinEvent event) {
+        this.itemManager.updateInventory(event.getPlayer().getInventory());
+    }
+
+    /**
+     * Reconciles the contents of a block-backed inventory as it is opened, so stacks stored in a
+     * chest, barrel, or shulker are brought up to date the moment a player looks at them.
+     * <p>
+     * Restricted to {@link BlockInventoryHolder} inventories, which excludes crafting grids, anvils,
+     * and the framework's own windows, whose contents are transient or managed elsewhere.
+     *
+     * @param event the inventory open event
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public final void onInventoryOpen(final InventoryOpenEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+
+        final Inventory topInventory = event.getView().getTopInventory();
+
+        if (!(topInventory.getHolder() instanceof BlockInventoryHolder)) {
+            return;
+        }
+
+        this.itemManager.updateInventory(topInventory);
     }
 }

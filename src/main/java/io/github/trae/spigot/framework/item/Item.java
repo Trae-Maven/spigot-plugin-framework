@@ -5,6 +5,7 @@ import io.github.trae.spigot.framework.item.events.ItemStackUpdateEvent;
 import io.github.trae.spigot.framework.item.style.ItemStyle;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilMessage;
+import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.utilities.UtilJava;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -26,7 +27,8 @@ import java.util.List;
 /**
  * Describes an {@link ItemStack} declaratively: its material, display name, lore, and presentation
  * options. Subclasses supply the description; {@link #create(int, int)} and
- * {@link #update(ItemStack)} turn it into a stack.
+ * {@link #update(ItemStack)} turn it into a stack, and {@link #refresh(ItemStack)} dispatches the
+ * update events against one that needs no rewriting.
  * <p>
  * This base type carries no identity, so the stacks it produces are indistinguishable from any
  * other. It suits transient stacks such as window icons, which are never picked up, persisted, or
@@ -94,6 +96,16 @@ public abstract class Item {
         return false;
     }
 
+    /**
+     * Returns the shared visual style this item belongs to, or {@code null} for none.
+     * <p>
+     * A style supplies the display name colour, the tooltip style, and a tag appended to the lore,
+     * so an item declaring one gets all three from a single decision rather than setting each
+     * itself. The framework attaches no meaning to a style beyond those three values; grouping them
+     * into rarities, tiers, or anything else is a decision for the plugin that defines them.
+     *
+     * @return the style, or {@code null}
+     */
     protected ItemStyle getStyle() {
         return null;
     }
@@ -109,7 +121,7 @@ public abstract class Item {
 
     /**
      * Returns the tooltip style key applied to the stack, or {@code null} to leave it at the
-     * default.
+     * default. Resolved from {@link #getStyle()} unless overridden.
      *
      * @return the tooltip style key, or {@code null}
      */
@@ -118,13 +130,13 @@ public abstract class Item {
     }
 
     /**
-     * Returns the colour applied to the display name when the name itself carries none. Defaults to
-     * white.
+     * Returns the colour applied to the display name when the name itself carries none. Resolved
+     * from {@link #getStyle()}, falling back to white for an item with no style.
      *
      * @return the display name colour, never {@code null}
      */
     protected Color getColor() {
-        return this.getStyle() != null ? this.getStyle().getColor() : null;
+        return this.getStyle() != null ? this.getStyle().getColor() : ChatColor.WHITE.getColor();
     }
 
     /**
@@ -139,6 +151,9 @@ public abstract class Item {
     /**
      * Returns the lore lines, or an empty list for no lore. Each line is deserialized through
      * {@link UtilMessage} and defaults to white where it carries no colour of its own.
+     * <p>
+     * An item with a style has its tag appended beneath these lines, separated by a blank, so a
+     * subclass never writes the tag itself.
      *
      * @return the lore lines
      */
@@ -207,7 +222,11 @@ public abstract class Item {
 
     /**
      * Creates a stack of this item carrying the amount and durability of an existing stack. Used to
-     * convert a vanilla stack into its custom counterpart without losing either.
+     * convert a vanilla stack into its custom counterpart.
+     * <p>
+     * Only the amount and durability cross over. A fresh stack is built, so enchantments, an anvil
+     * name, and any persistent data another plugin wrote are not carried across: the material is
+     * being reinterpreted as this item rather than the stack being preserved.
      *
      * @param itemStack the stack to take the amount and durability from
      * @return the created stack
@@ -222,18 +241,18 @@ public abstract class Item {
      * Re-applies this item's description to an existing stack, preserving its amount and durability.
      * Used to bring a stack a player already owns back in line with the item's current definition.
      * <p>
-     * Returns a new stack rather than editing in place, so callers can tell by reference whether
-     * anything changed.
+     * The stack is edited in place when its material already matches, and copied only when the
+     * material has to change, so nothing it carries is discarded either way.
      * <p>
      * Dispatches the same {@link ItemMetaUpdateEvent} and {@link ItemStackUpdateEvent} pair as
      * {@link #create(int, int)}, so a listener applies to a reconciled stack exactly as it does to a
      * fresh one.
      *
      * @param itemStack the stack to update
-     * @return the updated stack
+     * @return the updated stack, which is the input itself unless the material changed
      */
     public final ItemStack update(final ItemStack itemStack) {
-        final ItemStack newItemStack = itemStack.withType(this.getMaterial());
+        final ItemStack newItemStack = itemStack.getType() == this.material ? itemStack : itemStack.withType(this.getMaterial());
 
         newItemStack.editMeta(itemMeta -> {
             this.applyItemMeta(itemMeta);
@@ -247,9 +266,33 @@ public abstract class Item {
     }
 
     /**
+     * Dispatches this item's stack update event against a stack without re-applying its description.
+     * <p>
+     * The stack is left exactly as it is, so nothing it carries is rewritten. Only
+     * {@link ItemStackUpdateEvent} fires: there is no meta being built for an
+     * {@link ItemMetaUpdateEvent} listener to contribute to, and opening one purely to dispatch would
+     * cost a meta serialisation per stack for nothing.
+     * <p>
+     * This is what separates it from {@link #update(ItemStack)}, which writes the description before
+     * dispatching. Use that when the stack is out of date, and this when it is not, so that a
+     * listener applying something the version hash cannot know about still runs either way.
+     *
+     * @param itemStack the stack to dispatch for
+     * @return the same stack
+     */
+    public final ItemStack refresh(final ItemStack itemStack) {
+        UtilEvent.dispatch(new ItemStackUpdateEvent(this, itemStack));
+
+        return itemStack;
+    }
+
+    /**
      * Applies this item's full description to a meta: the subclass stamp first, then display name,
      * lore, model, tooltip style, and item flags. Options returning {@code null} are skipped,
      * leaving the vanilla default in place.
+     * <p>
+     * The style's tag is appended beneath the item's own lore, separated by a blank line, so it
+     * always reads as a footer rather than as another lore line.
      *
      * @param itemMeta the meta to write to
      */

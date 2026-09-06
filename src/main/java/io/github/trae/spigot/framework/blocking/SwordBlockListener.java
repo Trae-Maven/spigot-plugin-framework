@@ -25,9 +25,11 @@ import java.util.Set;
  * nothing, and with a disable cooldown scale of zero, so an axe hit cannot interrupt it. The block
  * delay is one tick rather than the shield's quarter second, so the raise registers immediately.
  * <p>
- * Only stacks built by an {@link io.github.trae.spigot.framework.item.Item} are affected, since the
- * component is applied through {@link ItemStackUpdateEvent}. A vanilla sword a player mines or
- * crafts is untouched unless it passes through the item system.
+ * Applied through {@link ItemStackUpdateEvent}, which
+ * {@link io.github.trae.spigot.framework.item.ItemManager#apply(ItemStack)} fires on every path:
+ * custom swords, vanilla ones passing through their default definition, and swords already current
+ * by version. That last group is why the refresh path exists at all, since an item's version hash
+ * covers its own description and says nothing about what a listener adds on top.
  */
 @Singleton
 public class SwordBlockListener implements Listener {
@@ -42,7 +44,7 @@ public class SwordBlockListener implements Listener {
     );
 
     /**
-     * Attaches the blocking component to a finished sword stack.
+     * Attaches the blocking component to a sword stack.
      * <p>
      * Handled on the stack event rather than the meta one because a data component set during the
      * meta edit would be discarded: applying a meta replaces the stack's whole component set.
