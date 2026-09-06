@@ -1,6 +1,7 @@
 package io.github.trae.spigot.framework.item;
 
 import io.github.trae.spigot.framework.item.enums.ActivateType;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.inventory.ItemStack;
@@ -9,11 +10,11 @@ import org.bukkit.inventory.ItemStack;
  * Implemented by a {@link CustomItem} that does something when a player clicks with it.
  * <p>
  * {@link ItemActivateListener} resolves the item behind the clicked stack and calls
- * {@link #onActivate(Player, ItemStack, ActivateType)} once the click has passed
- * {@link #canActivate(Player, ItemStack, ActivateType)} and the cancellable
- * {@link io.github.trae.spigot.framework.item.events.ItemPreActivateEvent}. An item not implementing
- * this interface is never invoked, so the capability is opt-in per item rather than a hook every
- * custom item has to override.
+ * {@link #onActivate(Player, ItemStack, ActivateType)} once the click has survived the cancellable
+ * {@link io.github.trae.spigot.framework.item.events.ItemPreActivateEvent} and passed
+ * {@link #canActivate(Player, ItemStack, ActivateType)}. An item not implementing this interface is
+ * never invoked, so the capability is opt-in per item rather than a hook every custom item has to
+ * override.
  * <p>
  * The stack is passed alongside the player because it is the specific stack that was clicked with,
  * carrying its own amount, durability, and persistent data, which the item definition itself does
@@ -22,8 +23,8 @@ import org.bukkit.inventory.ItemStack;
 public interface Activatable {
 
     /**
-     * Performs this item's action. Called only after the click has passed
-     * {@link #canActivate(Player, ItemStack, ActivateType)} and the pre-activate event.
+     * Performs this item's action. Called only after the click has survived the pre-activate event
+     * and passed {@link #canActivate(Player, ItemStack, ActivateType)}.
      *
      * @param player       the player who clicked
      * @param itemStack    the specific stack that was clicked with
@@ -35,7 +36,7 @@ public interface Activatable {
      * Returns whether this item may activate for the given player, stack, and click type (e.g. gated
      * behind a cooldown, a permission, or a durability threshold). Defaults to {@code true}.
      * <p>
-     * This is the item-level check, evaluated before the pre-activate event, for conditions the item
+     * This is the item-level check, evaluated after the pre-activate event, for conditions the item
      * itself owns.
      *
      * @param player       the player clicking
@@ -68,14 +69,16 @@ public interface Activatable {
      * to {@link Event.Result#DEFAULT}, leaving vanilla behaviour untouched.
      * <p>
      * Return {@link Event.Result#DENY} to stop the click opening a chest or toggling a lever while
-     * the item's own action runs.
+     * the item's own action runs. The block is passed so that decision can depend on what was
+     * clicked, and is {@code null} when the player clicked air.
      *
      * @param player       the player clicking
      * @param itemStack    the specific stack being clicked with
+     * @param block        the block that was clicked, or {@code null} for an air click
      * @param activateType the kind of click
      * @return the result applied to the interacted block
      */
-    default Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    default Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final Block block, final ActivateType activateType) {
         return Event.Result.DEFAULT;
     }
 }

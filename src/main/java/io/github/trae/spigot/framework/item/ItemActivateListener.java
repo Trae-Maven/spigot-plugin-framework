@@ -18,8 +18,8 @@ import org.bukkit.inventory.ItemStack;
  * Routes player interactions to the {@link Activatable} item behind the clicked stack.
  * <p>
  * A click reaches {@link Activatable#onActivate} only after resolving to a registered item that
- * implements the interface, passing {@link Activatable#canActivate}, and surviving a cancellable
- * {@link ItemPreActivateEvent}. Anything else is left entirely alone, so vanilla items and custom
+ * implements the interface, surviving a cancellable {@link ItemPreActivateEvent}, and passing
+ * {@link Activatable#canActivate}. Anything else is left entirely alone, so vanilla items and custom
  * items without the capability behave normally.
  */
 @AllArgsConstructor
@@ -33,6 +33,10 @@ public class ItemActivateListener implements Listener {
      * <p>
      * Only the main hand is handled, since the interaction event fires once per hand and an item
      * held in one hand would otherwise activate again on the other hand's pass.
+     * <p>
+     * The handler deliberately does not ignore cancelled events. An air click carries no block to
+     * interact with, so the event arrives already reporting itself as cancelled, and skipping those
+     * would leave an item that only responds to blocks.
      * <p>
      * The item's declared interaction results are applied before the action runs, so an item can
      * suppress the vanilla use of its material or of the block it was aimed at. A post event follows
@@ -59,16 +63,16 @@ public class ItemActivateListener implements Listener {
 
                 final Player player = event.getPlayer();
 
-                if (!activatable.canActivate(player, itemStack, activateType)) {
-                    return;
-                }
-
                 if (UtilEvent.supply(new ItemPreActivateEvent(item, player, itemStack, activateType)).isCancelled()) {
                     return;
                 }
 
+                if (!activatable.canActivate(player, itemStack, activateType)) {
+                    return;
+                }
+
                 event.setUseItemInHand(activatable.useItemInHand(player, itemStack, activateType));
-                event.setUseInteractedBlock(activatable.useInteractedBlock(player, itemStack, activateType));
+                event.setUseInteractedBlock(activatable.useInteractedBlock(player, itemStack, event.getClickedBlock(), activateType));
 
                 activatable.onActivate(player, itemStack, activateType);
 

@@ -3,7 +3,9 @@ package io.github.trae.spigot.framework.window;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilTask;
-import io.github.trae.spigot.framework.window.events.ButtonClickEvent;
+import io.github.trae.spigot.framework.window.events.ButtonPostClickEvent;
+import io.github.trae.spigot.framework.window.events.ButtonPreClickEvent;
+import io.github.trae.spigot.framework.window.events.WindowClickEvent;
 import io.github.trae.spigot.framework.window.events.WindowCloseEvent;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Player;
@@ -119,10 +121,11 @@ public class WindowListener implements Listener {
      * shift-clicks from the player's own inventory, so nothing can be moved into or out of a window
      * regardless of which half was clicked.
      * <p>
-     * A click reaches {@link Button#onClick(Player, ClickType)} only after passing the click
-     * cooldown, the {@link ButtonClickEvent}, and {@link Button#canClick(Player, ClickType)}. The
-     * cooldown is recorded only for a click that actually ran, so a refused click does not throttle
-     * the next attempt.
+     * Three gates stand between the click and {@link Button#onClick(Player, ClickType)}, coarsest
+     * first: the {@link WindowClickEvent}, which suppresses every button in the window at once; the
+     * {@link ButtonPreClickEvent}, which suppresses one; and
+     * {@link Button#canClick(Player, ClickType)}, which the button owns. A
+     * {@link ButtonPostClickEvent} follows a click that ran.
      *
      * @param event the inventory click event
      */
@@ -148,20 +151,24 @@ public class WindowListener implements Listener {
             return;
         }
 
-        if (this.windowManager.hasCooldown(player, WindowManager.BUTTON_CLICK_COOLDOWN_NAME)) {
+        if (UtilEvent.supply(new WindowClickEvent(window, player)).isCancelled()) {
             return;
         }
 
         window.getButtonBySlot(event.getSlot()).ifPresent(button -> {
             final ClickType clickType = event.getClick();
 
-            if (UtilEvent.supply(new ButtonClickEvent(window, button, player)).isCancelled() || !button.canClick(player, clickType)) {
+            if (UtilEvent.supply(new ButtonPreClickEvent(window, button, player)).isCancelled()) {
+                return;
+            }
+
+            if (!button.canClick(player, clickType)) {
                 return;
             }
 
             button.onClick(player, clickType);
 
-            this.windowManager.addCooldown(player, WindowManager.BUTTON_CLICK_COOLDOWN_NAME);
+            UtilEvent.dispatch(new ButtonPostClickEvent(window, button, player));
         });
     }
 

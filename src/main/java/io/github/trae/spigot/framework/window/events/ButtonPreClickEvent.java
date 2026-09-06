@@ -13,14 +13,14 @@ import org.bukkit.entity.Player;
  * Dispatched by {@link io.github.trae.spigot.framework.window.WindowListener}. Cancelling suppresses
  * the action; the underlying inventory click is cancelled regardless, so nothing moves either way.
  * <p>
- * This is the system-level gate, for conditions external to the button itself — a world restriction,
- * a global lockdown. A condition the button owns belongs in
+ * This is the system-level gate, for conditions external to the button itself, such as a world
+ * restriction or a global lockdown. A condition the button owns belongs in
  * {@link Button#canClick(Player, org.bukkit.event.inventory.ClickType)} instead, which is why the
  * click type is deliberately absent here.
  */
 @AllArgsConstructor
 @Getter
-public class ButtonClickEvent extends CustomCancellableEvent {
+public class ButtonPreClickEvent extends CustomCancellableEvent {
 
     /**
      * The window the button belongs to.

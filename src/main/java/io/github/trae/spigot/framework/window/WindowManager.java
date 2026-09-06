@@ -18,18 +18,10 @@ import java.util.UUID;
  * {@link org.bukkit.inventory.InventoryHolder} and resolves straight off the event, so a momentarily
  * stale map can never misroute a click. {@link WindowListener} keeps them in step with the inventory
  * open, close, and quit events.
- * <p>
- * The cooldown hooks are extension points: they do nothing here, so button clicks are unthrottled
- * unless a plugin subclasses this manager and implements them.
  */
 @Getter
 @Singleton
 public class WindowManager {
-
-    /**
-     * The cooldown name button clicks are gated under.
-     */
-    public static final String BUTTON_CLICK_COOLDOWN_NAME = "Button Click";
 
     /**
      * The window each player currently has open, keyed by their identifier.
@@ -59,27 +51,5 @@ public class WindowManager {
      */
     public final Optional<Window> getWindowByInventory(final Inventory inventory) {
         return Optional.ofNullable(this.windowByInventoryMap.get(inventory));
-    }
-
-    /**
-     * Records a cooldown of the given name against the player. Does nothing by default; override to
-     * gate repeated button clicks.
-     *
-     * @param player the player to record against
-     * @param name   the cooldown name
-     */
-    protected void addCooldown(final Player player, final String name) {
-    }
-
-    /**
-     * Returns whether the player is currently under a cooldown of the given name. Always
-     * {@code false} by default, so clicks are unthrottled until overridden.
-     *
-     * @param player the player to check
-     * @param name   the cooldown name
-     * @return {@code true} if the player is on cooldown
-     */
-    protected boolean hasCooldown(final Player player, final String name) {
-        return false;
     }
 }

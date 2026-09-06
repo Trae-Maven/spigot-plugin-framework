@@ -37,9 +37,9 @@ public abstract class Button {
      * Returns whether the given player may click this button with the given click type (e.g. gated
      * behind a permission, or restricted to left clicks). Defaults to {@code true}.
      * <p>
-     * This is the window-level check, evaluated after the system-level
-     * {@link io.github.trae.spigot.framework.window.events.ButtonClickEvent} and used for conditions
-     * the button itself owns.
+     * This is the button-level check, evaluated after the system-level
+     * {@link io.github.trae.spigot.framework.window.events.ButtonPreClickEvent} and used for
+     * conditions the button itself owns.
      *
      * @param player    the player clicking
      * @param clickType the type of click
@@ -50,8 +50,9 @@ public abstract class Button {
     }
 
     /**
-     * Performs this button's action. Called only once the click has passed both the
-     * {@link io.github.trae.spigot.framework.window.events.ButtonClickEvent} and
+     * Performs this button's action. Called only once the click has passed the
+     * {@link io.github.trae.spigot.framework.window.events.WindowClickEvent}, the
+     * {@link io.github.trae.spigot.framework.window.events.ButtonPreClickEvent}, and
      * {@link #canClick(Player, ClickType)}.
      * <p>
      * The underlying inventory click is always cancelled before this runs, so the stack itself never
