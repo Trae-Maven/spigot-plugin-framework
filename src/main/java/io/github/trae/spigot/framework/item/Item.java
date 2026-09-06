@@ -2,9 +2,10 @@ package io.github.trae.spigot.framework.item;
 
 import io.github.trae.spigot.framework.item.events.ItemMetaUpdateEvent;
 import io.github.trae.spigot.framework.item.events.ItemStackUpdateEvent;
+import io.github.trae.spigot.framework.item.style.ItemStyle;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilMessage;
-import io.github.trae.spigot.framework.utility.enums.ChatColor;
+import io.github.trae.utilities.UtilJava;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -19,6 +20,7 @@ import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.awt.Color;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -92,6 +94,10 @@ public abstract class Item {
         return false;
     }
 
+    protected ItemStyle getStyle() {
+        return null;
+    }
+
     /**
      * Returns the item model key applied to the stack, or {@code null} to leave it at the default.
      *
@@ -108,7 +114,7 @@ public abstract class Item {
      * @return the tooltip style key, or {@code null}
      */
     protected NamespacedKey getTooltipStyle() {
-        return null;
+        return this.getStyle() != null ? this.getStyle().getTooltipStyle() : null;
     }
 
     /**
@@ -118,7 +124,7 @@ public abstract class Item {
      * @return the display name colour, never {@code null}
      */
     protected Color getColor() {
-        return ChatColor.WHITE.getColor();
+        return this.getStyle() != null ? this.getStyle().getColor() : null;
     }
 
     /**
@@ -260,8 +266,19 @@ public abstract class Item {
         }
 
         // Lore
-        if (this.getLore() != null && !this.getLore().isEmpty()) {
-            itemMeta.lore(this.getLore().stream().map(line -> UtilMessage.deserialize(line).colorIfAbsent(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)).toList());
+        if (this.getLore() != null) {
+            final List<String> lore = UtilJava.createCollection(new ArrayList<>(), list -> {
+                if (!this.getLore().isEmpty()) {
+                    list.addAll(this.getLore());
+                }
+
+                if (this.getStyle() != null) {
+                    list.add("");
+                    list.add("<font:custom:tags>%s</font>".formatted(this.getStyle().getTag()));
+                }
+            });
+
+            itemMeta.lore(lore.stream().map(line -> UtilMessage.deserialize(line).colorIfAbsent(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)).toList());
         }
 
         // Model
