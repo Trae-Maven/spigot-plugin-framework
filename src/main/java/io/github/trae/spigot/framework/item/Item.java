@@ -269,14 +269,16 @@ public abstract class Item {
     }
 
     /**
-     * Re-applies this item's description to an existing stack while preserving its amount and wear.
+     * Re-applies this item's description to an existing stack while preserving its amount and
+     * accounting for its existing wear.
      * Used to bring a stack a player already owns back in line with the item's current definition.
      * <p>
      * If the stack already has the correct material, it is updated in place and its current damage
-     * is preserved. If the material changes, the stack is copied with the new material and its
-     * existing damage is adjusted relative to the maximum durability of the old and new materials.
-     * This allows wear on a less durable material to become less significant when upgrading to a
-     * more durable material, and vice versa.
+     * is preserved. If the material changes, its damage is adjusted according to the maximum
+     * durability of the old and new materials. When changing to a more durable material, existing
+     * wear is reduced proportionally. When changing to a less durable material, damage is applied
+     * only when the old item's remaining durability falls below the new material's maximum
+     * durability.
      * <p>
      * Dispatches the same {@link ItemMetaUpdateEvent} and {@link ItemStackUpdateEvent} pair as
      * {@link #create(int, int)}, so listeners apply to an updated stack exactly as they do to a
@@ -297,7 +299,21 @@ public abstract class Item {
                     final int newMaxDurability = newItemStack.getType().getMaxDurability();
 
                     if (oldMaxDurability > 0 && newMaxDurability > 0) {
-                        damageable.setDamage((int) Math.round(damageable.getDamage() * ((double) oldMaxDurability / newMaxDurability)));
+                        final int oldDamage = damageable.getDamage();
+                        final int newDamage;
+
+                        if (newMaxDurability > oldMaxDurability) {
+                            // Weak -> strong: existing wear becomes less significant.
+                            newDamage = (int) Math.round(oldDamage * ((double) oldMaxDurability / newMaxDurability));
+                        } else {
+                            // Strong -> weak: only damage the new item if the old item's
+                            // remaining durability is below the new item's maximum.
+                            final int remainingDurability = oldMaxDurability - oldDamage;
+
+                            newDamage = Math.max(0, newMaxDurability - remainingDurability);
+                        }
+
+                        damageable.setDamage(newDamage);
                     }
                 }
             }
