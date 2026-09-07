@@ -88,21 +88,23 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
     /**
      * {@inheritDoc}
      *
-     * <p>Forwards to {@link #getCooldownName()}, dropping the click type.</p>
+     * <p>For this item's click type, forwards to {@link #getCooldownName()}. Other click types retain
+     * the superclass behaviour.</p>
      */
     @Override
     public final String getCooldownName(final ActivateType activateType) {
-        return this.getCooldownName();
+        return activateType == this.activateType ? this.getCooldownName() : super.getCooldownName(activateType);
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Forwards to {@link #getCooldownDuration()}, dropping the click type.</p>
+     * <p>For this item's click type, forwards to {@link #getCooldownDuration()}. Other click types
+     * retain the superclass behaviour.</p>
      */
     @Override
     public final long getCooldownDuration(final ActivateType activateType) {
-        return this.getCooldownDuration();
+        return activateType == this.activateType ? this.getCooldownDuration() : super.getCooldownDuration(activateType);
     }
 
     /**
@@ -131,8 +133,9 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
     }
 
     /**
-     * Returns the name this item's activation cooldown is recorded under, resolved from the
-     * superclass default for this item's click type.
+     * Returns the name under which this item's activation cooldown is recorded.
+     * <p>
+     * Defaults to the cooldown name associated with this item's click type.
      *
      * @return the cooldown name
      */
@@ -141,8 +144,9 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
     }
 
     /**
-     * Returns how long the activation cooldown lasts, resolved from the superclass default for this
-     * item's click type.
+     * Returns how long this item's activation cooldown lasts.
+     * <p>
+     * Defaults to the cooldown duration associated with this item's click type.
      *
      * @return the cooldown duration
      */
