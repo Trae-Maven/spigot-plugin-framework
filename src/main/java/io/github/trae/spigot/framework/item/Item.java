@@ -269,23 +269,32 @@ public abstract class Item {
     }
 
     /**
-     * Re-applies this item's description to an existing stack, preserving its amount and durability.
+     * Re-applies this item's description to an existing stack while preserving its amount.
      * Used to bring a stack a player already owns back in line with the item's current definition.
      * <p>
-     * The stack is edited in place when its material already matches, and copied only when the
-     * material has to change, so nothing it carries is discarded either way.
+     * If the stack already has the correct material, it is updated in place and its current damage
+     * is preserved. If the material has changed, the stack is copied with the new material and any
+     * existing damage is reset to {@code 0}.
      * <p>
      * Dispatches the same {@link ItemMetaUpdateEvent} and {@link ItemStackUpdateEvent} pair as
-     * {@link #create(int, int)}, so a listener applies to a reconciled stack exactly as it does to a
-     * fresh one.
+     * {@link #create(int, int)}, so listeners apply to an updated stack exactly as they do to a
+     * freshly created one.
      *
      * @param itemStack the stack to update
-     * @return the updated stack, which is the input itself unless the material changed
+     * @return the updated stack, which is the input itself unless its material changed
      */
     public final ItemStack update(final ItemStack itemStack) {
-        final ItemStack newItemStack = itemStack.getType() == this.material ? itemStack : itemStack.withType(this.getMaterial());
+        final boolean requiresMaterialUpdate = itemStack.getType() != this.material;
+
+        final ItemStack newItemStack = requiresMaterialUpdate ? itemStack.withType(this.getMaterial()) : itemStack;
 
         newItemStack.editMeta(itemMeta -> {
+            if (requiresMaterialUpdate) {
+                if (itemMeta instanceof final Damageable damageable && damageable.getDamage() > 0) {
+                    damageable.setDamage(0);
+                }
+            }
+
             this.applyItemMeta(itemMeta, true);
 
             UtilEvent.dispatch(new ItemMetaUpdateEvent(this, itemMeta));
