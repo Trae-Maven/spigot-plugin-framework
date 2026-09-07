@@ -154,12 +154,17 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
      * Returns whether this item may activate for the given player and stack (e.g. gated behind a
      * resource or a durability threshold). The click type is not passed, since it is already known
      * to be this item's own.
+     * <p>
+     * This is the item-level check, evaluated after the pre-activate event, for conditions the item
+     * itself owns.
      *
      * @param player    the player clicking
      * @param itemStack the specific stack being clicked with
      * @return {@code true} if the activation should proceed
      */
-    public abstract boolean canActivate(final Player player, final ItemStack itemStack);
+    public boolean canActivate(final Player player, final ItemStack itemStack) {
+        return true;
+    }
 
     /**
      * Performs this item's action.
