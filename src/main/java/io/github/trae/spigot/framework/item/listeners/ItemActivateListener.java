@@ -132,7 +132,7 @@ public class ItemActivateListener implements Listener {
                     return true;
                 }
 
-                if (UtilEvent.supply(new ItemChannelEvent(channelCustomItem, player, itemStack)).isCancelled() || !channelCustomItem.canChannel(player, itemStack)) {
+                if (UtilEvent.supply(new ItemChannelEvent(channelCustomItem, player, itemStack)).isCancelled() || !channelCustomItem.canActivate(player, itemStack) || !channelCustomItem.canChannel(player, itemStack)) {
                     channelCustomItem.onStop(player, itemStack);
                     return true;
                 }

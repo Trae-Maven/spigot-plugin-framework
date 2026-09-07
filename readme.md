@@ -179,6 +179,7 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.sidebar` | `SidebarManager`, `SidebarListener` |
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
 | `io.github.trae.spigot.framework.team` | `TeamManager`, `TeamListener` |
+| `io.github.trae.spigot.framework.blocking` | `SwordBlockListener` |
 
 Your own `@Application` class's package is always scanned, so the sidebars, items, windows, and teams you define alongside it are discovered without any extra declaration. `@Scan` is only for pulling in packages you do not own.
 
@@ -287,14 +288,14 @@ Use `UtilEvent` for thread-safe event dispatch:
 // Synchronous, fire and inspect
 MyEvent event = UtilEvent.supply(new MyEvent());
 if (event.isCancelled()) {
-    return;
-}
+        return;
+        }
 
 // Asynchronous, fire and forget
-UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
+        UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
 
 // Asynchronous, fire and chain
-UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(event -> System.out.println("Done: " + event.isCancelled()));
+        UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(event -> System.out.println("Done: " + event.isCancelled()));
 ```
 
 ### Task Execution
@@ -353,7 +354,9 @@ UtilMessage.log("Core", "Plugin loaded successfully!");
 
 The framework provides a declarative item system. An item describes what a stack should look like, and the framework turns that description into an `ItemStack` and keeps existing stacks in line with it.
 
-There are two levels. `Item` is the plain description, producing stacks with no identity, suited to transient things such as window icons. `CustomItem` stamps an identifier and a version hash onto every stack it produces, so the stack can be recognised later and replaced when the definition changes.
+`Item` is the plain description, producing stacks with no identity, suited to transient things such as window icons. `CustomItem` stamps an identifier and a version hash onto every stack it produces, so the stack can be recognised later and brought back in line when the definition changes. `ActivatableCustomItem` and its subclasses add click behaviour on top.
+
+A stack the framework does not recognise still passes through, under a `DefaultItem` for its material. Nothing is written to it, but the update events fire, so a listener can apply something uniformly across every stack rather than only the custom ones.
 
 Requires `@Scan("io.github.trae.spigot.framework.item")`.
 
@@ -369,17 +372,17 @@ public class BackIcon extends Item {
     }
 
     @Override
-    protected Color getColor() {
+    public Color getColor() {
         return ChatColor.RED.getColor();
     }
 
     @Override
-    protected String getDisplayName() {
+    public String getDisplayName() {
         return "Back";
     }
 
     @Override
-    protected List<String> getLore() {
+    public List<String> getLore() {
         return List.of("Return to the previous window.");
     }
 }
@@ -391,28 +394,23 @@ final ItemStack itemStack = new BackIcon().create();
 
 ### Defining a Custom Item
 
-Extend `CustomItem` and register it as a component. `ItemApplyListener` discovers every subclass through the dependency injector at server load and registers it under its identifier:
+Extend `CustomItem` and register it as a component. `ItemManager` discovers every subclass through the dependency injector on first use and registers it under its identifier:
 
 ```java
 @Singleton
 public class MinersPickaxe extends CustomItem {
 
     public MinersPickaxe() {
-        super(Material.IRON_PICKAXE, "miners_pickaxe");
+        super(Material.IRON_PICKAXE, "2f9c1e04-7a13-4f60-9d2b-5c81ab3e7f10", "MINERS_PICKAXE");
     }
 
     @Override
-    protected Color getColor() {
-        return ChatColor.AQUA.getColor();
-    }
-
-    @Override
-    protected String getDisplayName() {
+    public String getDisplayName() {
         return "Miner's Pickaxe";
     }
 
     @Override
-    protected List<String> getLore() {
+    public List<String> getLore() {
         return List.of(
                 "Mines a little faster than it should.",
                 "",
@@ -421,11 +419,22 @@ public class MinersPickaxe extends CustomItem {
     }
 
     @Override
-    protected NamespacedKey getModel() {
+    public NamespacedKey getModel() {
         return new NamespacedKey("custom", "miners_pickaxe");
     }
 }
 ```
+
+### Identifier and Namespace
+
+The two arguments after the material do different jobs, and only one of them is ever written to a stack.
+
+| Value | Purpose |
+|---|---|
+| Identifier | Opaque and permanent. Stamped onto every stack, so the item can be renamed, restyled or moved between packages without orphaning stacks already in circulation. |
+| Namespace | The readable key. Never stamped, used for commands, configuration and search. |
+
+A UUID makes a good identifier precisely because it means nothing: there is no temptation to change it when the item's name changes. Renaming the namespace costs nothing, since no stack refers to it.
 
 ### Creating Stacks
 
@@ -441,7 +450,12 @@ final ItemStack damaged = minersPickaxe.create(1, 250);
 
 // Taking amount and durability from an existing stack
 final ItemStack converted = minersPickaxe.create(existingItemStack);
+
+// A display-only stack carrying no identity, for a menu icon
+final ItemStack icon = minersPickaxe.createView();
 ```
+
+`createView` skips the identity stamp, so the stack has no identifier and no version and `ItemManager` will never recognise it. Use it anywhere a player looks at an item rather than owns it: a stack from `create` is indistinguishable from a real item were it ever to escape into an inventory, where a view stack plainly is not one.
 
 ### Typed Meta
 
@@ -460,6 +474,34 @@ It runs after the display options, so an option set here overrides the equivalen
 
 > **Note:** `editMeta` exists separately from `stamp(ItemMeta)` because `CustomItem` marks that method final to write its identifier and version, leaving subclasses no other way to reach the meta. Anything set here is also invisible to the version hash, so fold the state behind it into `generateVersionEntries()` if existing stacks should be reconciled when it changes.
 
+### Styles
+
+An `ItemStyle` carries a colour, a tooltip style key and a tag glyph, so an item makes one decision rather than three:
+
+```java
+@Override
+protected ItemStyle getStyle() {
+    return ItemQuality.LEGENDARY;
+}
+```
+
+The style supplies the display name colour, sets the tooltip frame, and appends its tag beneath the item's lore separated by a blank line. An item declaring one writes no colour, no tooltip style and no tag line of its own.
+
+The framework attaches no meaning to a style beyond those three values. Grouping them into rarities, tiers or anything else is a decision for the plugin that defines them:
+
+```java
+@UtilityClass
+public class ItemQuality {
+
+    public static final ItemStyle LEGENDARY = ItemStyle.of(
+            "Legendary", // Name
+            ChatColor.GOLD.getColor(), // Color
+            new NamespacedKey("custom", "legendary"), // Tooltip Style
+            "\uE005" // Tag
+    );
+}
+```
+
 ### Naturally Obtainable Items
 
 An item declaring `naturallyObtainable()` is registered under its material as well as its identifier. Any vanilla stack of that material a player mines, crafts, smelts, or picks up is converted into the custom item automatically:
@@ -473,23 +515,23 @@ public class RawIron extends CustomItem {
     }
 
     @Override
-    protected boolean naturallyObtainable() {
-        return true;
-    }
-
-    @Override
-    protected Color getColor() {
+    public Color getColor() {
         return ChatColor.WHITE.getColor();
     }
 
     @Override
-    protected String getDisplayName() {
+    public String getDisplayName() {
         return "Raw Iron";
     }
 
     @Override
-    protected List<String> getLore() {
+    public List<String> getLore() {
         return List.of("Smelt in a furnace to refine.");
+    }
+
+    @Override
+    protected boolean naturallyObtainable() {
+        return true;
     }
 }
 ```
@@ -498,47 +540,139 @@ Only one item may claim a given material. Registering two throws at server load.
 
 ### Activatable Items
 
-An item implementing `Activatable` gains a click action. `ItemActivateListener` resolves the item behind the clicked stack and calls `onActivate` once the click has passed the item's own gate and the cancellable `ItemPreActivateEvent`:
+Extend `ActivatableCustomItem` for an item that does something when clicked. `ItemActivateListener` resolves the item behind the clicked stack and calls `onActivate` once the click has survived the cancellable `ItemPreActivateEvent` and passed the item's own `canActivate`:
 
 ```java
 @Singleton
-public class MinersPickaxe extends CustomItem implements Activatable {
+public class MinersPickaxe extends SingleActivatableCustomItem {
 
     public MinersPickaxe() {
-        super(Material.IRON_PICKAXE, "miners_pickaxe");
+        super(Material.IRON_PICKAXE, "2f9c1e04-7a13-4f60-9d2b-5c81ab3e7f10", "MINERS_PICKAXE", ActivateType.RIGHT_CLICK);
     }
 
     @Override
-    public void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
-        if (activateType != ActivateType.RIGHT_CLICK) {
-            return;
-        }
-
-        UtilMessage.message(player, "Items", "Vein mining <green>enabled</green>.");
-    }
-
-    @Override
-    protected Color getColor() {
-        return ChatColor.AQUA.getColor();
-    }
-
-    @Override
-    protected String getDisplayName() {
+    public String getDisplayName() {
         return "Miner's Pickaxe";
     }
 
     @Override
-    protected List<String> getLore() {
-        return List.of(
-                "Mines a little faster than it should.",
-                "",
-                "Right-Click to toggle vein mining."
-        );
+    public List<String> getLore() {
+        return List.of("Mines a little faster than it should.");
+    }
+
+    @Override
+    public void onActivate(final Player player, final ItemStack itemStack) {
+        UtilMessage.message(player, "Items", "Vein mining <green>enabled</green>.");
     }
 }
 ```
 
-The capability is opt-in per item rather than a hook every custom item overrides, so an item that does not implement the interface is never invoked.
+An item extending `CustomItem` directly is never invoked, so the capability is opt-in per item rather than a hook every custom item overrides.
+
+### Single-Click Items
+
+Most items respond to one kind of click and branch on nothing. `SingleActivatableCustomItem` fixes the click type at construction and drops the `ActivateType` parameter from every hook:
+
+```java
+@Singleton
+public class WarpStone extends SingleActivatableCustomItem {
+
+    public WarpStone() {
+        super(Material.AMETHYST_SHARD, "7e51c3b8-2d94-4a06-b83f-1ac6d095e274", "WARP_STONE", ActivateType.RIGHT_CLICK);
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Warp Stone";
+    }
+
+    @Override
+    public List<String> getLore() {
+        return List.of("Warm to the touch, and always pointing home.");
+    }
+
+    @Override
+    public boolean canActivate(final Player player, final ItemStack itemStack) {
+        return !player.isInsideVehicle();
+    }
+
+    @Override
+    public void onActivate(final Player player, final ItemStack itemStack) {
+        player.teleport(player.getWorld().getSpawnLocation());
+    }
+
+    @Override
+    public String getCooldownName() {
+        return "Warp";
+    }
+
+    @Override
+    public long getCooldownDuration() {
+        return TimeUnit.MINUTES.toMillis(5);
+    }
+}
+```
+
+The cooldown hooks lose their `ActivateType` parameter too, since the click type is already fixed.
+
+Any other click type is refused before the item's own checks run, so a left click never reaches `onActivate` and the item writes no click-type check. Every parameterised hook is final, so a subclass cannot accidentally override the wrong overload.
+
+### Channelled Items
+
+`ChannelCustomItem` is for an item that does something continuously while a player holds right click, rather than once when they press it:
+
+```java
+@Singleton
+public class DiviningRod extends ChannelCustomItem {
+
+    public DiviningRod() {
+        super(Material.STICK, "0d4f8a21-6b3c-4e79-8f15-c2a70b9e4d33", "DIVINING_ROD");
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Divining Rod";
+    }
+
+    @Override
+    public List<String> getLore() {
+        return List.of("It only has opinions underground.");
+    }
+
+    @Override
+    public boolean canChannel(final Player player, final ItemStack itemStack) {
+        return player.getLocation().getBlockY() < 40;
+    }
+
+    @Override
+    public void onStart(final Player player, final ItemStack itemStack) {
+        UtilMessage.message(player, "Items", "The rod begins to twitch.");
+    }
+
+    @Override
+    public void onStop(final Player player, final ItemStack itemStack) {
+        UtilMessage.message(player, "Items", "The rod falls still.");
+    }
+
+    @Override
+    public void onChannel(final Player player, final ItemStack itemStack) {
+        player.getWorld().spawnParticle(Particle.WAX_OFF, player.getLocation().add(0, 1, 0), 4, 0.2, 0.2, 0.2, 0.01);
+    }
+}
+```
+
+The right click starts a channel and a scheduler ticks it from there. `onChannel` runs every tick until the player lets go, swaps items, logs out, an `ItemChannelEvent` is cancelled, or `canChannel` stops returning `true`. Whichever ends it, `onStop` fires exactly once.
+
+Note `canChannel` is checked every tick rather than only at the start, so this rod stops on its own the moment the player climbs above ground.
+
+| Hook | When |
+|---|---|
+| `onStart` | Once, when the channel begins |
+| `onChannel` | Every tick the channel runs |
+| `onStop` | Once, however the channel ended |
+| `canChannel` | Every tick, before `onChannel` |
+
+Holding right click requires the item to have a use action. Many materials have none, a sword and a stick among them, and the hold never registers for those. See [Sword Blocking](#sword-blocking) for the component that gives one to a sword.
 
 ### Activation Types
 
@@ -574,7 +708,12 @@ public boolean canActivate(final Player player, final ItemStack itemStack, final
         return false;
     }
 
-    return !this.cooldownManager.hasCooldown(player, "Vein Mine");
+    if (player.isInWater() || player.isInLava()) {
+        UtilMessage.message(player, "Item", "You cannot use <green>%s</green> while in liquid.".formatted(this.getDisplayName()));
+        return false;
+    }
+
+    return true;
 }
 ```
 
@@ -589,7 +728,42 @@ public void onItemPreActivate(final ItemPreActivateEvent event) {
 }
 ```
 
-`ItemPostActivateEvent` fires after a successful activation, for recording a cooldown or a statistic. It is not cancellable, and never fires for an activation that was refused.
+`ItemPostActivateEvent` fires after a successful activation, for recording a statistic or logging. It is not cancellable, and never fires for an activation that was refused.
+
+### Cooldowns
+
+An item declares its own cooldown rather than each caller managing one:
+
+```java
+@Override
+public String getCooldownName(final ActivateType activateType) {
+    return this.getDisplayName();
+}
+
+@Override
+public long getCooldownDuration(final ActivateType activateType) {
+    return TimeUnit.SECONDS.toMillis(5);
+}
+```
+
+The name is the key rather than the item, so two items returning the same name share a cooldown, and one item returning different names per click type gates each independently. `getCooldownName` defaults to the display name and `getCooldownDuration` to zero, meaning no cooldown.
+
+A `SingleActivatableCustomItem` gets the parameterless overloads, since the click type is already fixed.
+
+### Gating a Channel
+
+A channel has the same split, checked every tick rather than once. `canChannel` is the item's own condition and `ItemChannelEvent` is the system-level one:
+
+```java
+@EventHandler
+public void onItemChannel(final ItemChannelEvent event) {
+    if (this.regionManager.isInSafezone(event.getPlayer())) {
+        event.setCancelled(true);
+    }
+}
+```
+
+Cancelling ends the channel outright rather than pausing it: `onChannel` does not run for that tick, `onStop` fires, and the player is dropped from the item's active set. The event is evaluated first, so `canChannel` never runs in a context the server has already refused.
 
 ### Suppressing Vanilla Behaviour
 
@@ -657,13 +831,27 @@ protected List<String> generateVersionEntries() {
 final ItemStack reconciled = this.itemManager.apply(itemStack);
 
 // Reconcile a whole inventory
-this.itemManager.updatePlayerInventory(player);
+this.itemManager.updateInventory(player.getInventory());
 
-// Look an item up
-this.itemManager.getItemByIdentifier("miners_pickaxe").ifPresent(item -> player.getInventory().addItem(item.create()));
+// Look an item up by identifier
+this.itemManager.getItemByIdentifier(identifier).ifPresent(item -> player.getInventory().addItem(item.create()));
+
+// Resolve one from a name a player typed, matching on namespace
+this.itemManager.searchItem(sender, input, true).ifPresent(item -> player.getInventory().addItem(item.create()));
 ```
 
-`apply` returns the input reference untouched when nothing changed, so callers can skip a write with an identity comparison.
+`apply` takes one of three routes, and only one of them replaces the stack:
+
+| Stack | Route |
+|---|---|
+| Known identifier, outdated version | `update`, rewriting the description in place |
+| Known identifier, current version | `refresh`, dispatching the events and nothing else |
+| No identifier, obtainable material | `create`, building a fresh stack |
+| Anything else | `refresh` under its `DefaultItem` |
+
+Only the obtainable route replaces a stack outright, and it does so deliberately: the material is being reinterpreted as a custom item, so enchantments and other data do not carry across. Every other route returns the input by reference, so an identity comparison tells a caller whether the stack was replaced rather than merely altered.
+
+The refresh route exists so a listener still runs against a stack that needed no rewriting. An item's version hash covers its own description and knows nothing about what a listener adds on top, so version-gating alone would leave those stacks permanently missing it.
 
 ---
 
@@ -690,43 +878,45 @@ public class ProfileWindow extends Window {
 
     @Override
     protected void populate(final Player player) {
-        this.addButton(new StatsButton(11, this.accountManager, player));
-        this.addButton(new SettingsButton(15, this));
+        this.addButton(new StatsButton(this, 11, player));
+        this.addButton(new SettingsButton(this, 15));
     }
 }
 ```
 
 ### Defining a Button
 
-Extend `Button` with the slot it occupies. `getItemStack` is resolved on every refresh, so a button whose appearance depends on changing state simply returns a different stack next time the window redraws:
+Extend `Button`, typed with the window it belongs to, and pass that window, the slot, and the stack it renders:
 
 ```java
-public class SettingsButton extends Button {
+public class SettingsButton extends Button<ProfileWindow> {
 
-    private final Window parentWindow;
-
-    public SettingsButton(final int slot, final Window parentWindow) {
-        super(slot);
-
-        this.parentWindow = parentWindow;
+    public SettingsButton(final ProfileWindow window, final int slot) {
+        super(window, slot, new SettingsIcon().createView());
     }
 
     @Override
-    protected ItemStack getItemStack() {
-        return new SettingsIcon().create();
+    protected List<String> getLore() {
+        return List.of("<green>Click to open settings.");
     }
 
     @Override
-    protected boolean canClick(final Player player, final ClickType clickType) {
+    public boolean canClick(final Player player, final ClickType clickType) {
         return clickType.isLeftClick();
     }
 
     @Override
-    protected void onClick(final Player player, final ClickType clickType) {
-        UtilWindow.open(player, new SettingsWindow(this.parentWindow));
+    public void onClick(final Player player, final ClickType clickType) {
+        UtilWindow.open(player, new SettingsWindow(this.getWindow()));
     }
 }
 ```
+
+The window is typed, so a button reaches its window's own state and methods without a cast: paging, toggling a filter, or triggering a re-render.
+
+`getDisplayName` and `getLore` layer over the base stack rather than replacing it. The base is cloned first, so a button handed a shared stack never mutates it; a display name the button declares overrides the base's own, and lore is appended beneath the base's, separated by a blank line. That lets a button annotate an item with what clicking it does while leaving the item's own description intact.
+
+Use `createView()` rather than `create()` for the base stack. A menu icon has no business carrying an item's identity, and a view stack cannot be mistaken for the real thing were it ever to escape the window.
 
 ### Opening a Window
 
@@ -758,7 +948,7 @@ Because the inventory is reused, calling either on a window someone is currently
 
 ```java
 @Override
-protected void onClick(final Player player, final ClickType clickType) {
+public void onClick(final Player player, final ClickType clickType) {
     this.window.setPage(this.window.getPage() + 1);
 
     this.window.render(player);
@@ -775,9 +965,9 @@ protected void onClick(final Player player, final ClickType clickType) {
 | `onClose(Player)` | Called after the player closed it and tracking entries were dropped |
 | `Button#canClick(Player, ClickType)` | Returning `false` suppresses the button's action |
 
-`canOpen`, `canClose`, and `canClick` are the window-level checks, for conditions the window or button itself owns. `WindowOpenEvent`, `WindowCloseEvent`, `WindowClickEvent`, and `ButtonPreClickEvent` are the system-level equivalents, for conditions external to it, such as a world restriction or a global lockdown.
+`canOpen`, `canClose`, and `canClick` are the window-level checks, for conditions the window or button itself owns. `WindowOpenEvent`, `WindowCloseEvent`, and `ButtonPreClickEvent` are the system-level equivalents, for conditions external to it, such as a world restriction or a global lockdown.
 
-Clicks pass three gates, coarsest first: `WindowClickEvent` suppresses every button in the window at once, `ButtonPreClickEvent` suppresses one, and `canClick` is the button's own. Rate-limiting belongs in a `ButtonPreClickEvent` listener, since the framework throttles nothing itself.
+A click passes `ButtonPreClickEvent` first, then `canClick`, and fires `ButtonPostClickEvent` once the action has run. The framework throttles nothing itself, so rate-limiting belongs in a `ButtonPreClickEvent` listener.
 
 ### Sub-Windows and Back Buttons
 
@@ -817,6 +1007,22 @@ Click dispatch never consults these maps. A window is its own `InventoryHolder`,
 
 ---
 
+## Sword Blocking
+
+A sword has no use action of its own, so right-clicking one does nothing and `isBlocking` can never become true for it. `SwordBlockListener` attaches the `blocks_attacks` data component to every sword the item system produces, which gives it one.
+
+Requires `@Scan("io.github.trae.spigot.framework.blocking")`.
+
+That matters for two reasons. It is what lets a `ChannelCustomItem` on a sword material register the hold at all, and it drives the `minecraft:using_item` model condition a resource pack needs to swap in a blocking pose.
+
+The component is applied with no damage reductions, so blocking is a pure gesture that reduces nothing, and with a disable cooldown scale of zero, so an axe hit cannot interrupt it. The block delay is one tick rather than the shield's quarter second, so the raise registers immediately.
+
+It hooks `ItemStackUpdateEvent`, which fires on every route through `apply`, so custom swords, vanilla ones passing through their default definition, and swords already current by version are all covered.
+
+> **Note:** the arm animation is the shield's, not 1.8's. A resource pack can change how the sword sits in the hand while blocking, but not how the arm moves.
+
+---
+
 ## Sidebar System
 
 The framework provides a packet-based sidebar (scoreboard) system with priority-based resolution. Multiple `Sidebar` subclasses can be registered, and the lowest priority one that passes all display checks is shown. Only changed lines and titles produce packets, eliminating flicker.
@@ -834,7 +1040,7 @@ public class HubSidebar extends Sidebar {
     private final PlayerManager playerManager;
 
     public HubSidebar(final PlayerManager playerManager) {
-        super("hub", 10);
+        super("HUB", 10);
 
         this.playerManager = playerManager;
     }
@@ -893,7 +1099,7 @@ public class FactionsSidebar extends Sidebar {
     private final FactionsManager factionsManager;
 
     public FactionsSidebar(final FactionsManager factionsManager) {
-        super("factions", 0); // wins over HubSidebar at 10
+        super("FACTIONS", 0); // wins over HubSidebar at 10
 
         this.factionsManager = factionsManager;
     }
@@ -926,7 +1132,7 @@ Fire `SidebarUpdateEvent` to trigger a refresh for a player:
 UtilEvent.dispatch(new SidebarUpdateEvent(player));
 
 // Only update if the active sidebar matches the given identifier
-UtilEvent.dispatch(new SidebarUpdateEvent("hub", player));
+UtilEvent.dispatch(new SidebarUpdateEvent("HUB", player));
 ```
 
 Cancelling the event clears the player's sidebar instead of refreshing it.
@@ -1030,7 +1236,7 @@ public class RankTeam extends Team {
     private final PlayerManager playerManager;
 
     public RankTeam(final PlayerManager playerManager) {
-        super("rank", 10); // fallback
+        super("RANK", 10); // fallback
 
         this.playerManager = playerManager;
     }
@@ -1051,7 +1257,7 @@ public class FactionsTeam extends Team {
     private final FactionsManager factionsManager;
 
     public FactionsTeam(final FactionsManager factionsManager) {
-        super("factions", 0); // wins over RankTeam
+        super("FACTIONS", 0); // wins over RankTeam
 
         this.factionsManager = factionsManager;
     }
@@ -1143,6 +1349,9 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 |---|---|
 | `Item` | Describe a stack with no identity, such as a window icon |
 | `CustomItem` | Describe a stack that carries an identifier and version, and is reconciled automatically |
+| `ActivatableCustomItem` | Add a click action, branching on the click type |
+| `SingleActivatableCustomItem` | Add a click action for one fixed click type |
+| `ChannelCustomItem` | Add an action that runs every tick while right click is held |
 | `Window` | Define an inventory menu composed of buttons |
 | `Button` | Define a clickable slot within a window |
 | `Sidebar` | Define a priority-sorted scoreboard sidebar |
@@ -1193,10 +1402,15 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 
 | Event | Fired When |
 |---|---|
+| `ItemMetaUpdateEvent` | An item has written its description to a stack's meta, before that meta is applied |
+| `ItemStackUpdateEvent` | An item has finished with a stack and its meta has been applied |
 | `ItemPreActivateEvent` | A player activated an item, before the item's action runs |
 | `ItemPostActivateEvent` | An item's activation has run |
+| `ItemChannelEvent` | Every tick a player is channelling an item, before the per-tick action runs |
 
-`ItemPreActivateEvent` is cancellable, and cancelling suppresses the activation entirely. `ItemPostActivateEvent` is not, since the action has already happened, and only fires for an activation that actually ran.
+`ItemPreActivateEvent` and `ItemChannelEvent` are cancellable. Cancelling an activation suppresses it entirely; cancelling a channel tick ends the channel outright, firing `onStop`. The rest are not cancellable, and the post event only fires for an activation that actually ran.
+
+The two update events differ by what they can safely touch. `ItemMetaUpdateEvent` fires while the meta is open, for anything belonging to the meta. `ItemStackUpdateEvent` fires after it has been applied, and is the only place a data component can be set, since applying a meta replaces the stack's whole component set.
 
 ---
 
@@ -1206,11 +1420,10 @@ All events are cancellable. Cancelling an execute event prevents execution; canc
 |---|---|
 | `WindowOpenEvent` | A window is about to be rendered and shown to a player |
 | `WindowCloseEvent` | A player closed a window, before its tracking entries are dropped |
-| `WindowClickEvent` | A player clicked a window, before the click is resolved to a button |
 | `ButtonPreClickEvent` | A player clicked a button, before the button's action runs |
 | `ButtonPostClickEvent` | A button's action has run |
 
-All but the last are cancellable. Cancelling an open aborts it, cancelling a close re-opens the window a tick later, cancelling a window click suppresses every button in that window, and cancelling a button click suppresses that one action. `ButtonPostClickEvent` only fires for a click that actually ran.
+All but the last are cancellable. Cancelling an open aborts it, cancelling a close re-opens the window a tick later, and cancelling a click suppresses the button's action. `ButtonPostClickEvent` only fires for a click that actually ran.
 
 ---
 

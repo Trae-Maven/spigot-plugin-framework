@@ -15,7 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * An {@link ActivatableCustomItem} that does something continuously while a player holds right
+ * A {@link SingleActivatableCustomItem} that does something continuously while a player holds right
  * click, rather than once when they press it.
  * <p>
  * The right click starts a channel and {@link ItemActivateListener} ticks it from there, calling
@@ -24,15 +24,16 @@ import java.util.UUID;
  * {@link #canChannel(Player, ItemStack)} stops returning {@code true}. Whichever ends it,
  * {@link #onStop(Player, ItemStack)} fires exactly once.
  * <p>
- * Holding right click requires the item to have a use action, which a sword does not have on its own.
- * Attaching the {@code blocks_attacks} data component gives it one, so a channelling sword needs
- * that component for the hold to register at all.
+ * Holding right click requires the item to have a use action. Many materials have none, a sword
+ * among them, and the hold never registers for those. Attaching the {@code blocks_attacks} data
+ * component gives a sword one, so a channelling sword needs that component to work at all.
  * <p>
- * {@link #onActivate} and {@link #canActivate} are final here, since the channel owns both: the
- * activation only ever starts a channel, and the tick owns every way one ends. Subclasses implement
- * {@link #onChannel(Player, ItemStack)} and override the start, stop, and gate hooks as needed.
+ * The click type is fixed to {@link ActivateType#RIGHT_CLICK} by the superclass, and
+ * {@link #onActivate(Player, ItemStack)} is final here, since starting a channel is the only thing
+ * an activation may do. Every way a channel ends belongs to the tick instead. A subclass implements
+ * {@link #onChannel(Player, ItemStack)} and overrides the start, stop, and gate hooks as needed.
  */
-public abstract class ChannelCustomItem extends ActivatableCustomItem {
+public abstract class ChannelCustomItem extends SingleActivatableCustomItem {
 
     /**
      * The players currently channelling this item, by identifier.
@@ -52,7 +53,7 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * @param namespace  the readable key this item is named by
      */
     public ChannelCustomItem(final Material material, final String identifier, final String namespace) {
-        super(material, identifier, namespace);
+        super(material, identifier, namespace, ActivateType.RIGHT_CLICK);
     }
 
     /**
@@ -63,22 +64,10 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * way the channel ends.</p>
      */
     @Override
-    public final void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    public final void onActivate(final Player player, final ItemStack itemStack) {
         if (this.activeChannelSet.add(player.getUniqueId())) {
             this.onStart(player, itemStack);
         }
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>Restricted to right clicks, since a channel is a hold rather than a press. Conditions a
-     * subclass owns belong in {@link #canChannel(Player, ItemStack)}, which is checked every tick
-     * rather than only at the start.</p>
-     */
-    @Override
-    public final boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
-        return activateType == ActivateType.RIGHT_CLICK;
     }
 
     /**
@@ -86,7 +75,8 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * resource or a durability threshold). Defaults to {@code true}.
      * <p>
      * Checked every tick, not just at the start, so returning {@code false} mid-channel ends it and
-     * fires {@link #onStop(Player, ItemStack)}.
+     * fires {@link #onStop(Player, ItemStack)}. This is separate from
+     * {@link #canActivate(Player, ItemStack)}, which decides only whether a channel may begin.
      * <p>
      * This is the item-level check, evaluated after the
      * {@link io.github.trae.spigot.framework.item.events.ItemChannelEvent}, for conditions the item
