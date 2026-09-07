@@ -270,15 +270,7 @@ public abstract class Item {
 
     /**
      * Re-applies this item's description to an existing stack while preserving its amount and
-     * accounting for its existing wear.
-     * Used to bring a stack a player already owns back in line with the item's current definition.
-     * <p>
-     * If the stack already has the correct material, it is updated in place and its current damage
-     * is preserved. If the material changes, its damage is adjusted according to the maximum
-     * durability of the old and new materials. When changing to a more durable material, existing
-     * wear is reduced proportionally. When changing to a less durable material, damage is applied
-     * only when the old item's remaining durability falls below the new material's maximum
-     * durability.
+     * existing wear. If the material changes, its durability is adjusted for the new material.
      * <p>
      * Dispatches the same {@link ItemMetaUpdateEvent} and {@link ItemStackUpdateEvent} pair as
      * {@link #create(int, int)}, so listeners apply to an updated stack exactly as they do to a
@@ -294,28 +286,7 @@ public abstract class Item {
 
         newItemStack.editMeta(itemMeta -> {
             if (requiresMaterialUpdate) {
-                if (itemMeta instanceof final Damageable damageable && damageable.getDamage() > 0) {
-                    final int oldMaxDurability = itemStack.getType().getMaxDurability();
-                    final int newMaxDurability = newItemStack.getType().getMaxDurability();
-
-                    if (oldMaxDurability > 0 && newMaxDurability > 0) {
-                        final int oldDamage = damageable.getDamage();
-                        final int newDamage;
-
-                        if (newMaxDurability > oldMaxDurability) {
-                            // Weak -> strong: existing wear becomes less significant.
-                            newDamage = (int) Math.round(oldDamage * ((double) oldMaxDurability / newMaxDurability));
-                        } else {
-                            // Strong -> weak: only damage the new item if the old item's
-                            // remaining durability is below the new item's maximum.
-                            final int remainingDurability = oldMaxDurability - oldDamage;
-
-                            newDamage = Math.max(0, newMaxDurability - remainingDurability);
-                        }
-
-                        damageable.setDamage(newDamage);
-                    }
-                }
+                this.updateDurability(itemStack, newItemStack, itemMeta);
             }
 
             this.applyItemMeta(itemMeta, true);
@@ -405,5 +376,56 @@ public abstract class Item {
         if (this.hideAttributes()) {
             itemMeta.addItemFlags(ItemFlag.values());
         }
+    }
+
+    /**
+     * Adjusts an item's damage when changing its material to account for the difference in maximum
+     * durability between the old and new materials.
+     * <p>
+     * When upgrading to a more durable material, the percentage of remaining durability is
+     * preserved. The larger durability capacity therefore grants the item additional remaining
+     * uses as part of the upgrade.
+     * <p>
+     * When downgrading to a less durable material, the number of remaining uses is preserved
+     * instead. If the old item has more remaining uses than the new material can represent, the
+     * new item is capped at full durability rather than penalizing the player for the downgrade.
+     * <p>
+     * No adjustment is made if either item's metadata is not {@link Damageable} or either material
+     * does not have durability.
+     *
+     * @param itemStack    the original stack before the material change
+     * @param newItemStack the stack after the material change
+     * @param itemMeta     the metadata of the new stack to adjust
+     */
+    private void updateDurability(final ItemStack itemStack, final ItemStack newItemStack, final ItemMeta itemMeta) {
+        if (!(itemStack.getItemMeta() instanceof final Damageable oldDamageable) || !(itemMeta instanceof final Damageable newDamageable)) {
+            return;
+        }
+
+        final int oldMaxDurability = itemStack.getType().getMaxDurability();
+        final int newMaxDurability = newItemStack.getType().getMaxDurability();
+
+        if (oldMaxDurability <= 0 || newMaxDurability <= 0) {
+            return;
+        }
+
+        final int oldDamage = oldDamageable.getDamage();
+        final int oldRemaining = oldMaxDurability - oldDamage;
+
+        final int newRemaining;
+
+        if (newMaxDurability > oldMaxDurability) {
+            // Upgrade: preserve percentage remaining, giving the player
+            // the additional uses provided by the stronger material.
+            final double remainingPercentage = (double) oldRemaining / oldMaxDurability;
+
+            newRemaining = (int) Math.round(remainingPercentage * newMaxDurability);
+        } else {
+            // Downgrade: preserve actual remaining uses without exceeding
+            // what the weaker material can represent.
+            newRemaining = Math.min(oldRemaining, newMaxDurability);
+        }
+
+        newDamageable.setDamage(newMaxDurability - Math.max(1, newRemaining));
     }
 }
