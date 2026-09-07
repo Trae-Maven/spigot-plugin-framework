@@ -77,6 +77,9 @@ public class ItemActivateListener implements Listener {
 
                 final Player player = event.getPlayer();
 
+                event.setUseItemInHand(activatableCustomItem.useItemInHand(player, itemStack, activateType));
+                event.setUseInteractedBlock(activatableCustomItem.useInteractedBlock(player, itemStack, event.getClickedBlock(), activateType));
+
                 if (UtilEvent.supply(new ItemPreActivateEvent(activatableCustomItem, player, itemStack, activateType)).isCancelled()) {
                     return;
                 }
@@ -84,9 +87,6 @@ public class ItemActivateListener implements Listener {
                 if (!activatableCustomItem.canActivate(player, itemStack, activateType)) {
                     return;
                 }
-
-                event.setUseItemInHand(activatableCustomItem.useItemInHand(player, itemStack, activateType));
-                event.setUseInteractedBlock(activatableCustomItem.useInteractedBlock(player, itemStack, event.getClickedBlock(), activateType));
 
                 activatableCustomItem.onActivate(player, itemStack, activateType);
 
