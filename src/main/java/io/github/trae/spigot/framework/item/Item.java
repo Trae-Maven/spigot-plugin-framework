@@ -269,12 +269,14 @@ public abstract class Item {
     }
 
     /**
-     * Re-applies this item's description to an existing stack while preserving its amount.
+     * Re-applies this item's description to an existing stack while preserving its amount and wear.
      * Used to bring a stack a player already owns back in line with the item's current definition.
      * <p>
      * If the stack already has the correct material, it is updated in place and its current damage
-     * is preserved. If the material has changed, the stack is copied with the new material and any
-     * existing damage is reset to {@code 0}.
+     * is preserved. If the material changes, the stack is copied with the new material and its
+     * existing damage is adjusted relative to the maximum durability of the old and new materials.
+     * This allows wear on a less durable material to become less significant when upgrading to a
+     * more durable material, and vice versa.
      * <p>
      * Dispatches the same {@link ItemMetaUpdateEvent} and {@link ItemStackUpdateEvent} pair as
      * {@link #create(int, int)}, so listeners apply to an updated stack exactly as they do to a
@@ -291,7 +293,12 @@ public abstract class Item {
         newItemStack.editMeta(itemMeta -> {
             if (requiresMaterialUpdate) {
                 if (itemMeta instanceof final Damageable damageable && damageable.getDamage() > 0) {
-                    damageable.setDamage(0);
+                    final int oldMaxDurability = itemStack.getType().getMaxDurability();
+                    final int newMaxDurability = newItemStack.getType().getMaxDurability();
+
+                    if (oldMaxDurability > 0 && newMaxDurability > 0) {
+                        damageable.setDamage((int) Math.round(damageable.getDamage() * ((double) oldMaxDurability / newMaxDurability)));
+                    }
                 }
             }
 
