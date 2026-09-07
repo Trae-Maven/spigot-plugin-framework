@@ -1,6 +1,7 @@
-package io.github.trae.spigot.framework.item;
+package io.github.trae.spigot.framework.item.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.item.ItemManager;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Item;
 import org.bukkit.event.EventHandler;
@@ -23,6 +24,9 @@ import org.bukkit.inventory.Inventory;
 @Singleton
 public class ItemApplyListener implements Listener {
 
+    /**
+     * The registry every stack is reconciled against.
+     */
     private final ItemManager itemManager;
 
     /**

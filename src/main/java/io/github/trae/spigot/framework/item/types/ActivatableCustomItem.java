@@ -1,6 +1,8 @@
-package io.github.trae.spigot.framework.item;
+package io.github.trae.spigot.framework.item.types;
 
+import io.github.trae.spigot.framework.item.CustomItem;
 import io.github.trae.spigot.framework.item.enums.ActivateType;
+import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -10,12 +12,12 @@ import org.bukkit.inventory.ItemStack;
 /**
  * A {@link CustomItem} that does something when a player clicks with it.
  * <p>
- * {@link io.github.trae.spigot.framework.item.ItemActivateListener} resolves the item behind the
- * clicked stack and calls {@link #onActivate(Player, ItemStack, ActivateType)} once the click has
- * survived the cancellable {@link io.github.trae.spigot.framework.item.events.ItemPreActivateEvent}
- * and passed {@link #canActivate(Player, ItemStack, ActivateType)}. An item extending
- * {@link CustomItem} directly is never invoked, so the capability is opt-in per item rather than a
- * hook every custom item has to override.
+ * {@link ItemActivateListener} resolves the item behind the clicked stack and calls
+ * {@link #onActivate(Player, ItemStack, ActivateType)} once the click has survived the cancellable
+ * {@link io.github.trae.spigot.framework.item.events.ItemPreActivateEvent} and passed
+ * {@link #canActivate(Player, ItemStack, ActivateType)}. An item extending {@link CustomItem}
+ * directly is never invoked, so the capability is opt-in per item rather than a hook every custom
+ * item has to override.
  * <p>
  * The stack is passed alongside the player because it is the specific stack that was clicked with,
  * carrying its own amount, durability, and persistent data, which the item definition itself does
@@ -24,13 +26,14 @@ import org.bukkit.inventory.ItemStack;
 public abstract class ActivatableCustomItem extends CustomItem {
 
     /**
-     * Creates an activatable item of the given material under the given identifier.
+     * Creates an activatable item of the given material.
      *
      * @param material   the material every stack is created with
-     * @param identifier the unique identifier to register and stamp under
+     * @param identifier the opaque, permanent identity to stamp onto every stack
+     * @param namespace  the readable key this item is named by
      */
-    protected ActivatableCustomItem(final Material material, final String identifier) {
-        super(material, identifier);
+    public ActivatableCustomItem(final Material material, final String identifier, final String namespace) {
+        super(material, identifier, namespace);
     }
 
     /**
@@ -45,7 +48,7 @@ public abstract class ActivatableCustomItem extends CustomItem {
      * @param activateType the kind of click
      * @return the result applied to the interaction's item use
      */
-    protected Event.Result useItemInHand(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    public Event.Result useItemInHand(final Player player, final ItemStack itemStack, final ActivateType activateType) {
         return Event.Result.DEFAULT;
     }
 
@@ -63,7 +66,7 @@ public abstract class ActivatableCustomItem extends CustomItem {
      * @param activateType the kind of click
      * @return the result applied to the interacted block
      */
-    protected Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final Block block, final ActivateType activateType) {
+    public Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final Block block, final ActivateType activateType) {
         return Event.Result.DEFAULT;
     }
 
@@ -79,7 +82,7 @@ public abstract class ActivatableCustomItem extends CustomItem {
      * @param activateType the kind of click
      * @return {@code true} if the activation should proceed
      */
-    protected boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    public boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
         return true;
     }
 
@@ -91,5 +94,5 @@ public abstract class ActivatableCustomItem extends CustomItem {
      * @param itemStack    the specific stack that was clicked with
      * @param activateType the kind of click
      */
-    protected abstract void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType);
+    public abstract void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType);
 }

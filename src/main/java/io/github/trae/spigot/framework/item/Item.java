@@ -2,16 +2,15 @@ package io.github.trae.spigot.framework.item;
 
 import io.github.trae.spigot.framework.item.events.ItemMetaUpdateEvent;
 import io.github.trae.spigot.framework.item.events.ItemStackUpdateEvent;
-import io.github.trae.spigot.framework.item.style.ItemStyle;
+import io.github.trae.spigot.framework.item.styles.ItemStyle;
+import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilMessage;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.utilities.UtilJava;
-import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -38,7 +37,7 @@ import java.util.List;
  * Every option hook has a default, so the minimum a subclass supplies is
  * {@link #getDisplayName()} and {@link #getLore()}.
  */
-@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 @Getter
 public abstract class Item {
 
@@ -115,7 +114,7 @@ public abstract class Item {
      *
      * @return the item model key, or {@code null}
      */
-    protected NamespacedKey getModel() {
+    public NamespacedKey getModel() {
         return null;
     }
 
@@ -125,7 +124,7 @@ public abstract class Item {
      *
      * @return the tooltip style key, or {@code null}
      */
-    protected NamespacedKey getTooltipStyle() {
+    public NamespacedKey getTooltipStyle() {
         return this.getStyle() != null ? this.getStyle().getTooltipStyle() : null;
     }
 
@@ -135,7 +134,7 @@ public abstract class Item {
      *
      * @return the display name colour, never {@code null}
      */
-    protected Color getColor() {
+    public Color getColor() {
         return this.getStyle() != null ? this.getStyle().getColor() : ChatColor.WHITE.getColor();
     }
 
@@ -146,7 +145,7 @@ public abstract class Item {
      *
      * @return the display name, or {@code null}
      */
-    protected abstract String getDisplayName();
+    public abstract String getDisplayName();
 
     /**
      * Returns the lore lines, or an empty list for no lore. Each line is deserialized through
@@ -157,7 +156,7 @@ public abstract class Item {
      *
      * @return the lore lines
      */
-    protected abstract List<String> getLore();
+    public abstract List<String> getLore();
 
     /**
      * Returns whether the given stack shares this item's material. Material alone says nothing about
@@ -184,21 +183,7 @@ public abstract class Item {
      * @return the created stack
      */
     public final ItemStack create(final int amount, final int durability) {
-        final ItemStack itemStack = ItemStack.of(this.getMaterial(), amount);
-
-        itemStack.editMeta(itemMeta -> {
-            if (itemMeta instanceof final Damageable damageable && durability > 0) {
-                damageable.setDamage(durability);
-            }
-
-            this.applyItemMeta(itemMeta);
-
-            UtilEvent.dispatch(new ItemMetaUpdateEvent(this, itemMeta));
-        });
-
-        UtilEvent.dispatch(new ItemStackUpdateEvent(this, itemStack));
-
-        return itemStack;
+        return this.build(amount, durability, true);
     }
 
     /**
@@ -238,6 +223,52 @@ public abstract class Item {
     }
 
     /**
+     * Creates a single stack that looks like this item but carries none of its identity.
+     * <p>
+     * The stamp is skipped, so the stack has no identifier and no version and
+     * {@link ItemManager#apply(ItemStack)} will never recognise it. Use this for a menu icon or
+     * anything else a player looks at rather than owns: a stack built by {@link #create()} is
+     * indistinguishable from a real item were it ever to escape into an inventory, where this one is
+     * plainly not one.
+     *
+     * @return the display stack
+     */
+    public final ItemStack createView() {
+        return this.build(1, 0, false);
+    }
+
+    /**
+     * Builds a stack of this item, with or without its identity stamped on.
+     * <p>
+     * The single implementation behind {@link #create(int, int)} and {@link #createView()}, so the
+     * meta pipeline and the event dispatch stay in one place and the two differ only in whether the
+     * stamp runs.
+     *
+     * @param amount     the stack size
+     * @param durability the damage value, applied only when positive and the meta is
+     *                   {@link Damageable}
+     * @param stamp      whether to write this item's identity onto the stack
+     * @return the built stack
+     */
+    private ItemStack build(final int amount, final int durability, final boolean stamp) {
+        final ItemStack itemStack = ItemStack.of(this.getMaterial(), amount);
+
+        itemStack.editMeta(itemMeta -> {
+            if (itemMeta instanceof final Damageable damageable && durability > 0) {
+                damageable.setDamage(durability);
+            }
+
+            this.applyItemMeta(itemMeta, stamp);
+
+            UtilEvent.dispatch(new ItemMetaUpdateEvent(this, itemMeta));
+        });
+
+        UtilEvent.dispatch(new ItemStackUpdateEvent(this, itemStack));
+
+        return itemStack;
+    }
+
+    /**
      * Re-applies this item's description to an existing stack, preserving its amount and durability.
      * Used to bring a stack a player already owns back in line with the item's current definition.
      * <p>
@@ -255,7 +286,7 @@ public abstract class Item {
         final ItemStack newItemStack = itemStack.getType() == this.material ? itemStack : itemStack.withType(this.getMaterial());
 
         newItemStack.editMeta(itemMeta -> {
-            this.applyItemMeta(itemMeta);
+            this.applyItemMeta(itemMeta, true);
 
             UtilEvent.dispatch(new ItemMetaUpdateEvent(this, itemMeta));
         });
@@ -287,25 +318,29 @@ public abstract class Item {
     }
 
     /**
-     * Applies this item's full description to a meta: the subclass stamp first, then display name,
-     * lore, model, tooltip style, and item flags. Options returning {@code null} are skipped,
-     * leaving the vanilla default in place.
+     * Applies this item's full description to a meta: the subclass stamp where requested, then
+     * display name, lore, model, tooltip style, and item flags. Options returning {@code null} are
+     * skipped, leaving the vanilla default in place.
      * <p>
      * The style's tag is appended beneath the item's own lore, separated by a blank line, so it
      * always reads as a footer rather than as another lore line.
      *
      * @param itemMeta the meta to write to
+     * @param stamp    whether to run {@link #stamp(ItemMeta)}, which is skipped for a display stack
+     *                 that should carry no identity
      */
-    private void applyItemMeta(final ItemMeta itemMeta) {
+    private void applyItemMeta(final ItemMeta itemMeta, final boolean stamp) {
         // Stamp
-        this.stamp(itemMeta);
+        if (stamp) {
+            this.stamp(itemMeta);
+        }
 
         // Edit Meta
         this.editMeta(itemMeta);
 
         // Display Name
         if (this.getDisplayName() != null) {
-            itemMeta.displayName(UtilMessage.deserialize(this.getDisplayName()).colorIfAbsent(TextColor.color(this.getColor().getRGB() & 0xFFFFFF)).decoration(TextDecoration.ITALIC, false));
+            itemMeta.displayName(UtilMessage.deserialize(this.getDisplayName()).colorIfAbsent(UtilColor.toTextColor(this.getColor())).decoration(TextDecoration.ITALIC, false));
         }
 
         // Lore

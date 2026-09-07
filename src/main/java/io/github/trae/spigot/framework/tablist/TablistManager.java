@@ -4,6 +4,7 @@ import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.tablist.events.TablistUpdateEvent;
+import io.github.trae.spigot.framework.tablist.listeners.TablistListener;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilServer;
 import lombok.Getter;
@@ -32,6 +33,10 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 public class TablistManager {
 
+    /**
+     * The players currently showing a tablist, so the clearing packet fires once on the transition
+     * away from one rather than on every dispatch.
+     */
     private final Set<UUID> activeTablistSet = ConcurrentHashMap.newKeySet();
 
     /**

@@ -1,6 +1,7 @@
-package io.github.trae.spigot.framework.tablist;
+package io.github.trae.spigot.framework.tablist.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.tablist.TablistManager;
 import io.github.trae.spigot.framework.tablist.events.TablistUpdateEvent;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Player;
@@ -17,6 +18,9 @@ import org.bukkit.event.player.PlayerQuitEvent;
 @Singleton
 public class TablistListener implements Listener {
 
+    /**
+     * The manager every tablist packet and lookup is delegated to.
+     */
     private final TablistManager tablistManager;
 
     /**

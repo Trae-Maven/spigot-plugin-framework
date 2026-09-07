@@ -1,4 +1,4 @@
-package io.github.trae.spigot.framework.item.style;
+package io.github.trae.spigot.framework.item.styles;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

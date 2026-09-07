@@ -1,6 +1,7 @@
 package io.github.trae.spigot.framework.tablist.events;
 
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
+import io.github.trae.spigot.framework.tablist.listeners.TablistListener;
 import lombok.Getter;
 import org.bukkit.entity.Player;
 
@@ -8,7 +9,7 @@ import org.bukkit.entity.Player;
  * Fired for a single player when their tab list header and footer should be re-resolved.
  * <p>
  * Dispatched on a fixed interval by {@link io.github.trae.spigot.framework.tablist.TablistManager}
- * and handled by {@link io.github.trae.spigot.framework.tablist.TablistListener}. Cancelling the
+ * and handled by {@link TablistListener}. Cancelling the
  * event clears the player's tablist instead of applying one, allowing other systems to suppress the
  * display for that player.
  */

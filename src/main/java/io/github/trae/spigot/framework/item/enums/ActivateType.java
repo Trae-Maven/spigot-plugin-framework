@@ -1,6 +1,6 @@
 package io.github.trae.spigot.framework.item.enums;
 
-import io.github.trae.spigot.framework.item.ActivatableCustomItem;
+import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.event.block.Action;

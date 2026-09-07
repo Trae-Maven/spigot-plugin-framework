@@ -1,7 +1,7 @@
 package io.github.trae.spigot.framework.team.events;
 
 import io.github.trae.spigot.framework.event.CustomEvent;
-import io.github.trae.spigot.framework.team.TeamListener;
+import io.github.trae.spigot.framework.team.listeners.TeamListener;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;

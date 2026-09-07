@@ -36,7 +36,7 @@ public class DefaultItem extends Item {
      * @return {@code null}
      */
     @Override
-    protected String getDisplayName() {
+    public String getDisplayName() {
         return null;
     }
 
@@ -46,7 +46,7 @@ public class DefaultItem extends Item {
      * @return {@code null}
      */
     @Override
-    protected List<String> getLore() {
+    public List<String> getLore() {
         return null;
     }
 }

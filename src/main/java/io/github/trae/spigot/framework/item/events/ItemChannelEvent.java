@@ -1,7 +1,8 @@
 package io.github.trae.spigot.framework.item.events;
 
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
-import io.github.trae.spigot.framework.item.ChannelCustomItem;
+import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
+import io.github.trae.spigot.framework.item.types.ChannelCustomItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -10,7 +11,7 @@ import org.bukkit.inventory.ItemStack;
 /**
  * Fired every tick a player is channelling an item, before the item's per-tick action runs.
  * <p>
- * Dispatched by {@link io.github.trae.spigot.framework.item.ItemActivateListener}. Cancelling ends
+ * Dispatched by {@link ItemActivateListener}. Cancelling ends
  * the channel outright: {@code onChannel} does not run for that tick, {@code onStop} fires, and the
  * player is dropped from the item's active set. It is the system-level equivalent of {@code
  * canChannel} returning {@code false}, for conditions external to the item such as a region

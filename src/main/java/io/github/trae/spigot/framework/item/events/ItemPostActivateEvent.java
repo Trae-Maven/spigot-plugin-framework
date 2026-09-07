@@ -1,8 +1,9 @@
 package io.github.trae.spigot.framework.item.events;
 
 import io.github.trae.spigot.framework.event.CustomEvent;
-import io.github.trae.spigot.framework.item.ActivatableCustomItem;
 import io.github.trae.spigot.framework.item.enums.ActivateType;
+import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
+import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -11,7 +12,7 @@ import org.bukkit.inventory.ItemStack;
 /**
  * Fired after an item's activation has run.
  * <p>
- * Dispatched by {@link io.github.trae.spigot.framework.item.ItemActivateListener}. Not cancellable,
+ * Dispatched by {@link ItemActivateListener}. Not cancellable,
  * since the action has already happened: this is for reacting to a successful activation, such as
  * recording a cooldown, incrementing a statistic, or logging.
  * <p>

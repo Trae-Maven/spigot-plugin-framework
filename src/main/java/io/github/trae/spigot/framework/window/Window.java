@@ -1,5 +1,6 @@
 package io.github.trae.spigot.framework.window;
 
+import io.github.trae.spigot.framework.window.listeners.WindowListener;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -33,7 +34,7 @@ public abstract class Window implements InventoryHolder {
      * The buttons currently placed in this window, keyed by slot. Rebuilt on every
      * {@link #render(Player)}.
      */
-    private final Map<Integer, Button> buttonMap = new HashMap<>();
+    private final Map<Integer, Button<?>> buttonMap = new HashMap<>();
 
     /**
      * The inventory this window renders into, created once and reused for the window's lifetime.
@@ -47,8 +48,21 @@ public abstract class Window implements InventoryHolder {
      * @param title the inventory title
      * @param rows  the number of rows, each nine slots wide
      */
-    protected Window(final Component title, final int rows) {
+    public Window(final Component title, final int rows) {
         this.inventory = Bukkit.getServer().createInventory(this, rows * 9, title);
+    }
+
+    /**
+     * Returns the total number of slots in this window, which is nine per row.
+     * <p>
+     * This is the window's capacity rather than what is free: a slot already holding a button counts
+     * the same as an empty one. Useful in {@link #populate(Player)} for laying out content that has
+     * to fit, such as knowing how many entries a page can hold.
+     *
+     * @return the total slot count
+     */
+    protected final int getInventorySize() {
+        return this.inventory.getSize();
     }
 
     /**
@@ -60,7 +74,7 @@ public abstract class Window implements InventoryHolder {
      *
      * @return the buttons currently placed, in no meaningful order
      */
-    public final List<Button> getButtons() {
+    public final List<Button<?>> getButtons() {
         return List.copyOf(this.buttonMap.values());
     }
 
@@ -70,7 +84,7 @@ public abstract class Window implements InventoryHolder {
      *
      * @param button the button to place
      */
-    protected final void addButton(final Button button) {
+    protected final void addButton(final Button<?> button) {
         this.buttonMap.put(button.getSlot(), button);
     }
 
@@ -80,7 +94,7 @@ public abstract class Window implements InventoryHolder {
      * @param slot the slot to look up
      * @return an {@link Optional} containing the button, or empty if the slot holds none
      */
-    protected final Optional<Button> getButtonBySlot(final int slot) {
+    public final Optional<Button<?>> getButtonBySlot(final int slot) {
         return Optional.ofNullable(this.buttonMap.get(slot));
     }
 
@@ -111,8 +125,8 @@ public abstract class Window implements InventoryHolder {
     public final void refresh() {
         this.inventory.clear();
 
-        for (final Button button : this.buttonMap.values()) {
-            this.inventory.setItem(button.getSlot(), button.getItemStack());
+        for (final Button<?> button : this.buttonMap.values()) {
+            this.inventory.setItem(button.getSlot(), button.toItemStack());
         }
     }
 
@@ -121,7 +135,7 @@ public abstract class Window implements InventoryHolder {
      *
      * @param player the player the window was opened for
      */
-    protected void onOpen(final Player player) {
+    public void onOpen(final Player player) {
     }
 
     /**
@@ -130,7 +144,7 @@ public abstract class Window implements InventoryHolder {
      *
      * @param player the player who closed the window
      */
-    protected void onClose(final Player player) {
+    public void onClose(final Player player) {
     }
 
     /**
@@ -152,7 +166,7 @@ public abstract class Window implements InventoryHolder {
      * @param player the player attempting to close
      * @return {@code true} if the close may proceed
      */
-    protected boolean canClose(final Player player) {
+    public boolean canClose(final Player player) {
         return true;
     }
 

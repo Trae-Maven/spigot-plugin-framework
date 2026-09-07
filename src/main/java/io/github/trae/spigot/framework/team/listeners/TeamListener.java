@@ -1,6 +1,7 @@
-package io.github.trae.spigot.framework.team;
+package io.github.trae.spigot.framework.team.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.team.TeamManager;
 import io.github.trae.spigot.framework.team.events.TeamUpdateEvent;
 import lombok.AllArgsConstructor;
 import org.bukkit.Bukkit;
@@ -19,6 +20,9 @@ import org.bukkit.event.player.PlayerQuitEvent;
 @Singleton
 public class TeamListener implements Listener {
 
+    /**
+     * The manager every team packet and lookup is delegated to.
+     */
     private final TeamManager teamManager;
 
     /**

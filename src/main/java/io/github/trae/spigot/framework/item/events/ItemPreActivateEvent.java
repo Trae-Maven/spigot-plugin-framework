@@ -1,8 +1,9 @@
 package io.github.trae.spigot.framework.item.events;
 
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
-import io.github.trae.spigot.framework.item.ActivatableCustomItem;
 import io.github.trae.spigot.framework.item.enums.ActivateType;
+import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
+import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -11,7 +12,7 @@ import org.bukkit.inventory.ItemStack;
 /**
  * Fired when a player activates an item, before the item's action runs.
  * <p>
- * Dispatched by {@link io.github.trae.spigot.framework.item.ItemActivateListener}. Cancelling
+ * Dispatched by {@link ItemActivateListener}. Cancelling
  * suppresses the activation entirely, so neither the action nor the interaction results the item
  * declares are applied.
  * <p>

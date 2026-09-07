@@ -1,11 +1,15 @@
-package io.github.trae.spigot.framework.item;
+package io.github.trae.spigot.framework.item.listeners;
 
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.item.CustomItem;
+import io.github.trae.spigot.framework.item.ItemManager;
 import io.github.trae.spigot.framework.item.enums.ActivateType;
 import io.github.trae.spigot.framework.item.events.ItemChannelEvent;
 import io.github.trae.spigot.framework.item.events.ItemPostActivateEvent;
 import io.github.trae.spigot.framework.item.events.ItemPreActivateEvent;
+import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
+import io.github.trae.spigot.framework.item.types.ChannelCustomItem;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilServer;
 import lombok.AllArgsConstructor;
@@ -32,6 +36,10 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 public class ItemActivateListener implements Listener {
 
+    /**
+     * The registry a clicked stack is resolved against, and the source of the items whose channels
+     * are ticked.
+     */
     private final ItemManager itemManager;
 
     /**

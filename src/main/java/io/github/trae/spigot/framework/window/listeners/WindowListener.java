@@ -1,8 +1,11 @@
-package io.github.trae.spigot.framework.window;
+package io.github.trae.spigot.framework.window.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilTask;
+import io.github.trae.spigot.framework.window.Button;
+import io.github.trae.spigot.framework.window.Window;
+import io.github.trae.spigot.framework.window.WindowManager;
 import io.github.trae.spigot.framework.window.events.ButtonPostClickEvent;
 import io.github.trae.spigot.framework.window.events.ButtonPreClickEvent;
 import io.github.trae.spigot.framework.window.events.WindowCloseEvent;
@@ -33,6 +36,9 @@ import java.time.temporal.ChronoUnit;
 @Singleton
 public class WindowListener implements Listener {
 
+    /**
+     * The manager whose tracking maps this listener keeps in step with the inventory events.
+     */
     private final WindowManager windowManager;
 
     /**

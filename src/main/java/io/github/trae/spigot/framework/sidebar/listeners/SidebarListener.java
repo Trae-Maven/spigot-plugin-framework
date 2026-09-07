@@ -1,6 +1,8 @@
-package io.github.trae.spigot.framework.sidebar;
+package io.github.trae.spigot.framework.sidebar.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.sidebar.Sidebar;
+import io.github.trae.spigot.framework.sidebar.SidebarManager;
 import io.github.trae.spigot.framework.sidebar.events.SidebarUpdateEvent;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Player;
@@ -20,6 +22,9 @@ import java.util.Optional;
 @Singleton
 public class SidebarListener implements Listener {
 
+    /**
+     * The manager every sidebar packet and lookup is delegated to.
+     */
     private final SidebarManager sidebarManager;
 
     /**

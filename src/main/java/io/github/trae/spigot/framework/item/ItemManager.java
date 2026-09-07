@@ -2,8 +2,13 @@ package io.github.trae.spigot.framework.item;
 
 import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
+import io.github.trae.spigot.framework.item.listeners.ItemApplyListener;
+import io.github.trae.spigot.framework.item.search.ItemSearchEngine;
+import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
 import io.github.trae.spigot.framework.utility.UtilItemStack;
 import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -13,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Holds the registry of {@link CustomItem}s and reconciles stacks against it.
@@ -21,7 +27,9 @@ import java.util.Optional;
  * material, and a lazily built {@link DefaultItem} per material. {@link #apply(ItemStack)} uses the
  * first to recognise a stack this framework produced, the second to convert a vanilla stack into its
  * custom counterpart, and the third to carry everything else through the update events so a listener
- * sees every stack rather than only the custom ones.
+ * sees every stack rather than only the custom ones. A fourth route,
+ * {@link #searchItem(CommandSender, String, boolean)}, resolves an item from a typed name for
+ * commands.
  * <p>
  * The registry populates itself on first use rather than at a fixed point in startup, so a lookup
  * is correct whenever it happens without the manager depending on any particular plugin's enable
@@ -57,6 +65,14 @@ public class ItemManager {
     private final Map<Material, DefaultItem> defaultItemMap = new EnumMap<>(Material.class);
 
     /**
+     * Resolves an item from a typed name, matching on namespace.
+     * <p>
+     * Backed by a supplier rather than a fixed list, since this field initialises long before the
+     * registry populates and a snapshot taken here would be permanently empty.
+     */
+    private final ItemSearchEngine itemSearchEngine = new ItemSearchEngine(this::getItems);
+
+    /**
      * Whether the registry has been built. Set before the scan runs, so a lookup performed from
      * within it cannot recurse.
      */
@@ -88,13 +104,15 @@ public class ItemManager {
     }
 
     /**
-     * Returns every registered item.
+     * Returns every registered item, building the registry first if this is the first lookup.
      * <p>
      * The list is an immutable copy taken at call time, in no meaningful order.
      *
      * @return the registered items
      */
     public final List<CustomItem> getItems() {
+        this.populateIfNecessary();
+
         return List.copyOf(this.identifierItemMap.values());
     }
 
@@ -137,6 +155,40 @@ public class ItemManager {
      */
     public final Optional<CustomItem> getItemByItemStack(final ItemStack itemStack) {
         return UtilItemStack.getPersistentData(itemStack, CustomItem.IDENTIFIER_KEY, PersistentDataType.STRING).flatMap(this::getItemByIdentifier);
+    }
+
+    /**
+     * Resolves an item from a typed name, matching on namespace rather than identifier.
+     * <p>
+     * An exact namespace match wins outright; otherwise partial matches are considered, and how an
+     * ambiguous or missing result is reported to the sender is the search engine's concern.
+     *
+     * @param sender    the sender to report back to
+     * @param input     the typed name to resolve
+     * @param inform    whether to message the sender when nothing matches or the term is ambiguous
+     * @param predicate an additional filter an item must pass to be considered, or {@code null} for
+     *                  no filter
+     * @return an {@link Optional} containing the resolved item, or empty if nothing matched
+     */
+    public final Optional<CustomItem> searchItem(final CommandSender sender, final String input, final boolean inform, final Predicate<CustomItem> predicate) {
+        return this.itemSearchEngine.find(
+                sender,
+                input,
+                inform,
+                predicate
+        );
+    }
+
+    /**
+     * Resolves an item from a typed name with no additional filter.
+     *
+     * @param sender the sender to report back to
+     * @param input  the typed name to resolve
+     * @param inform whether to message the sender when nothing matches or the term is ambiguous
+     * @return an {@link Optional} containing the resolved item, or empty if nothing matched
+     */
+    public final Optional<CustomItem> searchItem(final CommandSender sender, final String input, final boolean inform) {
+        return this.searchItem(sender, input, inform, null);
     }
 
     /**

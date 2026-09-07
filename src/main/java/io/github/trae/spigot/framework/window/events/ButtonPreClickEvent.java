@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.window.events;
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
 import io.github.trae.spigot.framework.window.Button;
 import io.github.trae.spigot.framework.window.Window;
+import io.github.trae.spigot.framework.window.listeners.WindowListener;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -10,7 +11,7 @@ import org.bukkit.entity.Player;
 /**
  * Fired when a player clicks a button, before the button's action runs.
  * <p>
- * Dispatched by {@link io.github.trae.spigot.framework.window.WindowListener}. Cancelling suppresses
+ * Dispatched by {@link WindowListener}. Cancelling suppresses
  * the action; the underlying inventory click is cancelled regardless, so nothing moves either way.
  * <p>
  * This is the system-level gate, for conditions external to the button itself, such as a world
@@ -30,7 +31,7 @@ public class ButtonPreClickEvent extends CustomCancellableEvent {
     /**
      * The button that was clicked.
      */
-    private final Button button;
+    private final Button<?> button;
 
     /**
      * The player who clicked.

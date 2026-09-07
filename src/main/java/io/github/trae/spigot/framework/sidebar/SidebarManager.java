@@ -4,6 +4,7 @@ import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.sidebar.events.SidebarUpdateEvent;
+import io.github.trae.spigot.framework.sidebar.listeners.SidebarListener;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilNms;
 import lombok.Getter;
@@ -49,8 +50,21 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 public class SidebarManager {
 
+    /**
+     * The sidebar each player currently has displayed, keyed by their identifier.
+     */
     private final ConcurrentHashMap<UUID, Sidebar> activeSidebarMap = new ConcurrentHashMap<>();
+
+    /**
+     * The title last rendered for each player, so a title-change packet is only sent when it
+     * actually changed.
+     */
     private final ConcurrentHashMap<UUID, Component> cachedTitleMap = new ConcurrentHashMap<>();
+
+    /**
+     * The lines last rendered for each player, diffed against the current ones so only changed lines
+     * produce packets.
+     */
     private final ConcurrentHashMap<UUID, List<Component>> cachedLinesMap = new ConcurrentHashMap<>();
 
     /**

@@ -1,7 +1,7 @@
 package io.github.trae.spigot.framework.sidebar.events;
 
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
-import io.github.trae.spigot.framework.sidebar.SidebarListener;
+import io.github.trae.spigot.framework.sidebar.listeners.SidebarListener;
 import lombok.Getter;
 import org.bukkit.entity.Player;
 

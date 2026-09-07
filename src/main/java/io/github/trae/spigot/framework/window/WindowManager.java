@@ -1,6 +1,7 @@
 package io.github.trae.spigot.framework.window;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.window.listeners.WindowListener;
 import lombok.Getter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;

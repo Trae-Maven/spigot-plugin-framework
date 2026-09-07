@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.team;
 import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.team.events.TeamUpdateEvent;
+import io.github.trae.spigot.framework.team.listeners.TeamListener;
 import io.github.trae.spigot.framework.utility.UtilNms;
 import lombok.Getter;
 import net.minecraft.network.protocol.game.ClientboundSetPlayerTeamPacket;
@@ -34,6 +35,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class TeamManager {
 
+    /**
+     * The player and viewer pairs currently carrying a team, keyed by team name, so a removal only
+     * fires for a pair that actually has one registered.
+     */
     private final Set<String> activeTeamSet = ConcurrentHashMap.newKeySet();
 
     /**

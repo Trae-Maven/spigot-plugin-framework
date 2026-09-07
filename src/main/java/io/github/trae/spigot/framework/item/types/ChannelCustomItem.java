@@ -1,7 +1,7 @@
-package io.github.trae.spigot.framework.item;
+package io.github.trae.spigot.framework.item.types;
 
 import io.github.trae.spigot.framework.item.enums.ActivateType;
-import lombok.AccessLevel;
+import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -20,7 +20,8 @@ import java.util.UUID;
  * <p>
  * The right click starts a channel and {@link ItemActivateListener} ticks it from there, calling
  * {@link #onChannel(Player, ItemStack)} every tick until the player lets go, swaps items, logs out,
- * or {@link #canChannel(Player, ItemStack)} stops returning {@code true}. Whichever ends it,
+ * a {@link io.github.trae.spigot.framework.item.events.ItemChannelEvent} is cancelled, or
+ * {@link #canChannel(Player, ItemStack)} stops returning {@code true}. Whichever ends it,
  * {@link #onStop(Player, ItemStack)} fires exactly once.
  * <p>
  * Holding right click requires the item to have a use action, which a sword does not have on its own.
@@ -40,17 +41,18 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * the set bounded: a player whose conditions lapse is dropped on the next tick rather than left
      * behind.
      */
-    @Getter(AccessLevel.PROTECTED)
+    @Getter
     private final Set<UUID> activeChannelSet = new HashSet<>();
 
     /**
-     * Creates a channelling item of the given material under the given identifier.
+     * Creates a channelling item of the given material.
      *
      * @param material   the material every stack is created with
-     * @param identifier the unique identifier to register and stamp under
+     * @param identifier the opaque, permanent identity to stamp onto every stack
+     * @param namespace  the readable key this item is named by
      */
-    protected ChannelCustomItem(final Material material, final String identifier) {
-        super(material, identifier);
+    public ChannelCustomItem(final Material material, final String identifier, final String namespace) {
+        super(material, identifier, namespace);
     }
 
     /**
@@ -61,7 +63,7 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * way the channel ends.</p>
      */
     @Override
-    protected final void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    public final void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
         if (this.activeChannelSet.add(player.getUniqueId())) {
             this.onStart(player, itemStack);
         }
@@ -75,22 +77,27 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * rather than only at the start.</p>
      */
     @Override
-    protected final boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    public final boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
         return activateType == ActivateType.RIGHT_CLICK;
     }
 
     /**
      * Returns whether the channel may continue for the given player and stack (e.g. gated behind a
-     * resource, a durability threshold, or a region). Defaults to {@code true}.
+     * resource or a durability threshold). Defaults to {@code true}.
      * <p>
      * Checked every tick, not just at the start, so returning {@code false} mid-channel ends it and
      * fires {@link #onStop(Player, ItemStack)}.
+     * <p>
+     * This is the item-level check, evaluated after the
+     * {@link io.github.trae.spigot.framework.item.events.ItemChannelEvent}, for conditions the item
+     * itself owns. A condition external to it, such as a region restriction, belongs on that event
+     * instead, which ends every channel rather than only this item's.
      *
      * @param player    the player channelling
      * @param itemStack the stack being channelled with
      * @return {@code true} if the channel may continue
      */
-    protected boolean canChannel(final Player player, final ItemStack itemStack) {
+    public boolean canChannel(final Player player, final ItemStack itemStack) {
         return true;
     }
 
@@ -100,7 +107,7 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * @param player    the player who started channelling
      * @param itemStack the stack being channelled with
      */
-    protected void onStart(final Player player, final ItemStack itemStack) {
+    public void onStart(final Player player, final ItemStack itemStack) {
     }
 
     /**
@@ -111,7 +118,7 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * @param player    the player who stopped channelling
      * @param itemStack the stack that was being channelled with
      */
-    protected void onStop(final Player player, final ItemStack itemStack) {
+    public void onStop(final Player player, final ItemStack itemStack) {
     }
 
     /**
@@ -120,7 +127,7 @@ public abstract class ChannelCustomItem extends ActivatableCustomItem {
      * @param player    the player channelling
      * @param itemStack the stack being channelled with
      */
-    protected abstract void onChannel(final Player player, final ItemStack itemStack);
+    public abstract void onChannel(final Player player, final ItemStack itemStack);
 
     /**
      * Returns every online player currently channelling this item.

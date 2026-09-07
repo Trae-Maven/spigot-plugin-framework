@@ -29,7 +29,7 @@ public abstract class SpigotSearchEngine<Type> extends AbstractSearchEngine<Type
      * @param name               the prefix applied to informational messages, may be null or empty
      * @param collectionSupplier supplies the candidates to search, evaluated on every search
      */
-    protected SpigotSearchEngine(final String name, final Supplier<Collection<? extends Type>> collectionSupplier) {
+    public SpigotSearchEngine(final String name, final Supplier<Collection<? extends Type>> collectionSupplier) {
         super(name, collectionSupplier);
     }
 
