@@ -95,4 +95,33 @@ public abstract class ActivatableCustomItem extends CustomItem {
      * @param activateType the kind of click
      */
     public abstract void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType);
+
+    /**
+     * Returns the name this item's activation cooldown is recorded under for the given click type.
+     * Defaults to the item's display name, so a cooldown message reads as the item the player
+     * recognises rather than an internal key.
+     * <p>
+     * The name is the key rather than the item, so two items sharing a display name share a
+     * cooldown, and one item returning different names per click type gates each independently.
+     *
+     * @param activateType the kind of click
+     * @return the cooldown name
+     */
+    public String getCooldownName(final ActivateType activateType) {
+        return this.getDisplayName();
+    }
+
+    /**
+     * Returns how long the activation cooldown lasts for the given click type, in milliseconds.
+     * Defaults to no cooldown.
+     * <p>
+     * Only consulted when {@link #getCooldownName(ActivateType)} returns a name, so an item gating
+     * one click type and not another need only vary that.
+     *
+     * @param activateType the kind of click
+     * @return the cooldown duration in milliseconds
+     */
+    public long getCooldownDuration(final ActivateType activateType) {
+        return 0L;
+    }
 }
