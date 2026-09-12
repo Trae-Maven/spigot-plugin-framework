@@ -4,6 +4,7 @@ import io.github.trae.spigot.framework.command.events.CommandExecuteEvent;
 import io.github.trae.spigot.framework.command.events.CommandTabCompleteEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilMessage;
+import io.github.trae.spigot.framework.utility.UtilPermission;
 import io.github.trae.utilities.UtilGeneric;
 import io.github.trae.utilities.UtilJava;
 import org.bukkit.command.CommandSender;
@@ -82,20 +83,17 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
     }
 
     /**
-     * Returns whether the given {@link CommandSender} has permission to execute this command.
-     * <p>
-     * Returns {@code true} if any of the following are true:
-     * <ul>
-     *   <li>No permission node is defined ({@link #getPermission()} returns {@code null})</li>
-     *   <li>The sender has the required permission node</li>
-     *   <li>The sender is an operator</li>
-     * </ul>
+     * Checks whether the specified {@link CommandSender} has permission to execute this command.
      *
-     * @param commandSender the sender to check
-     * @return {@code true} if the sender is permitted to run this command
+     * <p>This check delegates to {@link UtilPermission#hasPermission} using the permission
+     * returned by {@link #getPermission()}.</p>
+     *
+     * @param commandSender the command sender to check
+     * @return {@code true} if the command sender is permitted to execute this command,
+     * otherwise {@code false}
      */
     default boolean hasPermission(final CommandSender commandSender) {
-        return this.getPermission() == null || commandSender.hasPermission(this.getPermission()) || commandSender.isOp();
+        return UtilPermission.hasPermission(commandSender, this.getPermission());
     }
 
     /**

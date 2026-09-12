@@ -1,25 +1,31 @@
 package io.github.trae.spigot.framework.utility;
 
+import io.github.trae.utilities.UtilString;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.UtilityClass;
 import org.bukkit.permissions.Permissible;
 
-import java.util.stream.Stream;
-
 /**
- * Utility helpers for permission checks that honour wildcards and operator status.
+ * Provides utility methods for checking Bukkit permissions with support for
+ * operator status and global wildcard permissions.
  *
- * <p>Bukkit's own {@link Permissible#hasPermission(String)} only matches the node it is given, so a
- * holder of a wildcard node is not granted everything beneath it unless the permission plugin
- * expands it. These helpers close that gap by also testing the global {@code *} node and a
- * configurable custom wildcard, and by treating operators as permitted.</p>
+ * <p>A permissible is considered to have a permission when any of the following
+ * conditions are satisfied:</p>
+ *
+ * <ul>
+ *     <li>The requested permission is empty.</li>
+ *     <li>The permissible is an operator.</li>
+ *     <li>The permissible has the global {@code *} permission.</li>
+ *     <li>The permissible has the configured custom wildcard permission.</li>
+ *     <li>The permissible directly has the requested permission.</li>
+ * </ul>
  */
 @UtilityClass
 public class UtilPermission {
 
     /**
-     * Additional wildcard node treated as granting every permission, such as a network-wide admin
+     * Additional wildcard node treated as granting every permission, such as a server admin
      * node. Defaults to {@code *}.
      */
     @Getter
@@ -27,16 +33,40 @@ public class UtilPermission {
     private static String customWildcardPermission = "*";
 
     /**
-     * Checks whether the given holder has the specified permission.
+     * Determines whether a permissible has access to the specified permission.
      *
-     * <p>Returns true if the holder is an operator, holds the global {@code *} node, holds the
-     * configured custom wildcard, or holds the permission itself.</p>
+     * <p>An empty permission is always permitted. Otherwise, access is granted
+     * when the permissible is an operator, has the global {@code *} permission,
+     * has the configured custom wildcard permission, or directly has the
+     * requested permission.</p>
      *
-     * @param permissible the permission holder to test, such as a player or console sender
-     * @param permission  the permission node to test
-     * @return true if the holder is permitted
+     * @param permissible the permissible to check
+     * @param permission  the permission to check
+     * @return {@code true} if access is permitted, otherwise {@code false}
      */
     public static boolean hasPermission(final Permissible permissible, final String permission) {
-        return permissible.isOp() || Stream.of("*", customWildcardPermission, permission).anyMatch(permissible::hasPermission);
+        if (UtilString.isEmpty(permission)) {
+            return true;
+        }
+
+        if (permissible != null) {
+            if (permissible.isOp()) {
+                return true;
+            }
+
+            if (permissible.hasPermission("*")) {
+                return true;
+            }
+
+            if (permissible.hasPermission(customWildcardPermission)) {
+                return true;
+            }
+
+            if (permissible.hasPermission(permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
