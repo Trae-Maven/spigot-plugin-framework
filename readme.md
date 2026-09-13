@@ -1,6 +1,6 @@
 # Spigot-Plugin-Framework
 
-A Spigot/Paper plugin framework providing structured command systems, event utilities, packet-based sidebars, tablists, teams and holograms, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
+A Spigot/Paper plugin framework providing structured command systems, event utilities, a staged damage and death pipeline, packet-based sidebars, tablists, teams and holograms, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
 
 Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-based hierarchy architecture, automatically handling registration and teardown of listeners, commands, and subcommands as components are initialized and shut down.
 
@@ -19,6 +19,12 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Tablist system with priority resolution for per-player header and footer content
 - Packet-based team system with per-viewer prefix and suffix resolution, giving relation-aware nametag colours through priority-sorted `Team` subclasses
 - Packet-based hologram system built on text displays rather than armour stands, with per-player text, per-player visibility, and no entity in the world
+- Staged damage pipeline that replaces vanilla damage entirely, with a gate stage, an ability stage and a reduction stage, each cancellable
+- Damage modifiers filed under named keys so a weapon's damage, a critical multiplier and an armour reduction all compose instead of overwriting one another
+- Vanilla-accurate defaults for armour, toughness, protection, resistance, weapon damage, critical hits, knockback, durability and immunity windows, each replaceable per piece or per item through its own event
+- Pre-1.9 combat by default, with the attack cooldown removed and immunity tracked per attacker rather than shared
+- Death system that knows who killed whom and with what, including attributions that outlive the hit that set them
+- Three-part display names, so a consumer takes just the name where a prefix would be noise and the full thing where it would not
 - Declarative item system with identity stamping and automatic version reconciliation, so stacks in player inventories update themselves when the definition changes
 - Opt-in item activation, so a custom item gains a click action with its own gate, cancellable events, and control over the vanilla behaviour it replaces
 - Inventory window system with slot-bound buttons, open and close gating, and full click and drag protection
@@ -48,7 +54,7 @@ Commands and subcommands integrate directly into the hierarchy as Nodes, each wi
 | `BaseCommand` | Node under a Manager | Registered with `CommandMap` |
 | `BaseSubCommand` | Node under a command | Attached to parent command |
 
-The sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
+The damage, death, sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
 
 ---
 
@@ -181,6 +187,8 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
 | `io.github.trae.spigot.framework.team` | `TeamManager`, `TeamListener` |
 | `io.github.trae.spigot.framework.hologram` | `HologramManager`, `HologramListener` |
+| `io.github.trae.spigot.framework.damage` | `DamageManager`, `DamageListener`, `CustomDamageListener`, and the reduction, durability, knockback, critical, delay and attack-speed listeners |
+| `io.github.trae.spigot.framework.death` | `DeathListener`, `DeathMessageListener` |
 | `io.github.trae.spigot.framework.blocking` | `SwordBlockListener` |
 
 Your own `@Application` class's package is always scanned, so the sidebars, items, windows, and teams you define alongside it are discovered without any extra declaration. `@Scan` is only for pulling in packages you do not own.
@@ -1139,6 +1147,12 @@ UtilEvent.dispatch(new SidebarUpdateEvent("HUB", player));
 
 Cancelling the event clears the player's sidebar instead of refreshing it.
 
+### Cost
+
+The scheduler runs four times a second, but nothing is sent unless the diff finds a change, so a static sidebar costs resolution time and no bandwidth at all. What the interval does cost is a `getTitle` and `getLines` call per player per pass, so keep those cheap and built from cached state rather than live lookups.
+
+The registered sidebars are sorted by priority once on first use rather than on every lookup, so resolving a player's sidebar is a walk of an already-ordered list.
+
 ---
 
 ## Tablist System
@@ -1218,6 +1232,12 @@ public void onTablistUpdate(final TablistUpdateEvent event) {
 ```
 
 The clearing packet is only sent once, on the transition away from an active tablist, rather than every tick.
+
+### Cost
+
+Unlike the sidebar, nothing is cached to diff against, so every dispatch is a send. That is why the interval is a second rather than a tick: at a high player count, a faster interval is bandwidth spent re-sending content that has not changed.
+
+The registered tablists are sorted by priority once on first use, same as the sidebar.
 
 ---
 
@@ -1311,6 +1331,12 @@ UtilEvent.dispatch(new TeamUpdateEvent(player));
 // Only apply for viewers whose eligible team matches the given identifier
 UtilEvent.dispatch(new TeamUpdateEvent("factions", player));
 ```
+
+### Cost
+
+Resolution is per player and viewer pair, so a full refresh at a hundred players is ten thousand lookups. The registered teams are therefore sorted by priority once on first use rather than scanned and sorted per lookup, which is the difference between a noticeable stall and nothing.
+
+That same quadratic shape is why firing `TeamUpdateEvent` in a loop is worth avoiding. One player's relation change is one dispatch, not one per viewer.
 
 ---
 
@@ -1495,6 +1521,223 @@ A hologram whose `getLocation()` returns `null`, or names a world that is not lo
 
 ---
 
+## Damage System
+
+The framework takes vanilla damage over entirely. The vanilla event is cancelled the moment it fires, a three-stage chain runs in its place, and the resolved figure is applied by hand.
+
+That is a heavier intervention than the other subsystems make, and it buys two things. Damage becomes something a plugin composes rather than overwrites, so an ability, a weapon, a set of armour and a potion effect can each contribute without any of them knowing about the others. And the numbers become yours: the vanilla behaviour ships as the default, expressed in ordinary listeners that a game mode can replace or rebalance piece by piece.
+
+Requires `@Scan("io.github.trae.spigot.framework.damage")`.
+
+### The Pipeline
+
+Every hit passes through three stages, each its own event, each cancellable. Cancelling stops the chain, so a later stage never runs against damage that was refused.
+
+| Stage | For |
+|---|---|
+| `CustomPreDamageEvent` | Gating the hit and establishing the base |
+| `CustomDamageEvent` | Consuming plugins setting ability damage |
+| `CustomPostDamageEvent` | Reductions and side effects |
+
+The pre stage is where the damage delay is enforced, where the weapon's contribution is resolved from the held item, and where a critical hit is recognised. By the time it ends, the base reflects what the attack is worth before anything custom touches it.
+
+The damage stage is reserved. Nothing in the framework writes damage there, so an ability has the field to itself:
+
+```java
+@EventHandler
+public void onCustomDamage(final CustomDamageEvent event) {
+    if (!this.isFrostbite(event)) {
+        return;
+    }
+
+    event.setDamage(7.0D);
+    event.removeModifier(DamageModifier.WEAPON);
+}
+```
+
+The post stage applies armour, protection and resistance early, then durability, knockback and the delay record at the end. Once it completes, `DamageManager` deals what is left.
+
+### Modifiers
+
+The damage figure is a base plus a set of named contributions, rather than a single number listeners fight over. Each key holds at most one additive and one multiplier, so two things writing to different keys compose and two things writing to the same key do not.
+
+| Key | Holds |
+|---|---|
+| `WEAPON` | The attacking item's own damage |
+| `CRITICAL` | The critical hit multiplier |
+| `POTION` | Contributions from effects on the attacker |
+| `ARMOUR` | The reduction from worn armour |
+| `PROTECTION` | The reduction from protection enchantments |
+| `RESISTANCE` | The reduction from the resistance effect |
+| `CUSTOM` | Anything a consuming plugin contributes |
+
+```java
+// One thing lives under this key, so replace it
+event.setModifier(DamageModifier.WEAPON, 6.0D);
+
+// Several things stack under this key, so add to it
+event.addModifier(DamageModifier.ARMOUR, -2.5D);
+
+// Proportional rather than flat
+event.setMultiplier(DamageModifier.CRITICAL, 1.5D);
+
+// Discard a contribution an ability does not want
+event.removeModifier(DamageModifier.WEAPON);
+```
+
+`getFinalDamage()` applies every additive to the base first, then every multiplier, and floors the result at zero. That ordering is why a reduction written as a negative additive is still scaled by a multiplier written elsewhere, which is what makes armour and resistance compose the way vanilla's do.
+
+### Dealing Damage Yourself
+
+A plugin that wants to deal damage directly builds a pre stage and dispatches it, rather than calling `damage` and having the pipeline intercept it:
+
+```java
+// Environmental, with no attacker
+UtilEvent.dispatch(CustomPreDamageEvent.create(target, DamageCause.MAGIC, 4.0D, Reason.of(Component.text("Trap"))));
+
+// Attributed to an attacker, so the kill is credited and mobs retaliate
+UtilEvent.dispatch(CustomPreDamageEvent.create(target, player, DamageCause.MAGIC, 4.0D, Reason.of(Component.text("Ignite"))));
+```
+
+Both go through the full chain, so a delay still applies, armour still reduces, and the death system still sees it.
+
+### Reasons
+
+A reason is what the damage is attributed to in messages. The pipeline seeds one from the attacker's held item, complete with its display name and hover tooltip, so a death message can show what killed someone without rebuilding it.
+
+A `CustomReason` carries a duration and outlives the hit that set it. That is what an ability wants: the attribution should survive the attacker swapping items, and should still name the ability if the kill lands a few seconds later.
+
+```java
+// Stands for five seconds, whatever the killing blow turns out to be
+event.setReason(CustomReason.of(Component.text("Frostbite 5"), TimeUnit.SECONDS.toMillis(5L)));
+
+// Stands until the target dies
+event.setReason(CustomReason.of(Component.text("Bleed")));
+```
+
+The manager retains one of these per damagee and attacker pair, and the death system reads it before falling back to the killing hit's own reason. A plain reason reads with an article in front of it, so an item renders as "with a Diamond Sword"; a custom one does not, so an ability renders as "with Frostbite 5".
+
+### Vanilla Defaults
+
+Because the pipeline owns everything, every piece of vanilla behaviour it replaced ships as a listener. Each is ordinary code with no special standing, which is what makes the whole set replaceable.
+
+| Listener | Provides |
+|---|---|
+| `DamageWeaponReductionListener` | The weapon's damage, by material, plus sharpness |
+| `DamageCriticalListener` | The critical hit multiplier |
+| `DamageArmourReductionListener` | Armour, toughness, protection and resistance reduction |
+| `DamageWeaponDurabilityListener` | One durability point per hit on the attacker's item |
+| `DamageArmourDurabilityListener` | A quarter of the damage, floored at one, on each worn piece |
+| `DamageKnockbackListener` | Knockback away from the attacker, with resistance applied |
+| `DamageDelayListener` | The immunity window, per attacker and per environmental cause |
+| `DamageAttackSpeedListener` | Removal of the 1.9 attack cooldown |
+
+The figures match vanilla: armour points and toughness by material, the twenty-point cap and the division by twenty-five, twenty percent per resistance level, and the displayed attack damage for every weapon including copper. Each cause carries its own rules about which reductions apply, mirroring vanilla's damage type tags, so armour does nothing against drowning or poison and resistance does nothing against the void.
+
+Combat is pre-1.9 by default. Attack speed is raised high enough that every swing lands at full strength, the immunity window is ten ticks rather than twenty, and it is tracked per attacker rather than shared, so two players can hit the same target at once.
+
+### Rebalancing
+
+The two reduction events are per item, which is the hook a game mode uses to move off vanilla's balance without replacing the formula.
+
+```java
+@EventHandler
+public void onWeaponReduction(final WeaponReductionEvent event) {
+    if (event.getItemStack().getType() == Material.IRON_SWORD) {
+        event.setAmount(4.0D);
+    }
+}
+
+@EventHandler
+public void onArmourReduction(final ArmourReductionEvent event) {
+    if (event.getItemStack().getType() == Material.DIAMOND_CHESTPLATE) {
+        event.setAmount(24.0D);
+        event.setToughness(0.0D);
+    }
+}
+```
+
+`WeaponReductionEvent` sets what that item is worth in damage. `ArmourReductionEvent` sets what that piece is worth in armour points, and its toughness separately; every piece's value is summed and the total goes through the reduction formula, so raising one piece makes the whole set stronger. Setting toughness to zero collapses the formula to a flat armour curve, which is the pre-1.9 shape.
+
+Cancelling either excludes that item from the calculation entirely.
+
+### Applying Damage
+
+`DamageManager` deals the resolved figure and reproduces what vanilla would have done: health and absorption, the hurt animation and flash, the combat tracker that names a killer in death messages, mob aggro, statistics, advancements, and death itself.
+
+Aggro is the one worth knowing about. Marking the attacker as the damagee's last attacker is a single field write, and it is what makes a spider turn on a player who hits it in daylight, and what angers neutral mobs. Without it, custom damage would be invisible to mob behaviour.
+
+Three pieces of vanilla behaviour are unreachable from a plugin because the methods behind them are not visible: totem of undying, the entity-specific hurt sound, and the damagee's own last damage source.
+
+---
+
+## Death System
+
+The death system turns a vanilla death into one that knows what caused it.
+
+Vanilla's own death handling only knows that an entity died. The damage pipeline knows who dealt the blow, with what item, and for what reason, so the two are joined here: `DamageManager` retains the last damage pass that landed on each entity, and the death listener reads it.
+
+Requires `@Scan("io.github.trae.spigot.framework.death")`.
+
+### Reacting to a Death
+
+```java
+@EventHandler
+public void onCustomDeath(final CustomDeathEvent event) {
+    final Entity killer = event.getKiller();
+    if (killer == null) {
+        return;
+    }
+
+    this.statisticsManager.addKill(killer);
+}
+```
+
+Fired after the vanilla death events, so drops and death handling have already run. Not cancellable for that reason.
+
+Attribution is resolved before the event is dispatched rather than read straight off the damage pass. A killer with an unexpired `CustomReason` standing against the target is credited with that instead of with whatever the killing hit happened to be, so a kill landed with a sword moments after an ability still names the ability.
+
+### Death Messages
+
+Vanilla's message is suppressed and replaced. The replacement is dispatched once per recipient rather than broadcast, so a plugin can vary it by who is reading it, or suppress it for some players and not others:
+
+```java
+@EventHandler
+public void onCustomDeathMessage(final CustomDeathMessageEvent event) {
+    if (this.settingsManager.hasDeathMessagesHidden(event.getRecipient())) {
+        event.setCancelled(true);
+    }
+}
+```
+
+Both names are seeded from the damage pass and settable per recipient, so a team colour or a rank replaces only their copy.
+
+The message takes one of three shapes: a self-inflicted death names nobody, a death with a killer names them and what it was attributed to, and anything else names the cause.
+
+Messages are only produced for player deaths. Mob deaths still fire `CustomDeathEvent`, so a plugin wanting to announce those listens to it directly.
+
+---
+
+## Display Names
+
+A `DisplayName` is a name in three parts: whatever sits before it, the name itself, and whatever sits after it.
+
+Keeping the parts separate rather than pre-joined means a consumer can take just the name where a prefix would be noise, such as a compact scoreboard line, and the full thing where it would not. Either side may be absent, which is the normal case for anything unranked or untagged.
+
+```java
+// With a rank in front and a tag behind
+DisplayName.of(rankComponent, nameComponent, tagComponent);
+
+// Nothing either side
+DisplayName.of(nameComponent);
+```
+
+`getFullName()` joins the parts with a single space, skipping the absent ones so a name with no prefix does not start with one.
+
+The damage pipeline carries one for each side of a hit, so a plugin with display names, ranks or nicknames writes them once at the pre stage rather than at every message site.
+
+---
+
 ## NMS Utilities
 
 `UtilNms` provides direct access to NMS operations without requiring each consumer to handle CraftBukkit casting:
@@ -1508,6 +1751,8 @@ UtilNms.sendPacket(player, packet);
 ```
 
 Packet sending writes directly to the Netty channel pipeline, bypassing the main thread. This is what enables the sidebar and team systems to run without blocking the main thread.
+
+The damage system reaches deeper than this, driving vanilla's own damage internals directly rather than sending packets. See [Damage System](#damage-system).
 
 ---
 
@@ -1523,6 +1768,9 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 | `UtilItemStack` | Persistent data reads and writes on an `ItemStack` |
 | `UtilWindow` | Opening a `Window` for a player, honouring the open event and gate |
 | `UtilHologram` | Spawning, updating and despawning a `Hologram` for a single player |
+| `UtilDamage` | Resolving whether an attack qualifies as a critical hit |
+| `UtilAdventure` | Joining components with a separator and an inclusion filter, skipping nulls and empties |
+| `UtilColor` | Converting between AWT, Adventure and Bukkit colours, and wrapping text in MiniMessage colour tags |
 | `UtilServer` | Server and online player access |
 
 ---
@@ -1542,6 +1790,8 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 | `Tablist` | Define a priority-sorted tab list header and footer |
 | `Team` | Define a priority-sorted, per-viewer nametag decoration |
 | `Hologram` | Define a packet-based floating text display with per-player text and visibility |
+| `Reason` | Describe what a hit is attributed to in messages |
+| `CustomReason` | Describe an attribution that outlives the hit that set it |
 
 ---
 
@@ -1648,6 +1898,36 @@ Only the spawn event is cancellable, and cancelling it stops the hologram being 
 
 ---
 
+## Damage Events
+
+| Event | Fired When |
+|---|---|
+| `CustomPreDamageEvent` | Damage is about to be processed, before anything has been decided |
+| `CustomDamageEvent` | The base is settled, for consuming plugins to set ability damage |
+| `CustomPostDamageEvent` | The damage is final, for reductions and side effects |
+| `WeaponReductionEvent` | The attacking item's damage contribution is being resolved |
+| `ArmourReductionEvent` | A worn piece's armour value is being resolved, once per piece |
+| `WeaponDurabilityEvent` | The attacker's item is about to spend durability |
+| `ArmourDurabilityEvent` | A worn piece is about to spend durability, once per piece |
+| `CustomKnockbackEvent` | Knockback has been calculated, before it is applied |
+
+All are cancellable. Cancelling any of the three stages stops the chain there, so nothing downstream runs. Cancelling a reduction event excludes that item from the calculation entirely; cancelling a durability event spares that item; cancelling the knockback event means no knockback at all.
+
+The three stages exist so the framework, consuming plugins and reductions each have a place that is not the others'. Writing damage at the pre stage would be overwritten by a weapon, and writing it at the post stage would miss armour.
+
+---
+
+## Death Events
+
+| Event | Fired When |
+|---|---|
+| `CustomDeathEvent` | An entity has died, with the damage pass that killed it attached |
+| `CustomDeathMessageEvent` | A death message is about to be sent to one player |
+
+`CustomDeathEvent` is not cancellable, since the vanilla death events have already run by the time it fires. `CustomDeathMessageEvent` is, and is dispatched once per recipient, so a message can be suppressed or reworded for some players and not others.
+
+---
+
 ## Interfaces
 
 | Interface | Description |
@@ -1658,3 +1938,7 @@ Only the spawn event is cancellable, and cancelling it stops the hologram being 
 | `IBaseCommand` | Command contract with subcommand management |
 | `Activatable` | Capability a `CustomItem` implements to gain a click action |
 | `ICustomCancellableEvent` | Cancellable event with reason support |
+| `SystemTimeMixin` | Carries a timestamp of when something was created or started |
+| `DurationMixin` | Carries a duration, with `-1` meaning permanent |
+| `ExpiredMixin` | Reports whether a duration has elapsed |
+| `RemainingMixin` | Reports how much of a duration is left |

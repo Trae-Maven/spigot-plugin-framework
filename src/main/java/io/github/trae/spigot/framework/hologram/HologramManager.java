@@ -1,9 +1,11 @@
 package io.github.trae.spigot.framework.hologram;
 
+import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.utility.UtilHologram;
 import io.github.trae.spigot.framework.utility.UtilServer;
+import io.github.trae.utilities.UtilJava;
 import io.github.trae.utilities.UtilString;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -20,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Owns every registered {@link Hologram} and keeps each player's client in sync with them.
  *
- * <p>Holograms are collected by list injection, so any {@code @Singleton} extending
+ * <p>Holograms are resolved from the container on first use, so any {@code @Singleton} extending
  * {@link Hologram} is picked up with no registration call. Each is built on the first scheduler
  * pass that finds it unbuilt, and from then on a pass decides, for each player and hologram,
  * whether to spawn, despawn or refresh.</p>
@@ -44,20 +46,23 @@ import java.util.concurrent.TimeUnit;
 public class HologramManager {
 
     /**
-     * Every registered hologram, keyed by lowercased name. Populated at construction and never
-     * mutated afterwards.
-     */
-    private final Map<String, Hologram> hologramMap = new HashMap<>();
-
-    /**
-     * Collects every injected hologram into the name lookup.
+     * Every registered hologram, keyed by lowercased name.
      *
-     * @param hologramList every {@code @Singleton} hologram in the container
+     * <p>Resolved on first use rather than at construction, since the container is still wiring
+     * when this is built. Never mutated afterwards.</p>
      */
-    public HologramManager(final List<Hologram> hologramList) {
-        for (final Hologram hologram : hologramList) {
-            this.hologramMap.put(hologram.getName().toLowerCase(Locale.ROOT), hologram);
+    private Map<String, Hologram> hologramMap;
+
+    private Map<String, Hologram> getHologramMap() {
+        if (this.hologramMap == null) {
+            this.hologramMap = UtilJava.createMap(new HashMap<>(), map -> {
+                for (final Hologram hologram : InjectorApi.getAll(Hologram.class)) {
+                    map.put(hologram.getName().toLowerCase(Locale.ROOT), hologram);
+                }
+            });
         }
+
+        return this.hologramMap;
     }
 
     /**
@@ -78,7 +83,7 @@ public class HologramManager {
             return;
         }
 
-        for (final Hologram hologram : this.hologramMap.values()) {
+        for (final Hologram hologram : this.getHologramMap().values()) {
             if (!hologram.isBuilt()) {
                 hologram.build();
 
@@ -123,7 +128,7 @@ public class HologramManager {
             return Optional.empty();
         }
 
-        return Optional.ofNullable(this.hologramMap.get(name.toLowerCase(Locale.ROOT)));
+        return Optional.ofNullable(this.getHologramMap().get(name.toLowerCase(Locale.ROOT)));
     }
 
     /**
@@ -204,6 +209,6 @@ public class HologramManager {
      * @param player the player to forget
      */
     public final void forget(final Player player) {
-        this.hologramMap.values().forEach(hologram -> hologram.getViewerSet().remove(player.getUniqueId()));
+        this.getHologramMap().values().forEach(hologram -> hologram.getViewerSet().remove(player.getUniqueId()));
     }
 }
