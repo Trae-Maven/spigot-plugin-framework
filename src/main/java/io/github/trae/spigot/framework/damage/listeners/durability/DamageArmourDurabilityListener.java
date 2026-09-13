@@ -35,7 +35,7 @@ public class DamageArmourDurabilityListener implements Listener {
      *
      * @param event the completed post stage
      */
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public final void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;

@@ -1,12 +1,8 @@
 package io.github.trae.spigot.framework.damage.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
-import io.github.trae.spigot.framework.damage.DamageManager;
-import io.github.trae.spigot.framework.damage.events.damage.CustomDamageEvent;
-import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPreDamageEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
-import lombok.AllArgsConstructor;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -16,24 +12,25 @@ import org.bukkit.event.entity.EntityDamageEvent;
 /**
  * The entry point of the damage pipeline.
  *
- * <p>Takes over vanilla damage entirely: the vanilla event is cancelled, a three-stage chain runs in
- * its place, and the resolved figure is applied by the manager. Nothing vanilla would have done
- * happens on its own after this, which is why the manager reproduces it by hand.</p>
+ * <p>Takes over vanilla damage: the vanilla event is cancelled and the pre stage is dispatched in
+ * its place. Nothing vanilla would have done happens on its own after this, which is why the
+ * manager reproduces it by hand.</p>
  *
- * <p>Each stage short-circuits the chain if cancelled, so refusing damage at the pre stage means no
- * reduction, durability, knockback or delay work is done for it.</p>
+ * <p>This class does no more than the handover. Advancing through the remaining stages and applying
+ * the result is {@link CustomDamageListener}'s job, which keeps the vanilla boundary in one place
+ * and the pipeline's own flow in another.</p>
  *
  * @see CustomPreDamageEvent
- * @see DamageManager
+ * @see CustomDamageListener
  */
-@AllArgsConstructor
 @Singleton
 public class DamageListener implements Listener {
 
-    private final DamageManager damageManager;
-
     /**
-     * Cancels the vanilla event and runs the pipeline in its place.
+     * Cancels the vanilla event and dispatches the pre stage in its place.
+     *
+     * <p>The cancellation check on the returned event is what stops the handover when the pre stage
+     * was refused, since nothing further happens here either way.</p>
      *
      * @param entityDamageEvent the vanilla event being taken over
      */
@@ -49,18 +46,6 @@ public class DamageListener implements Listener {
         if (customPreDamageEvent.isCancelled()) {
             return;
         }
-
-        final CustomDamageEvent customDamageEvent = UtilEvent.supply(new CustomDamageEvent(customPreDamageEvent));
-        if (customDamageEvent.isCancelled()) {
-            return;
-        }
-
-        final CustomPostDamageEvent customPostDamageEvent = UtilEvent.supply(new CustomPostDamageEvent(customDamageEvent));
-        if (customPostDamageEvent.isCancelled()) {
-            return;
-        }
-
-        this.damageManager.apply(customPostDamageEvent);
     }
 
     /**

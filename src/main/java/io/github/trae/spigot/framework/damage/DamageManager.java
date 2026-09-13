@@ -1,5 +1,6 @@
 package io.github.trae.spigot.framework.damage;
 
+import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.utilities.UtilJava;
@@ -17,6 +18,7 @@ import org.bukkit.entity.LivingEntity;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Applies resolved damage to an entity, reproducing vanilla's side effects.
@@ -43,6 +45,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class DamageManager {
 
+    private static final long RETENTION = TimeUnit.MINUTES.toMillis(1L);
+
     /**
      * The last damage pass that landed on each entity, by UUID.
      *
@@ -51,6 +55,21 @@ public class DamageManager {
      * mobs need a sweep or they accumulate.</p>
      */
     private final ConcurrentHashMap<UUID, CustomPostDamageEvent> lastDamageMap = new ConcurrentHashMap<>();
+
+    /**
+     * Drops retained records older than the retention window.
+     *
+     * <p>Nothing else clears these for a mob, since one that takes damage and never dies leaves its
+     * entry behind, and mobs die or unload without notice. The window only needs to outlive the gap
+     * between a killing blow and the death being read, which is the same tick, so a minute is
+     * generous.</p>
+     */
+    @Scheduler(period = 1, unit = TimeUnit.MINUTES)
+    public final void onScheduler() {
+        final long now = System.currentTimeMillis();
+
+        this.lastDamageMap.values().removeIf(event -> now - event.getSystemTime() >= RETENTION);
+    }
 
     /**
      * The last damage pass that landed on an entity.
