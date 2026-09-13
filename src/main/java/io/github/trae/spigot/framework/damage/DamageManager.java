@@ -14,6 +14,10 @@ import org.bukkit.craftbukkit.damage.CraftDamageSource;
 import org.bukkit.craftbukkit.entity.CraftLivingEntity;
 import org.bukkit.entity.LivingEntity;
 
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Applies resolved damage to an entity, reproducing vanilla's side effects.
  *
@@ -25,6 +29,10 @@ import org.bukkit.entity.LivingEntity;
  * The tradeoff is that armour, enchantment and resistance reduction are not applied here; those are
  * the pipeline's job, and by this point they are already folded into the resolved figure.</p>
  *
+ * <p>The last damage pass that landed on each entity is retained, since cancelling vanilla's
+ * handling also means {@code getLastDamageCause} is never populated. That record is what the death
+ * system reads to find out who killed whom and with what.</p>
+ *
  * <h2>Known gaps</h2>
  * <p>Three pieces of vanilla behaviour are unreachable from a plugin because the methods behind them
  * are not visible: totem of undying, the entity-specific hurt sound, and the damagee's
@@ -34,6 +42,40 @@ import org.bukkit.entity.LivingEntity;
  */
 @Singleton
 public class DamageManager {
+
+    /**
+     * The last damage pass that landed on each entity, by UUID.
+     *
+     * <p>Entries are written for every hit and are only cleared by {@link #forget(LivingEntity)}, so
+     * an entity that takes damage and never dies leaves one behind. Players are cleared on quit;
+     * mobs need a sweep or they accumulate.</p>
+     */
+    private final ConcurrentHashMap<UUID, CustomPostDamageEvent> lastDamageMap = new ConcurrentHashMap<>();
+
+    /**
+     * The last damage pass that landed on an entity.
+     *
+     * <p>Empty for an entity that has taken no damage through the pipeline, which is the honest
+     * answer for deaths from outside it, such as a command kill.</p>
+     *
+     * @param damagee the entity to look up
+     * @return the last damage pass, or empty
+     */
+    public final Optional<CustomPostDamageEvent> getLastDamage(final LivingEntity damagee) {
+        return Optional.ofNullable(this.lastDamageMap.get(damagee.getUniqueId()));
+    }
+
+    /**
+     * Drops an entity's retained damage record.
+     *
+     * <p>Called after a death has been read, and on quit, so the record does not outlive the reason
+     * for keeping it.</p>
+     *
+     * @param entity the entity to forget
+     */
+    public final void forget(final LivingEntity entity) {
+        this.lastDamageMap.remove(entity.getUniqueId());
+    }
 
     /**
      * Applies the resolved damage from a completed damage pass.
@@ -61,6 +103,8 @@ public class DamageManager {
         if (damagee.isInvulnerableTo(serverLevel, damageSource)) {
             return;
         }
+
+        this.lastDamageMap.put(bukkitDamagee.getUniqueId(), event);
 
         final float damage = (float) event.getFinalDamage();
 

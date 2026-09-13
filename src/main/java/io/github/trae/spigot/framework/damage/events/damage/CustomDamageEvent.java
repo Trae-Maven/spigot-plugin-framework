@@ -2,6 +2,7 @@ package io.github.trae.spigot.framework.damage.events.damage;
 
 import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
+import net.kyori.adventure.text.Component;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Projectile;
@@ -23,15 +24,16 @@ import java.util.Map;
  */
 public class CustomDamageEvent extends AbstractCustomDamageEvent {
 
-    protected CustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final EntityDamageEvent.DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final String reason) {
-        super(systemTime, additiveMap, multiplierMap, damagee, damager, projectile, source, cause, itemStack, armourContents, originalDamage, critical, damage, delay, reason);
+    protected CustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final EntityDamageEvent.DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Component reason) {
+        super(systemTime, additiveMap, multiplierMap, damagee, damager, projectile, source, cause, itemStack, armourContents, originalDamage, critical, damage, delay, damageeName, damagerName, causeName, reason);
     }
 
     /**
      * Carries the pre stage forward.
      *
      * <p>The modifier maps are passed by reference rather than copied, so anything contributed
-     * during the pre stage is still in place here.</p>
+     * during the pre stage is still in place here. Names and reason carry forward by value, so a
+     * plugin that renamed either side at the pre stage keeps that name.</p>
      *
      * @param event the pre stage that produced this one
      */
@@ -51,6 +53,9 @@ public class CustomDamageEvent extends AbstractCustomDamageEvent {
                 event.isCritical(),
                 event.getDamage(),
                 event.getDelay(),
+                event.getDamageeName(),
+                event.getDamagerName(),
+                event.getCauseName(),
                 event.getReason()
         );
     }
