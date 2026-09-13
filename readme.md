@@ -1,6 +1,6 @@
 # Spigot-Plugin-Framework
 
-A Spigot/Paper plugin framework providing structured command systems, event utilities, packet-based sidebars, tablists and teams, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
+A Spigot/Paper plugin framework providing structured command systems, event utilities, packet-based sidebars, tablists, teams and holograms, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
 
 Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-based hierarchy architecture, automatically handling registration and teardown of listeners, commands, and subcommands as components are initialized and shut down.
 
@@ -18,6 +18,7 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Packet-based sidebar system with priority resolution, where only changed lines and titles produce packets, giving zero flicker and dynamic animated titles
 - Tablist system with priority resolution for per-player header and footer content
 - Packet-based team system with per-viewer prefix and suffix resolution, giving relation-aware nametag colours through priority-sorted `Team` subclasses
+- Packet-based hologram system built on text displays rather than armour stands, with per-player text, per-player visibility, and no entity in the world
 - Declarative item system with identity stamping and automatic version reconciliation, so stacks in player inventories update themselves when the definition changes
 - Opt-in item activation, so a custom item gains a click action with its own gate, cancellable events, and control over the vanilla behaviour it replaces
 - Inventory window system with slot-bound buttons, open and close gating, and full click and drag protection
@@ -47,7 +48,7 @@ Commands and subcommands integrate directly into the hierarchy as Nodes, each wi
 | `BaseCommand` | Node under a Manager | Registered with `CommandMap` |
 | `BaseSubCommand` | Node under a command | Attached to parent command |
 
-The sidebar, tablist, team, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
+The sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
 
 ---
 
@@ -57,7 +58,7 @@ Spigot-Plugin-Framework requires Java 21+ and a Paper API environment.
 
 ### NMS Access (paper-nms-maven-plugin)
 
-The sidebar and team systems and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
+The sidebar, team and hologram systems and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
 
 Add `.paper-nms` to your `.gitignore`, as it contains locally generated dependencies.
 
@@ -123,7 +124,7 @@ Add the dependency to your Maven project:
 
 ## Enabling Subsystems
 
-The sidebar, tablist, team, item, and window systems each ship their own manager and listener as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
+The sidebar, tablist, team, hologram, item, and window systems each ship their own manager and listener as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
 
 Declare the packages you want with `@Scan` on your `@Application` class, or on any interface or superclass in its hierarchy. The `ScanResolver` walks the full type graph of the bootstrap class and collects every `@Scan` it finds, so each layer can declare what it owns.
 
@@ -179,6 +180,7 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.sidebar` | `SidebarManager`, `SidebarListener` |
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
 | `io.github.trae.spigot.framework.team` | `TeamManager`, `TeamListener` |
+| `io.github.trae.spigot.framework.hologram` | `HologramManager`, `HologramListener` |
 | `io.github.trae.spigot.framework.blocking` | `SwordBlockListener` |
 
 Your own `@Application` class's package is always scanned, so the sidebars, items, windows, and teams you define alongside it are discovered without any extra declaration. `@Scan` is only for pulling in packages you do not own.
@@ -288,14 +290,14 @@ Use `UtilEvent` for thread-safe event dispatch:
 // Synchronous, fire and inspect
 MyEvent event = UtilEvent.supply(new MyEvent());
 if (event.isCancelled()) {
-        return;
-        }
+    return;
+}
 
 // Asynchronous, fire and forget
-        UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
+UtilEvent.dispatchAsynchronous(new MyAsyncEvent());
 
 // Asynchronous, fire and chain
-        UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(event -> System.out.println("Done: " + event.isCancelled()));
+UtilEvent.supplyAsynchronous(new MyAsyncEvent()).thenAccept(event -> System.out.println("Done: " + event.isCancelled()));
 ```
 
 ### Task Execution
@@ -1312,6 +1314,187 @@ UtilEvent.dispatch(new TeamUpdateEvent("factions", player));
 
 ---
 
+## Hologram System
+
+The framework provides a packet-based hologram system built on text displays. A `Hologram` describes where it sits and what it says, and the framework sends it to the players who should see it.
+
+Nothing exists server-side. The backing entity is constructed but never added to a level, so the server never ticks it, no chunk persists it, and no other plugin can see it. That is what makes the text per-player: two players standing in the same place can be sent different lines from the same hologram, and a hologram can be shown to one of them and not the other.
+
+Requires `@Scan("io.github.trae.spigot.framework.hologram")`.
+
+### Defining a Hologram
+
+Extend `Hologram`, passing a name, and register it as a component. `HologramManager` collects every subclass through the dependency injector, so a hologram never registers itself:
+
+```java
+@Singleton
+public class SpawnHologram extends Hologram {
+
+    private final SpawnConfig spawnConfig;
+
+    public SpawnHologram(final SpawnConfig spawnConfig) {
+        super("SPAWN");
+
+        this.spawnConfig = spawnConfig;
+    }
+
+    @Override
+    public Location getLocation() {
+        return this.spawnConfig.getHologramLocation();
+    }
+
+    @Override
+    protected List<String> getLines(final Player player) {
+        return List.of(
+                "<gold><bold>WELCOME</bold></gold>",
+                "<gray>Right-Click the villager to begin.</gray>"
+        );
+    }
+}
+```
+
+Lines are MiniMessage strings, deserialised and joined with newlines, which is how a single text display renders more than one line.
+
+### Per-Player Text
+
+`getLines` takes the player it is resolving for, so the text can name them, reflect their rank, or read their own progress. Declare `isDynamic()` when the text changes on its own and should be re-sent while they watch:
+
+```java
+@Singleton
+public class StatsHologram extends Hologram {
+
+    private final PlayerManager playerManager;
+
+    public StatsHologram(final PlayerManager playerManager) {
+        super("STATS");
+
+        this.playerManager = playerManager;
+    }
+
+    @Override
+    public Location getLocation() {
+        return new Location(Bukkit.getWorld("world"), 0.5, 65.0, 0.5);
+    }
+
+    @Override
+    protected List<String> getLines(final Player player) {
+        final PlayerData data = this.playerManager.getPlayerData(player);
+
+        return List.of(
+                "<yellow>%s</yellow>".formatted(player.getName()),
+                "<gray>Kills: <white>%s</white></gray>".formatted(data.getKills()),
+                "<gray>Coins: <white>%s</white></gray>".formatted(data.getCoins())
+        );
+    }
+
+    @Override
+    public boolean isDynamic() {
+        return true;
+    }
+}
+```
+
+Leave `isDynamic()` false unless the text really does change. A dynamic hologram resolves its lines, deserialises them, and sends a metadata packet for every viewer on every pass, where a static one does that once at spawn.
+
+### Per-Player Visibility
+
+`canSee` is the hologram's own rule, checked after the world and distance tests pass:
+
+```java
+@Override
+public boolean canSee(final Player player) {
+    return this.questManager.hasStarted(player);
+}
+```
+
+`HologramSpawnEvent` is the system-level equivalent, for conditions external to the hologram such as a global lockdown or another plugin hiding it. Both must pass.
+
+Cancelling leaves the player out of the viewer set, so the next pass tries again. A listener that wants a hologram hidden keeps cancelling for as long as that holds, rather than cancelling once:
+
+```java
+@EventHandler
+public void onHologramSpawn(final HologramSpawnEvent event) {
+    if (this.settingsManager.hasHologramsHidden(event.getPlayer())) {
+        event.setCancelled(true);
+    }
+}
+```
+
+### Facing and Appearance
+
+Every appearance hook has a default, so a hologram overrides only what it cares about:
+
+| Hook | Controls | Default |
+|---|---|---|
+| `getBillboard()` | How the display rotates to face viewers | `CENTER` |
+| `getAlignment()` | How multiple lines align against each other | `CENTER` |
+| `getBackgroundColor()` | The ARGB background behind the text | Fully transparent |
+| `getScale()` | Uniform scale | `1.0F` |
+| `getTextOpacity()` | Text opacity, `-1` for fully opaque | `-1` |
+| `getLineWidth()` | Pixel width at which text wraps | `200` |
+| `isSeeThrough()` | Whether the text renders through blocks | `false` |
+| `isShadowed()` | Whether the text is drawn with a shadow | `false` |
+| `getViewDistance()` | How far a player may be and still be sent it | `48.0D` |
+
+`Billboard.FIXED` is the one worth knowing. It does not rotate at all, facing whatever direction the location's yaw and pitch specify, which is what gives a hologram mounted flat against a wall or laid across the floor:
+
+```java
+@Override
+protected Billboard getBillboard() {
+    return Billboard.FIXED;
+}
+
+@Override
+protected Color getBackgroundColor() {
+    return Color.fromARGB(160, 0, 0, 0);
+}
+```
+
+`Billboard.VERTICAL` turns to face the player but stays upright, and `Billboard.CENTER` pivots on both axes and tilts with their pitch.
+
+The vanilla grey box is always disabled, so `getBackgroundColor` is the only background a viewer sees. It is only ever a rectangle: a shaped or textured background is a bitmap font glyph drawn behind the text, the same mechanism as an inline image.
+
+### Images
+
+There is no image support in a text display, and no packet that carries one. Both images and shaped backgrounds go through a bitmap font provider in a resource pack: register a glyph mapping a private-use character to a PNG, then return that character in a line like any other text. The provider's height and ascent control how it sits against the text, and a negative-space provider backs the cursor up when something needs to sit behind rather than beside.
+
+### Visibility Resolution
+
+There is no registration call and no manual show or hide. A scheduler runs twice a second and reconciles each player's client against each hologram, spawning what has come into view, despawning what has left it, and re-sending the text of dynamic ones:
+
+| State | Result |
+|---|---|
+| Visible, not currently viewing | Spawned, if `HologramSpawnEvent` is not cancelled |
+| Not visible, currently viewing | Despawned |
+| Visible, viewing, dynamic | Text re-sent |
+| Visible, viewing, static | Nothing |
+
+Visibility depends on the player's position, the hologram's position and `canSee`, and only the first of those produces an event, which is why the system polls rather than listening for movement. The pass is holograms outer and players inner, so a hologram resolves its location and settings once rather than once per player, and players in another world are rejected by a single comparison.
+
+### Moving and Refreshing
+
+Position and rotation live in the add packet and cannot be corrected by a metadata update, so a hologram that has moved is despawned and spawned again rather than updated in place:
+
+```java
+// After getLocation() already returns the new location
+this.hologramManager.relocate(hologram);
+
+// Push a settings change to current viewers, for a static hologram
+this.hologramManager.refresh(hologram);
+
+// Force a clean re-send by dropping every viewer
+this.hologramManager.despawn(hologram);
+
+// Look one up by name, case-insensitively
+this.hologramManager.getHologramByName("SPAWN").ifPresent(hologram -> this.hologramManager.refresh(hologram));
+```
+
+`despawn` is not a way to hide a hologram, since the next pass spawns it again if it is still visible. Use `canSee` or a cancelled `HologramSpawnEvent` for that.
+
+A hologram whose `getLocation()` returns `null`, or names a world that is not loaded, is treated as not ready rather than as an error. The scheduler retries it, so a hologram in a world that loads late starts working on its own.
+
+---
+
 ## NMS Utilities
 
 `UtilNms` provides direct access to NMS operations without requiring each consumer to handle CraftBukkit casting:
@@ -1339,6 +1522,7 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 | `UtilNms` | NMS packet sending and Adventure-to-vanilla component conversion |
 | `UtilItemStack` | Persistent data reads and writes on an `ItemStack` |
 | `UtilWindow` | Opening a `Window` for a player, honouring the open event and gate |
+| `UtilHologram` | Spawning, updating and despawning a `Hologram` for a single player |
 | `UtilServer` | Server and online player access |
 
 ---
@@ -1357,6 +1541,7 @@ Packet sending writes directly to the Netty channel pipeline, bypassing the main
 | `Sidebar` | Define a priority-sorted scoreboard sidebar |
 | `Tablist` | Define a priority-sorted tab list header and footer |
 | `Team` | Define a priority-sorted, per-viewer nametag decoration |
+| `Hologram` | Define a packet-based floating text display with per-player text and visibility |
 
 ---
 
@@ -1448,6 +1633,18 @@ All but the last are cancellable. Cancelling an open aborts it, cancelling a clo
 | Event | Fired When |
 |---|---|
 | `TeamUpdateEvent` | A team prefix and suffix update is requested for a player |
+
+---
+
+## Hologram Events
+
+| Event | Fired When |
+|---|---|
+| `HologramSpawnEvent` | A hologram is about to be sent to a player |
+| `HologramDespawnEvent` | A hologram's remove packet has been sent to a player |
+| `HologramUpdateEvent` | A hologram's metadata packet has been sent to a player |
+
+Only the spawn event is cancellable, and cancelling it stops the hologram being sent. The other two are notifications dispatched after their packets have gone out. `HologramUpdateEvent` fires for every viewer of every dynamic hologram on each pass, so a listener on it should stay proportionate to that.
 
 ---
 
