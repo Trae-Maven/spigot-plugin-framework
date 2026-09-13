@@ -8,7 +8,6 @@ import io.github.trae.utilities.UtilString;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -74,8 +73,8 @@ public class HologramManager {
      */
     @Scheduler(period = 500, unit = TimeUnit.MILLISECONDS)
     public final void onScheduler() {
-        final Collection<? extends Player> playerCollection = UtilServer.getOnlinePlayers();
-        if (playerCollection.isEmpty()) {
+        final List<Player> playerList = UtilServer.getOnlinePlayers();
+        if (playerList.isEmpty()) {
             return;
         }
 
@@ -92,7 +91,7 @@ public class HologramManager {
             final Set<UUID> viewerSet = hologram.getViewerSet();
             final boolean dynamic = hologram.isDynamic();
 
-            for (final Player player : playerCollection) {
+            for (final Player player : playerList) {
                 final boolean viewing = viewerSet.contains(player.getUniqueId());
                 final boolean visible = hologram.isVisible(player, location);
 

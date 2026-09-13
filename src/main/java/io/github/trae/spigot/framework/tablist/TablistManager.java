@@ -12,6 +12,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -22,10 +23,14 @@ import java.util.concurrent.TimeUnit;
  * Manages each player's tab list header and footer by resolving the lowest-priority eligible
  * {@link Tablist} (discovered via the dependency injector) and sending it to the player.
  * <p>
- * An asynchronous scheduler dispatches a {@link TablistUpdateEvent} for every online player on a
- * fixed interval, so dynamic header/footer content is re-resolved and re-sent each tick. The set of
- * players currently showing a tablist is tracked so the clearing packet only fires once on the
- * transition to "no tablist", rather than every tick.
+ * An asynchronous scheduler dispatches a {@link TablistUpdateEvent} for every online player once a
+ * second, so dynamic header and footer content is re-resolved and re-sent on that interval. The set
+ * of players currently showing a tablist is tracked so the clearing packet only fires once on the
+ * transition to "no tablist", rather than on every dispatch.
+ * <p>
+ * Unlike the sidebar, nothing is cached to diff against, so every dispatch is a send. That is why
+ * the interval is a second rather than a tick: at a high player count, a faster interval is
+ * bandwidth spent re-sending content that has not changed.
  * <p>
  * Update events and player quit are handled by {@link TablistListener}.
  */
@@ -34,16 +39,24 @@ import java.util.concurrent.TimeUnit;
 public class TablistManager {
 
     /**
+     * Every registered tablist, sorted by priority.
+     * <p>
+     * Resolved on first use rather than on every lookup, since the set never changes once the
+     * container has finished scanning.
+     */
+    private List<Tablist> tablistList;
+
+    /**
      * The players currently showing a tablist, so the clearing packet fires once on the transition
      * away from one rather than on every dispatch.
      */
     private final Set<UUID> activeTablistSet = ConcurrentHashMap.newKeySet();
 
     /**
-     * Dispatches a {@link TablistUpdateEvent} for every online player on a fixed interval, driving
-     * the per-player resolution in {@link TablistListener}.
+     * Dispatches a {@link TablistUpdateEvent} for every online player once a second, driving the
+     * per-player resolution in {@link TablistListener}.
      */
-    @Scheduler(period = 100, unit = TimeUnit.MILLISECONDS, asynchronous = true)
+    @Scheduler(period = 1, unit = TimeUnit.SECONDS, asynchronous = true)
     public final void onScheduler() {
         UtilServer.getOnlinePlayers().forEach(player -> UtilEvent.dispatch(new TablistUpdateEvent(player)));
     }
@@ -53,7 +66,7 @@ public class TablistManager {
      * displaying a tablist.
      * <p>
      * This is intentionally not guarded by {@link #activeTablistSet}: the header and footer are
-     * re-deserialized and re-sent on every dispatch so that dynamic content stays current.
+     * re-resolved and re-sent on every dispatch so that dynamic content stays current.
      *
      * @param player  the player the tablist is sent to
      * @param tablist the tablist supplying the header and footer
@@ -82,17 +95,20 @@ public class TablistManager {
     }
 
     /**
-     * Resolves the eligible tablist for the player — the one with the lowest priority that passes
+     * Resolves the eligible tablist for the player, the one with the lowest priority that passes
      * both the global and per-player display checks.
+     * <p>
+     * Populates the sorted list on first use, so each call costs only a walk of an already-ordered
+     * list rather than a fresh scan and sort.
      *
      * @param player the player to resolve for
      * @return an {@link Optional} containing the eligible tablist, or empty if none qualify
      */
     public final Optional<Tablist> getEligibleTablist(final Player player) {
-        return InjectorApi.getAll(Tablist.class)
-                .stream()
-                .sorted(Comparator.comparingInt(Tablist::getPriority))
-                .filter(tablist -> tablist.canDisplay() && tablist.canDisplay(player))
-                .findFirst();
+        if (this.tablistList == null) {
+            this.tablistList = InjectorApi.getAll(Tablist.class).stream().sorted(Comparator.comparingInt(Tablist::getPriority)).toList();
+        }
+
+        return this.tablistList.stream().filter(tablist -> tablist.canDisplay() && tablist.canDisplay(player)).findFirst();
     }
 }

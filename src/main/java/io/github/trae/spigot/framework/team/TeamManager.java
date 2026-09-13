@@ -12,6 +12,7 @@ import net.minecraft.world.scores.Scoreboard;
 import org.bukkit.entity.Player;
 
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,21 +20,34 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Manages per-viewer player teams using direct NMS team packets.
  * <p>
- * For each player/viewer pair, resolves the lowest-priority eligible {@link Team} (discovered via
- * the dependency injector) and sends a {@link PlayerTeam} packet to the viewer carrying that
+ * For each player and viewer pair, resolves the lowest-priority eligible {@link Team} (discovered
+ * via the dependency injector) and sends a {@link PlayerTeam} packet to the viewer carrying that
  * team's prefix, suffix, and other options. Because resolution is per-pair, the same target player
- * can present different nametag decorations to different viewers — enabling relation-aware coloring.
+ * can present different nametag decorations to different viewers, enabling relation-aware coloring.
  * <p>
- * Teams are keyed uniquely per player/viewer pair so they never collide, and the set of currently
- * displayed pairs is tracked so removals only fire for pairs that actually have a team registered.
- * Player join and quit are handled by {@link TeamListener}, as are {@link TeamUpdateEvent}s. Whether
- * a pair is eligible at all is decided entirely by {@link #getEligibleTeam(Player, Player)}, so any
- * suppression (such as a per-player preference) is expressed through a team's display checks rather
- * than at the event level.
+ * There is no scheduler here, and deliberately so: resolution is quadratic in online players, so a
+ * timer would mean tens of thousands of resolutions per pass on a busy server. Refreshes are
+ * event-driven instead, which puts the cost only where a relation actually changed.
+ * <p>
+ * Teams are keyed uniquely per player and viewer pair so they never collide, and the set of
+ * currently displayed pairs is tracked so removals only fire for pairs that actually have a team
+ * registered. Player join and quit are handled by {@link TeamListener}, as are
+ * {@link TeamUpdateEvent}s. Whether a pair is eligible at all is decided entirely by
+ * {@link #getEligibleTeam(Player, Player)}, so any suppression (such as a per-player preference) is
+ * expressed through a team's display checks rather than at the event level.
  */
 @Getter
 @Singleton
 public class TeamManager {
+
+    /**
+     * Every registered team, sorted by priority.
+     * <p>
+     * Resolved on first use rather than on every lookup. This matters more here than elsewhere:
+     * resolution is per player and viewer pair, so a hundred players is ten thousand lookups for a
+     * single full refresh, and a scan and sort on each would dominate.
+     */
+    private List<Team> teamList;
 
     /**
      * The player and viewer pairs currently carrying a team, keyed by team name, so a removal only
@@ -42,14 +56,14 @@ public class TeamManager {
     private final Set<String> activeTeamSet = ConcurrentHashMap.newKeySet();
 
     /**
-     * Registers (or replaces) the eligible team for the given player/viewer pair on the viewer's
+     * Registers (or replaces) the eligible team for the given player and viewer pair on the viewer's
      * client and binds the target player as its member.
      * <p>
      * Sends two packets: an add-or-modify packet with {@code updatePlayers = true} (method
      * {@code ADD}), then a player packet with {@code ADD}. The {@code false} (method {@code CHANGE})
      * variant is deliberately not used: {@code CHANGE} only updates a team the client already has
-     * registered, so a pair whose team first becomes eligible after join — having never received an
-     * initial {@code ADD} — would have a {@code CHANGE} packet silently dropped. An {@code ADD}
+     * registered, so a pair whose team first becomes eligible after join, having never received an
+     * initial {@code ADD}, would have a {@code CHANGE} packet silently dropped. An {@code ADD}
      * packet built from a memberless {@link PlayerTeam} also carries an empty roster, so the explicit
      * player {@code ADD} packet is required to (re)bind the member. Both calls together are
      * idempotent, so this serves equally for the initial display and for later updates.
@@ -70,7 +84,7 @@ public class TeamManager {
     }
 
     /**
-     * Removes the player/viewer team from the viewer's client by detaching the player entry and
+     * Removes the player and viewer team from the viewer's client by detaching the player entry and
      * removing the team itself.
      * <p>
      * No-ops when the pair has no team currently registered, so this is safe to call
@@ -143,8 +157,8 @@ public class TeamManager {
     }
 
     /**
-     * Builds the unique team name for a player/viewer pair from their UUIDs, ensuring each viewer
-     * has its own distinct team for each target player.
+     * Builds the unique team name for a player and viewer pair from their UUIDs, ensuring each
+     * viewer has its own distinct team for each target player.
      *
      * @param player the target player
      * @param viewer the viewer
@@ -155,18 +169,21 @@ public class TeamManager {
     }
 
     /**
-     * Resolves the eligible team for the player/viewer pair — the one with the lowest priority that
-     * passes both the global and per-pair display checks.
+     * Resolves the eligible team for the player and viewer pair, the one with the lowest priority
+     * that passes both the global and per-pair display checks.
+     * <p>
+     * Populates the sorted list on first use, so each of the many per-pair calls costs only a walk
+     * of an already-ordered list.
      *
      * @param player the target player
      * @param viewer the viewer
      * @return an {@link Optional} containing the eligible team, or empty if none qualify
      */
     public final Optional<Team> getEligibleTeam(final Player player, final Player viewer) {
-        return InjectorApi.getAll(Team.class)
-                .stream()
-                .sorted(Comparator.comparingInt(Team::getPriority))
-                .filter(team -> team.canDisplay() && team.canDisplay(player, viewer))
-                .findFirst();
+        if (this.teamList == null) {
+            this.teamList = InjectorApi.getAll(Team.class).stream().sorted(Comparator.comparingInt(Team::getPriority)).toList();
+        }
+
+        return this.teamList.stream().filter(team -> team.canDisplay() && team.canDisplay(player, viewer)).findFirst();
     }
 }

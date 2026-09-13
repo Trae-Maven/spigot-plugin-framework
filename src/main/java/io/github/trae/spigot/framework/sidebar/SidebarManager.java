@@ -51,6 +51,14 @@ import java.util.concurrent.TimeUnit;
 public class SidebarManager {
 
     /**
+     * Every registered sidebar, sorted by priority.
+     * <p>
+     * Resolved on first use rather than on every lookup, since the set never changes once the
+     * container has finished scanning and the sort would otherwise run per player per tick.
+     */
+    private List<Sidebar> sidebarList;
+
+    /**
      * The sidebar each player currently has displayed, keyed by their identifier.
      */
     private final ConcurrentHashMap<UUID, Sidebar> activeSidebarMap = new ConcurrentHashMap<>();
@@ -75,8 +83,11 @@ public class SidebarManager {
      * {@link Sidebar#canDisplay(Player)}), a {@link SidebarUpdateEvent} is dispatched to re-resolve
      * and switch to the next eligible sidebar. Otherwise {@link #updateTitle(Player)} is called to
      * refresh animated titles.
+     * <p>
+     * A fast interval is affordable here because nothing is sent unless the diff finds a change, so
+     * a static sidebar costs resolution time and no bandwidth at all.
      */
-    @Scheduler(period = 100, unit = TimeUnit.MILLISECONDS, asynchronous = true)
+    @Scheduler(period = 250, unit = TimeUnit.MILLISECONDS, asynchronous = true)
     public final void onScheduler() {
         for (final Player player : Bukkit.getServer().getOnlinePlayers()) {
             final Sidebar activeSidebar = this.activeSidebarMap.get(player.getUniqueId());
@@ -273,18 +284,21 @@ public class SidebarManager {
     }
 
     /**
-     * Resolves the eligible sidebar for the player — the one with the lowest priority that passes
+     * Resolves the eligible sidebar for the player, the one with the lowest priority that passes
      * both the global and per-player display checks.
+     * <p>
+     * Populates the sorted list on first use, so each call costs only a walk of an already-ordered
+     * list rather than a fresh scan and sort.
      *
      * @param player the player to resolve a sidebar for
      * @return an {@link Optional} containing the eligible sidebar, or empty if none qualify
      */
     public final Optional<Sidebar> getEligibleSidebar(final Player player) {
-        return InjectorApi.getAll(Sidebar.class)
-                .stream()
-                .sorted(Comparator.comparingInt(Sidebar::getPriority))
-                .filter(sidebar -> sidebar.canDisplay() && sidebar.canDisplay(player))
-                .findFirst();
+        if (this.sidebarList == null) {
+            this.sidebarList = InjectorApi.getAll(Sidebar.class).stream().sorted(Comparator.comparingInt(Sidebar::getPriority)).toList();
+        }
+
+        return this.sidebarList.stream().filter(sidebar -> sidebar.canDisplay() && sidebar.canDisplay(player)).findFirst();
     }
 
     /**
