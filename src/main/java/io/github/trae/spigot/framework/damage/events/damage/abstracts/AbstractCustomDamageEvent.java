@@ -1,5 +1,6 @@
 package io.github.trae.spigot.framework.damage.events.damage.abstracts;
 
+import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
 import lombok.Getter;
@@ -122,12 +123,15 @@ public abstract class AbstractCustomDamageEvent extends CustomCancellableEvent {
 
     /**
      * What the damage is attributed to in messages. Seeded from the damager's held item, complete
-     * with its hover tooltip, and {@code null} when there was no item or no damager. Set it to
-     * attribute the damage to an ability or effect instead of a weapon.
+     * with its hover tooltip, and {@code null} when there was no item or no damager.
+     *
+     * <p>Set a plain {@link Reason} to attribute this hit to something else. Set a
+     * {@link io.github.trae.spigot.framework.damage.data.CustomReason} to have the attribution
+     * outlive the hit, which is what an ability whose effect lingers wants.</p>
      */
-    private Component reason;
+    private Reason reason;
 
-    protected AbstractCustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Component reason) {
+    protected AbstractCustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Reason reason) {
         this.systemTime = systemTime;
         this.additiveMap = additiveMap;
         this.multiplierMap = multiplierMap;

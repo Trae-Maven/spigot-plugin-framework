@@ -2,8 +2,11 @@ package io.github.trae.spigot.framework.damage;
 
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.damage.data.CustomReason;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.utilities.UtilJava;
+import io.github.trae.utilities.mixins.ExpiredMixin;
+import lombok.Getter;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,7 +18,6 @@ import org.bukkit.craftbukkit.damage.CraftDamageSource;
 import org.bukkit.craftbukkit.entity.CraftLivingEntity;
 import org.bukkit.entity.LivingEntity;
 
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +35,9 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>The last damage pass that landed on each entity is retained, since cancelling vanilla's
  * handling also means {@code getLastDamageCause} is never populated. That record is what the death
- * system reads to find out who killed whom and with what.</p>
+ * system reads to find out who killed whom and with what. Alongside it, any lingering
+ * {@link CustomReason} an attacker has on that entity is retained separately, so a death can be
+ * attributed to an ability whose effect outlasted the hit that applied it.</p>
  *
  * <h2>Known gaps</h2>
  * <p>Three pieces of vanilla behaviour are unreachable from a plugin because the methods behind them
@@ -42,6 +46,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @see CustomPostDamageEvent
  */
+@Getter
 @Singleton
 public class DamageManager {
 
@@ -50,11 +55,22 @@ public class DamageManager {
     /**
      * The last damage pass that landed on each entity, by UUID.
      *
-     * <p>Entries are written for every hit and are only cleared by {@link #forget(LivingEntity)}, so
-     * an entity that takes damage and never dies leaves one behind. Players are cleared on quit;
-     * mobs need a sweep or they accumulate.</p>
+     * <p>Entries are written for every hit, dropped by the death system once a death has been read,
+     * and swept on a timer for entities that take damage and never die.</p>
      */
     private final ConcurrentHashMap<UUID, CustomPostDamageEvent> lastDamageMap = new ConcurrentHashMap<>();
+
+    /**
+     * The lingering reason each attacker has on each damagee, by damagee then attacker UUID.
+     *
+     * <p>Only a {@link CustomReason} is retained here, since a plain reason describes one hit and
+     * has nothing to outlive it. Keyed per attacker so two players applying different effects to
+     * the same target are each credited for their own.</p>
+     *
+     * <p>The death system reads this before falling back to the killing pass's own reason, which is
+     * what attributes a death to the ability that caused it rather than to whatever landed last.</p>
+     */
+    private final ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, CustomReason>> lastCustomReasonMap = new ConcurrentHashMap<>();
 
     /**
      * Drops retained records older than the retention window.
@@ -69,31 +85,9 @@ public class DamageManager {
         final long now = System.currentTimeMillis();
 
         this.lastDamageMap.values().removeIf(event -> now - event.getSystemTime() >= RETENTION);
-    }
 
-    /**
-     * The last damage pass that landed on an entity.
-     *
-     * <p>Empty for an entity that has taken no damage through the pipeline, which is the honest
-     * answer for deaths from outside it, such as a command kill.</p>
-     *
-     * @param damagee the entity to look up
-     * @return the last damage pass, or empty
-     */
-    public final Optional<CustomPostDamageEvent> getLastDamage(final LivingEntity damagee) {
-        return Optional.ofNullable(this.lastDamageMap.get(damagee.getUniqueId()));
-    }
-
-    /**
-     * Drops an entity's retained damage record.
-     *
-     * <p>Called after a death has been read, and on quit, so the record does not outlive the reason
-     * for keeping it.</p>
-     *
-     * @param entity the entity to forget
-     */
-    public final void forget(final LivingEntity entity) {
-        this.lastDamageMap.remove(entity.getUniqueId());
+        this.lastCustomReasonMap.values().forEach(map -> map.values().removeIf(ExpiredMixin::hasExpired));
+        this.lastCustomReasonMap.values().removeIf(ConcurrentHashMap::isEmpty);
     }
 
     /**
@@ -124,6 +118,10 @@ public class DamageManager {
         }
 
         this.lastDamageMap.put(bukkitDamagee.getUniqueId(), event);
+
+        if (event.getDamager() != null && event.getReason() instanceof final CustomReason customReason) {
+            this.lastCustomReasonMap.computeIfAbsent(bukkitDamagee.getUniqueId(), __ -> new ConcurrentHashMap<>()).put(event.getDamager().getUniqueId(), customReason);
+        }
 
         final float damage = (float) event.getFinalDamage();
 
@@ -209,10 +207,10 @@ public class DamageManager {
     /**
      * Records damage dealt and fires the advancement trigger, when the damager is a player.
      *
+     * @param event        the completed post stage
      * @param damagee      the entity taking the damage
      * @param damageSource the source being attributed
      * @param damage       the resolved damage
-     * @param event        the completed post stage
      */
     private void applyDamagerStatistics(final CustomPostDamageEvent event, final net.minecraft.world.entity.LivingEntity damagee, final DamageSource damageSource, final float damage) {
         if (!(event.getDamager() instanceof final LivingEntity bukkitDamager)) {

@@ -1,5 +1,6 @@
 package io.github.trae.spigot.framework.damage.events.damage;
 
+import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.utility.UtilColor;
@@ -32,7 +33,7 @@ import java.util.Optional;
  */
 public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
 
-    protected CustomPreDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Component reason) {
+    protected CustomPreDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Reason reason) {
         super(systemTime, additiveMap, multiplierMap, damagee, damager, projectile, source, cause, itemStack, armourContents, originalDamage, critical, damage, delay, damageeName, damagerName, causeName, reason);
     }
 
@@ -108,7 +109,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 .filter(value -> !value.isEmpty())
                 .orElse(null);
 
-        final Component reason = Optional.ofNullable(itemStack)
+        final Component reasonName = Optional.ofNullable(itemStack)
                 .map(value -> value.displayName().hoverEvent(value.asHoverEvent()))
                 .map(component -> component.colorIfAbsent(UtilColor.toTextColor(ChatColor.GREEN.getColor())))
                 .orElse(null);
@@ -131,7 +132,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 getName(entity),
                 getName(damager),
                 getCauseName(entityDamageByEntityEvent.getCause()),
-                reason
+                Reason.of(reasonName)
         );
     }
 
@@ -152,7 +153,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      * @param reason  how it is described in messages, or {@code null}
      * @return the pre stage event
      */
-    public static CustomPreDamageEvent create(final Entity damagee, final DamageCause cause, final double damage, final Component reason) {
+    public static CustomPreDamageEvent create(final Entity damagee, final DamageCause cause, final double damage, final Reason reason) {
         return new CustomPreDamageEvent(
                 System.currentTimeMillis(),
                 new EnumMap<>(DamageModifier.class),
@@ -192,7 +193,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      * @param reason  how it is described in messages, or {@code null}
      * @return the pre stage event
      */
-    public static CustomPreDamageEvent create(final Entity damagee, final Entity damager, final DamageCause cause, final double damage, final Component reason) {
+    public static CustomPreDamageEvent create(final Entity damagee, final Entity damager, final DamageCause cause, final double damage, final Reason reason) {
         return new CustomPreDamageEvent(
                 System.currentTimeMillis(),
                 new EnumMap<>(DamageModifier.class),

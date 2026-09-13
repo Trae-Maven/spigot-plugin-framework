@@ -1,6 +1,8 @@
 package io.github.trae.spigot.framework.blocking;
 
+import io.github.trae.di.annotations.type.DependsOn;
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.item.ItemManager;
 import io.github.trae.spigot.framework.item.events.ItemStackUpdateEvent;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.BlocksAttacks;
@@ -30,7 +32,13 @@ import java.util.Set;
  * custom swords, vanilla ones passing through their default definition, and swords already current
  * by version. That last group is why the refresh path exists at all, since an item's version hash
  * covers its own description and says nothing about what a listener adds on top.
+ * <p>
+ * The dependency on {@link ItemManager} is declared rather than injected, since nothing here calls
+ * it: the listener only reacts to what it fires. Without the declaration the container has no
+ * reason to order them, and a sword reconciled before this listener exists would go out without its
+ * component.
  */
+@DependsOn(values = ItemManager.class)
 @Singleton
 public class SwordBlockListener implements Listener {
 
