@@ -38,8 +38,8 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
     public SpigotPlugin() {
         InjectorApi.setConfigurationDirectory(this.getClass(), this.getDataPath());
 
-        InjectorApi.setSynchronousExecutor(this.getClass(), UtilTask::executeSynchronous);
-        InjectorApi.setAsynchronousExecutor(this.getClass(), UtilTask::executeAsynchronous);
+        InjectorApi.setSynchronousExecutor(this.getClass(), runnable -> UtilTask.executeSynchronous(this, runnable));
+        InjectorApi.setAsynchronousExecutor(this.getClass(), runnable -> UtilTask.executeAsynchronous(this, runnable));
     }
 
     /**
