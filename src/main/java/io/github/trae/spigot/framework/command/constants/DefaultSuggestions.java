@@ -6,6 +6,7 @@ import io.github.trae.spigot.framework.command.BaseSubCommand;
 import io.github.trae.spigot.framework.utility.UtilPlugin;
 import io.github.trae.utilities.UtilString;
 import io.github.trae.utilities.objects.function.BiFunction;
+import io.github.trae.utilities.objects.function.Function;
 import io.github.trae.utilities.objects.function.TriFunction;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -15,7 +16,6 @@ import org.bukkit.generator.WorldInfo;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 

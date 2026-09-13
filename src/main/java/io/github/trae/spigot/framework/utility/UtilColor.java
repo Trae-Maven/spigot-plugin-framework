@@ -57,4 +57,23 @@ public class UtilColor {
 
         return TextColor.color(color.getRGB() & 0xFFFFFF);
     }
+
+    /**
+     * Converts an AWT colour to its Bukkit equivalent, discarding the alpha channel.
+     * <p>
+     * {@link org.bukkit.Color#fromRGB(int)} rejects any value with bits set above the low 24, and
+     * {@link Color#getRGB()} always carries alpha in the high byte, so the alpha is masked off
+     * before conversion. Use {@link org.bukkit.Color#fromARGB(int)} directly where transparency
+     * matters, such as a text display background.
+     *
+     * @param color the colour to convert
+     * @return the equivalent {@link org.bukkit.Color}
+     */
+    public static org.bukkit.Color toBukkitColor(final Color color) {
+        if (color == null) {
+            return null;
+        }
+
+        return org.bukkit.Color.fromRGB(color.getRGB() & 0xFFFFFF);
+    }
 }
