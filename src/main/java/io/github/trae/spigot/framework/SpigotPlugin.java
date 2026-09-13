@@ -4,6 +4,8 @@ import io.github.trae.di.InjectorApi;
 import io.github.trae.hf.Plugin;
 import io.github.trae.spigot.framework.command.BaseCommand;
 import io.github.trae.spigot.framework.command.BaseSubCommand;
+import io.github.trae.spigot.framework.config.events.ConfigReloadEvent;
+import io.github.trae.spigot.framework.config.events.ConfigSaveEvent;
 import io.github.trae.spigot.framework.plugin.events.PluginInitializeEvent;
 import io.github.trae.spigot.framework.plugin.events.PluginShutdownEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
@@ -30,13 +32,20 @@ public abstract class SpigotPlugin extends JavaPlugin implements Plugin {
      *
      * <p>Registers this plugin's data directory as the configuration
      * directory for {@link io.github.trae.di.configuration.annotations.Configuration @Configuration}
-     * file resolution, and sets up the per-application synchronous and
-     * asynchronous executors for dispatching
+     * file resolution, and registers configuration save and reload callbacks
+     * that dispatch {@link ConfigSaveEvent} and {@link ConfigReloadEvent}
+     * through the Bukkit event system.</p>
+     *
+     * <p>Also configures the per-application synchronous and asynchronous
+     * executors for dispatching
      * {@link io.github.trae.di.annotations.method.Scheduler @Scheduler}
      * tasks onto the Bukkit thread pool via {@link UtilTask}.</p>
      */
     public SpigotPlugin() {
         InjectorApi.setConfigurationDirectory(this.getClass(), this.getDataPath());
+
+        InjectorApi.setConfigurationSaveCallback(this.getClass(), configurationClass -> UtilEvent.dispatch(new ConfigSaveEvent(this, configurationClass)));
+        InjectorApi.setConfigurationReloadCallback(this.getClass(), configurationClass -> UtilEvent.dispatch(new ConfigReloadEvent(this, configurationClass)));
 
         InjectorApi.setSynchronousExecutor(this.getClass(), runnable -> UtilTask.executeSynchronous(this, runnable));
         InjectorApi.setAsynchronousExecutor(this.getClass(), runnable -> UtilTask.executeAsynchronous(this, runnable));
