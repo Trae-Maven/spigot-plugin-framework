@@ -2,6 +2,7 @@ package io.github.trae.spigot.framework.damage.events.damage.abstracts;
 
 import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
+import io.github.trae.spigot.framework.displayname.DisplayName;
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
 import lombok.Getter;
 import lombok.Setter;
@@ -114,12 +115,17 @@ public abstract class AbstractCustomDamageEvent extends CustomCancellableEvent {
     private long delay;
 
     /**
-     * How each side and the cause are named in messages. Seeded from the entities and the damage
-     * cause, and settable, so a plugin with display names, ranks or nicknames writes them once here
-     * rather than everywhere a message is built. The damager's name is {@code null} for
-     * environmental causes.
+     * How each side is named in messages. Seeded from the entities, and settable, so a plugin with
+     * display names, ranks or nicknames writes them once here rather than everywhere a message is
+     * built. The damager's name is {@code null} for environmental causes.
      */
-    private Component damageeName, damagerName, causeName;
+    private DisplayName damageeName, damagerName;
+
+    /**
+     * How the cause reads in a message, cleaned from the enum constant so it is ordinary text rather
+     * than a constant name.
+     */
+    private Component causeName;
 
     /**
      * What the damage is attributed to in messages. Seeded from the damager's held item, complete
@@ -131,7 +137,7 @@ public abstract class AbstractCustomDamageEvent extends CustomCancellableEvent {
      */
     private Reason reason;
 
-    protected AbstractCustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Reason reason) {
+    protected AbstractCustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final DisplayName damageeName, final DisplayName damagerName, final Component causeName, final Reason reason) {
         this.systemTime = systemTime;
         this.additiveMap = additiveMap;
         this.multiplierMap = multiplierMap;

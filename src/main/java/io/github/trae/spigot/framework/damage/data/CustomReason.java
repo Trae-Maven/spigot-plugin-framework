@@ -17,7 +17,8 @@ import net.kyori.adventure.text.Component;
  *
  * <p>The manager retains one of these per damagee and attacker pair for as long as its duration
  * lasts, so a later death from any source is attributed to it instead of to whatever landed last.
- * Once expired it is dropped and the pass's own reason takes over again.</p>
+ * Once expired it is dropped and the pass's own reason takes over again. A permanent one is never
+ * dropped that way, and only goes when the entity dies and its records are cleared.</p>
  *
  * <p>Unlike a plain reason, the name is used verbatim in a message with no article in front of it,
  * since an ability reads as "killed by Bob with Frostbite" rather than "with a Frostbite".</p>
@@ -29,7 +30,17 @@ import net.kyori.adventure.text.Component;
 public class CustomReason extends Reason implements SystemTimeMixin, DurationMixin, RemainingMixin, ExpiredMixin {
 
     /**
+     * The duration that marks a reason as never expiring.
+     *
+     * <p>A sentinel rather than a very large number, since a duration near {@code Long.MAX_VALUE}
+     * overflows when added to the current time and reads as already expired.</p>
+     */
+    private static final long PERMANENT_DURATION = -1L;
+
+    /**
      * When the reason was set, and how long it stays authoritative for, both in milliseconds.
+     *
+     * <p>A duration of {@link #PERMANENT_DURATION} means it never expires on its own.</p>
      */
     private final long systemTime, duration;
 
@@ -64,5 +75,18 @@ public class CustomReason extends Reason implements SystemTimeMixin, DurationMix
      */
     public static CustomReason of(final Component name, final long duration) {
         return new CustomReason(name, System.currentTimeMillis(), duration);
+    }
+
+    /**
+     * Builds a reason that never expires on its own.
+     *
+     * <p>It stands until the entity dies and its records are cleared, so this is for an effect that
+     * should still be credited no matter how long the fight runs.</p>
+     *
+     * @param name how it reads in a message
+     * @return the reason
+     */
+    public static CustomReason of(final Component name) {
+        return new CustomReason(name, System.currentTimeMillis(), PERMANENT_DURATION);
     }
 }

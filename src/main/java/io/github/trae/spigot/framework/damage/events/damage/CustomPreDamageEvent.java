@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.damage.events.damage;
 import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
+import io.github.trae.spigot.framework.displayname.DisplayName;
 import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.utilities.UtilString;
@@ -33,7 +34,7 @@ import java.util.Optional;
  */
 public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
 
-    protected CustomPreDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Reason reason) {
+    protected CustomPreDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final DisplayName damageeName, final DisplayName damagerName, final Component causeName, final Reason reason) {
         super(systemTime, additiveMap, multiplierMap, damagee, damager, projectile, source, cause, itemStack, armourContents, originalDamage, critical, damage, delay, damageeName, damagerName, causeName, reason);
     }
 
@@ -82,7 +83,8 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      *
      * <p>The reason is seeded from the damager's held item, carrying its display name and hover
      * tooltip, so a death message can show what killed someone without rebuilding it. An empty hand
-     * leaves it {@code null}.</p>
+     * still produces a reason, but one with no name, so anything reading it should check the name
+     * rather than the reason itself.</p>
      *
      * @param entityDamageByEntityEvent the vanilla event being taken over
      * @return the pre stage event
@@ -244,8 +246,8 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      * @param entity the entity to name
      * @return the coloured name
      */
-    private static Component getName(final Entity entity) {
-        return Component.text(entity.getName()).color(UtilColor.toTextColor(ChatColor.YELLOW.getColor()));
+    private static DisplayName getName(final Entity entity) {
+        return DisplayName.of(Component.text(entity.getName()).color(UtilColor.toTextColor(ChatColor.YELLOW.getColor())));
     }
 
     /**

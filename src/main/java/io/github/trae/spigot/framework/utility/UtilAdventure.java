@@ -10,9 +10,9 @@ import java.util.function.Predicate;
 /**
  * Utility helpers for joining Adventure {@link Component}s.
  *
- * <p>Wraps the {@link Component#join} and {@link JoinConfiguration} pairing in shorter,
- * null-tolerant helpers, so callers can supply a separator and an inclusion filter without building
- * a configuration by hand.</p>
+ * <p>Wraps the {@link Component#join} and {@link JoinConfiguration} pairing in shorter helpers, so
+ * callers can supply a separator and an inclusion filter without building a configuration by
+ * hand.</p>
  */
 @UtilityClass
 public class UtilAdventure {
@@ -44,8 +44,8 @@ public class UtilAdventure {
     }
 
     /**
-     * Joins the given components with a single space between them, skipping empty components so no
-     * stray spacing is produced.
+     * Joins the given components with a single space between them, skipping null and empty
+     * components so no stray spacing is produced.
      * <p>
      * Emptiness is tested by identity against {@link Component#empty()}, so only that shared instance
      * is skipped, not any other component that happens to render as nothing.
@@ -54,6 +54,6 @@ public class UtilAdventure {
      * @return the joined component
      */
     public static Component join(final Component... components) {
-        return join(Component.space(), componentLike -> componentLike != Component.empty(), components);
+        return join(Component.space(), componentLike -> componentLike != null && componentLike != Component.empty(), components);
     }
 }

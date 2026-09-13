@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.damage.events.damage;
 import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
+import io.github.trae.spigot.framework.displayname.DisplayName;
 import net.kyori.adventure.text.Component;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.entity.Entity;
@@ -30,7 +31,7 @@ import java.util.Map;
  */
 public class CustomPostDamageEvent extends AbstractCustomDamageEvent {
 
-    protected CustomPostDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final EntityDamageEvent.DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final Component damageeName, final Component damagerName, final Component causeName, final Reason reason) {
+    protected CustomPostDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final EntityDamageEvent.DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final DisplayName damageeName, final DisplayName damagerName, final Component causeName, final Reason reason) {
         super(systemTime, additiveMap, multiplierMap, damagee, damager, projectile, source, cause, itemStack, armourContents, originalDamage, critical, damage, delay, damageeName, damagerName, causeName, reason);
     }
 
