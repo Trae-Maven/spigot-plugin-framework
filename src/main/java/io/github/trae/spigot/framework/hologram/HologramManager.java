@@ -34,10 +34,10 @@ import java.util.concurrent.TimeUnit;
  * on head rotation alone, and would still miss the other two.</p>
  *
  * <h2>Cost</h2>
- * <p>The pass is holograms outer, players inner, so {@link Hologram#getLocation()} and the other
- * per-hologram settings are resolved once per hologram rather than once per player per hologram, and
- * players in other worlds are rejected by a single world comparison. What remains per player is a
- * set lookup, three subtractions and {@link Hologram#canSee(Player)}.</p>
+ * <p>The pass is holograms outer, players inner, so the location and the other per-hologram settings
+ * are resolved once per hologram rather than once per player per hologram, and players in other
+ * worlds are rejected by a single world comparison. What remains per player is a set lookup, three
+ * subtractions and {@link Hologram#canSee(Player)}.</p>
  *
  * @see Hologram
  * @see io.github.trae.spigot.framework.utility.UtilHologram
@@ -138,8 +138,8 @@ public class HologramManager {
      * id, so neither can be pushed as a metadata update. Every viewer is despawned first, then the
      * hologram is rebuilt; the next scheduler pass spawns it afresh wherever it now belongs.</p>
      *
-     * <p>Call this after the subclass's {@link Hologram#getLocation()} already returns the new
-     * location, not before.</p>
+     * <p>Call this after the subclass's location already resolves to the new position, not
+     * before.</p>
      *
      * @param hologram the hologram that has moved
      */

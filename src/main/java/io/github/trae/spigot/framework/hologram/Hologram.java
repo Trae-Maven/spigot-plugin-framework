@@ -33,24 +33,23 @@ import java.util.concurrent.ConcurrentHashMap;
  * entity's {@link org.bukkit.entity.TextDisplay} view, which writes into the same synched data the
  * metadata packet is built from, so no reflection is needed.</p>
  *
- * <p>Subclasses supply {@link #getLocation()} and {@link #getLines(Player)}; everything else has a
- * sensible default and is overridden only when needed. Each hologram is registered as a
- * {@code @Singleton} and collected by {@link HologramManager} through list injection, so a
- * subclass never registers itself.</p>
+ * <p>Subclasses pass a name and location to the constructor and supply {@link #getLines(Player)};
+ * everything else has a sensible default and is overridden only when needed. Each hologram is
+ * registered as a {@code @Singleton} and collected by {@link HologramManager} through list
+ * injection, so a subclass never registers itself.</p>
  *
  * <h2>Lifecycle</h2>
  * <p>The handle is created in {@link #build()}, not the constructor, because constructor injection
- * means a subclass's injected fields are still unassigned while {@code super(...)} runs and
- * {@link #getLocation()} would read them. {@link HologramManager} builds each hologram on the first
- * scheduler pass that finds it unbuilt, and retries any that is still not ready.</p>
+ * means a subclass's injected fields are still unassigned while {@code super(...)} runs, and the
+ * settings overrides read during a build may depend on them. {@link HologramManager} builds each
+ * hologram on the first scheduler pass that finds it unbuilt, and retries any that is still not
+ * ready.</p>
  *
  * <h2>Cost</h2>
- * <p>{@link #getLocation()} is called once per hologram per scheduler pass and again on each spawn.
- * {@link #canSee(Player)} is called once per player per hologram per pass, and
+ * <p>{@link #canSee(Player)} is called once per player per hologram per pass, and
  * {@link #getLines(Player)} once per viewer per pass for a {@link #isDynamic() dynamic} hologram.
- * Implementations of all three should be cheap and allocation-light: returning a cached
- * {@link Location} field rather than constructing one, and caching text that does not actually vary
- * per player.</p>
+ * Both should be cheap and allocation-light: caching text that does not actually vary per player,
+ * and deciding visibility without lookups that hit storage.</p>
  *
  * @see HologramManager
  * @see io.github.trae.spigot.framework.utility.UtilHologram
@@ -72,6 +71,16 @@ public abstract class Hologram {
      * The unique name this hologram is registered and looked up under. Matched case-insensitively.
      */
     private final String name;
+
+    /**
+     * Where the hologram sits, with the yaw and pitch it faces when the billboard mode is
+     * {@link Billboard#FIXED}.
+     *
+     * <p>Read on every build and every visibility test. A subclass that needs the position to move
+     * overrides the getter instead, and must despawn before the world changes, since a rebuild for a
+     * different world assigns a new entity id.</p>
+     */
+    private final Location location;
 
     /**
      * The backing NMS entity, or {@code null} until {@link #build()} has run successfully.
@@ -131,21 +140,6 @@ public abstract class Hologram {
     public final Component getComponent(final Player player) {
         return Component.join(JoinConfiguration.newlines(), this.getLines(player).stream().map(UtilMessage::deserialize).toList());
     }
-
-    /**
-     * Where this hologram sits.
-     *
-     * <p>May return {@code null}, or a location whose world is not loaded; both are treated as "not
-     * ready" rather than an error, so a hologram in a world that loads late starts working once it
-     * does. Called on every scheduler pass, so implementations should return a stored
-     * {@link Location} rather than building one.</p>
-     *
-     * <p>Position and rotation are baked into the add packet and cannot be corrected by a metadata
-     * update, so a hologram that moves must go through {@link HologramManager#relocate(Hologram)}.</p>
-     *
-     * @return the location, or {@code null} if not currently placed
-     */
-    public abstract Location getLocation();
 
     /**
      * The lines of text shown to a given player, as MiniMessage strings.
@@ -312,8 +306,8 @@ public abstract class Hologram {
     /**
      * Whether this hologram should currently be sent to a player, resolving the location itself.
      *
-     * <p>Prefer {@link #isVisible(Player, Location)} in a loop over many players, so the location is
-     * resolved once rather than per player.</p>
+     * <p>Prefer {@link #isVisible(Player, Location)} in a loop over many players, so a subclass that
+     * computes its location resolves it once rather than per player.</p>
      *
      * @param player the player to test
      * @return whether the player should be seeing this hologram
@@ -325,10 +319,10 @@ public abstract class Hologram {
     /**
      * Creates the backing entity if needed and applies every current setting to it.
      *
-     * <p>Does nothing when {@link #getLocation()} returns {@code null} or names an unloaded world,
-     * leaving {@link #isBuilt()} false so the caller can retry later. The handle is recreated when
-     * the location has moved to a different world, which assigns a new entity id; callers must
-     * despawn before that happens.</p>
+     * <p>Does nothing when the location is {@code null} or names an unloaded world, leaving
+     * {@link #isBuilt()} false so the caller can retry later. The handle is recreated when the
+     * location resolves to a different world than the one it was built against, which assigns a new
+     * entity id; callers must despawn before that happens.</p>
      *
      * <p>Applying settings only writes them into the entity's synched data. Nothing reaches a client
      * until a metadata packet is sent, so a settings change on a static hologram needs an explicit
