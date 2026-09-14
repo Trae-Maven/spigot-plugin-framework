@@ -112,7 +112,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 .orElse(null);
 
         final Component reasonName = Optional.ofNullable(itemStack)
-                .map(value -> value.displayName().hoverEvent(value.asHoverEvent()))
+                .map(value -> value.effectiveName().hoverEvent(value.asHoverEvent()))
                 .map(component -> component.colorIfAbsent(UtilColor.toTextColor(ChatColor.GREEN.getColor())))
                 .orElse(null);
 

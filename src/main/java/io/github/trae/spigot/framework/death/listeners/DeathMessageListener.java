@@ -1,9 +1,10 @@
 package io.github.trae.spigot.framework.death.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
-import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.death.events.CustomDeathEvent;
 import io.github.trae.spigot.framework.death.events.CustomDeathMessageEvent;
+import io.github.trae.spigot.framework.death.events.DeathEvent;
+import io.github.trae.spigot.framework.death.events.VanillaDeathEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilMessage;
 import io.github.trae.spigot.framework.utility.UtilServer;
@@ -45,7 +46,7 @@ public class DeathMessageListener implements Listener {
     }
 
     /**
-     * Dispatches a message event per online player.
+     * Dispatches a message event per online player for an enriched death.
      *
      * <p>One per recipient rather than one broadcast, so each can be cancelled or reworded
      * independently.</p>
@@ -54,6 +55,25 @@ public class DeathMessageListener implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public final void onCustomDeath(final CustomDeathEvent event) {
+        if (!(event.getEntity() instanceof Player)) {
+            return;
+        }
+
+        for (final Player recipient : UtilServer.getOnlinePlayers()) {
+            UtilEvent.dispatch(new CustomDeathMessageEvent(event, recipient));
+        }
+    }
+
+    /**
+     * The same dispatch for a death the pipeline never saw.
+     *
+     * <p>Kept separate only because the message event seeds its names differently from each shape;
+     * from here on the two are handled identically.</p>
+     *
+     * @param event the death
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public final void onVanillaDeath(final VanillaDeathEvent event) {
         if (!(event.getEntity() instanceof Player)) {
             return;
         }
@@ -77,9 +97,7 @@ public class DeathMessageListener implements Listener {
             return;
         }
 
-        final CustomDeathEvent deathEvent = event.getDeathEvent();
-
-        final CustomPostDamageEvent damageEvent = deathEvent.getDamageEvent();
+        final DeathEvent deathEvent = event.getDeathEvent();
 
         final Player recipient = event.getRecipient();
 
@@ -87,7 +105,7 @@ public class DeathMessageListener implements Listener {
 
         final Entity killer = deathEvent.getKiller();
 
-        if (damageEvent.getCause() == EntityDamageEvent.DamageCause.SUICIDE || damageEvent.getCause() == EntityDamageEvent.DamageCause.KILL) {
+        if (deathEvent.getCause() == EntityDamageEvent.DamageCause.SUICIDE || deathEvent.getCause() == EntityDamageEvent.DamageCause.KILL) {
             UtilMessage.message(recipient, "Death", "%s was killed.".formatted(UtilMessage.serializeWithReset(entityName)));
             return;
         }
@@ -110,7 +128,7 @@ public class DeathMessageListener implements Listener {
 
         UtilMessage.message(recipient, "Death", "%s was killed by %s.".formatted(
                 UtilMessage.serializeWithReset(entityName),
-                UtilMessage.serializeWithReset(damageEvent.getCauseName())
+                UtilMessage.serializeWithReset(deathEvent.getCauseName())
         ));
     }
 }

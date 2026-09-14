@@ -4,13 +4,10 @@ import io.github.trae.spigot.framework.damage.data.CustomReason;
 import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.event.CustomEvent;
-import io.github.trae.spigot.framework.utility.UtilMessage;
-import io.github.trae.utilities.UtilString;
 import lombok.Getter;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.entity.EntityDamageEvent;
 
 /**
  * An entity has died, with the damage pass that killed it attached.
@@ -27,10 +24,10 @@ import org.bukkit.entity.LivingEntity;
  * @see CustomDeathMessageEvent
  */
 @Getter
-public class CustomDeathEvent extends CustomEvent {
+public class CustomDeathEvent extends CustomEvent implements DeathEvent {
 
     /**
-     * The damage pass that killed the entity.
+     * The damage pass that killed the entity, still holding the item, the names and the cause.
      */
     private final CustomPostDamageEvent damageEvent;
 
@@ -50,6 +47,15 @@ public class CustomDeathEvent extends CustomEvent {
      */
     private final Reason reason;
 
+    /**
+     * Takes the reason already resolved rather than resolving it here, since the lookup needs the
+     * damage manager's retained state and this event is meant to be readable without it.
+     *
+     * @param damageEvent the damage pass that killed the entity
+     * @param entity      the entity that died
+     * @param reason      what the death is attributed to, or {@code null} when there is nothing to
+     *                    name
+     */
     public CustomDeathEvent(final CustomPostDamageEvent damageEvent, final LivingEntity entity, final Reason reason) {
         this.damageEvent = damageEvent;
 
@@ -59,28 +65,12 @@ public class CustomDeathEvent extends CustomEvent {
     }
 
     /**
-     * The reason as it should read in a sentence.
+     * The cause recorded by the killing damage pass.
      *
-     * <p>A plain reason gets an article in front of it, chosen from its plain text, so an item reads
-     * as "with a Diamond Sword". A {@link CustomReason} does not, since an ability reads as "with
-     * Frostbite" rather than "with a Frostbite". Either way the component is rebuilt so the hover
-     * tooltip survives the round trip.</p>
-     *
-     * @return the formatted reason, or {@code null} when there is no reason to show
+     * @return the damage cause behind the death
      */
-    public final Component getFormattedReason() {
-        final Reason reason = this.reason;
-        if (reason == null) {
-            return null;
-        }
-
-        final Component reasonName = reason.getName();
-        if (reasonName == null) {
-            return null;
-        }
-
-        final String indefiniteArticlePrefix = reason instanceof CustomReason ? "" : UtilString.getIndefiniteArticlePrefix(PlainTextComponentSerializer.plainText().serialize(reasonName));
-
-        return UtilMessage.deserialize(indefiniteArticlePrefix + UtilMessage.serializeWithReset(reasonName));
+    @Override
+    public final EntityDamageEvent.DamageCause getCause() {
+        return this.damageEvent.getCause();
     }
 }

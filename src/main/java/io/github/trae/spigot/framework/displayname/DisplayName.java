@@ -50,12 +50,12 @@ public class DisplayName {
     /**
      * The three parts joined into one component, ready to render.
      *
-     * <p>A single space separates the parts that are present, and absent ones produce no stray
-     * spacing, so a name with no prefix does not start with one.</p>
+     * <p>Joined with no separator, so any spacing a caller wants between the parts belongs in the
+     * prefix or suffix itself. Absent parts are dropped rather than rendered as nothing.</p>
      *
      * @return the joined name
      */
     public final Component getFullName() {
-        return UtilAdventure.join(this.prefix, this.name, this.suffix);
+        return UtilAdventure.joinWithEmpty(this.prefix, this.name, this.suffix);
     }
 }

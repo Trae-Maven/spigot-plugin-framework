@@ -5,6 +5,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.text.JoinConfiguration;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -23,6 +25,9 @@ public class UtilAdventure {
      * <p>
      * A {@code null} separator means no separator is inserted; a {@code null} predicate means every
      * component is included. Filtered-out components produce no surrounding separator.
+     * <p>
+     * Null components are dropped before the join rather than left to the predicate, since
+     * {@link Component#join} rejects a null element in the array before any predicate is consulted.
      *
      * @param separator  the separator to place between components, or {@code null} for none
      * @param predicate  the filter deciding which components to include, or {@code null} to include all
@@ -40,12 +45,15 @@ public class UtilAdventure {
             builder.predicate(predicate);
         }
 
-        return Component.join(builder.build(), components);
+        return Component.join(builder.build(), Arrays.stream(components).filter(Objects::nonNull).toArray(Component[]::new));
     }
 
     /**
-     * Joins the given components with a single space between them, skipping null and empty
-     * components so no stray spacing is produced.
+     * Joins the given components with a single space between them, skipping empty components so no
+     * stray spacing is produced. Nulls are dropped by the underlying join.
+     * <p>
+     * Named separately from {@link #join(ComponentLike, Predicate, Component...)} because a varargs
+     * overload of the same name would be ambiguous at every call site that passes a separator.
      * <p>
      * Emptiness is tested by identity against {@link Component#empty()}, so only that shared instance
      * is skipped, not any other component that happens to render as nothing.
@@ -53,7 +61,20 @@ public class UtilAdventure {
      * @param components the components to join
      * @return the joined component
      */
-    public static Component join(final Component... components) {
-        return join(Component.space(), componentLike -> componentLike != null && componentLike != Component.empty(), components);
+    public static Component joinWithSpace(final Component... components) {
+        return join(Component.space(), componentLike -> componentLike != Component.empty(), components);
+    }
+
+    /**
+     * Joins the given components back to back, with nothing between them.
+     * <p>
+     * Any spacing belongs in the components themselves. Null components are dropped, so an absent
+     * part leaves no trace in the result.
+     *
+     * @param components the components to join
+     * @return the joined component
+     */
+    public static Component joinWithEmpty(final Component... components) {
+        return join(Component.empty(), null, components);
     }
 }
