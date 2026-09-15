@@ -11,12 +11,15 @@ import io.github.trae.spigot.framework.item.events.ItemPreActivateEvent;
 import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
 import io.github.trae.spigot.framework.item.types.ChannelCustomItem;
 import io.github.trae.spigot.framework.utility.UtilEvent;
+import io.github.trae.spigot.framework.utility.UtilMaterial;
 import io.github.trae.spigot.framework.utility.UtilServer;
 import lombok.AllArgsConstructor;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -52,9 +55,17 @@ public class ItemActivateListener implements Listener {
      * interact with, so the event arrives already reporting itself as cancelled, and skipping those
      * would leave an item that only responds to blocks.
      * <p>
-     * The item's declared interaction results are applied before the action runs, so an item can
-     * suppress the vanilla use of its material or of the block it was aimed at. A post event follows
-     * a successful activation.
+     * A right click that competes with vanilla is skipped entirely rather than fought over: the
+     * material's own use wins unless the item declares otherwise through
+     * {@link ActivatableCustomItem#activateOnItemUse(Player, ItemStack, ActivateType)}, and so does
+     * the clicked block through
+     * {@link ActivatableCustomItem#activateOnBlockUse(Player, ItemStack, Block, ActivateType)}. A
+     * sneaking player is exempt from the block check, since vanilla skips the block's response with a
+     * full hand. Left clicks compete with nothing and are never gated.
+     * <p>
+     * Past those, the item's declared interaction results are applied before the action runs, so an
+     * item can suppress the vanilla use of its material or of the block it was aimed at. A post event
+     * follows a successful activation.
      *
      * @param event the interaction event
      */
@@ -69,7 +80,9 @@ public class ItemActivateListener implements Listener {
             return;
         }
 
-        ActivateType.getByAction(event.getAction()).ifPresent(activateType -> {
+        final Action action = event.getAction();
+
+        ActivateType.getByAction(action).ifPresent(activateType -> {
             this.itemManager.getItemByItemStack(itemStack).ifPresent(item -> {
                 if (!(item instanceof final ActivatableCustomItem activatableCustomItem)) {
                     return;
@@ -77,8 +90,27 @@ public class ItemActivateListener implements Listener {
 
                 final Player player = event.getPlayer();
 
+                final Block clickedBlock = event.getClickedBlock();
+
+                // Consumable materials defer to vanilla unless the item opts in, so a custom golden apple is eaten rather than activated. Returning skips the activation entirely.
+                // Example: return on a custom Ender Pearl because a right click would throw it.
+                if (activateType == ActivateType.RIGHT_CLICK && !activatableCustomItem.activateOnItemUse(player, itemStack, activateType) && UtilMaterial.isUsable(itemStack.getType())) {
+                    return;
+                }
+
+                // A block that responds on its own wins unless the item opts in, so a chest opens instead of activating. Sneaking is exempt, since vanilla skips the block entirely with a full hand. Returning skips the activation entirely.
+                // Example: return on a Chest because a right click would open it, or on Grass because a right click with a Hoe would till it.
+                if (activateType == ActivateType.RIGHT_CLICK && clickedBlock != null && !player.isSneaking() && !activatableCustomItem.activateOnBlockUse(player, itemStack, clickedBlock, activateType) && (UtilMaterial.isInteractable(clickedBlock.getType()) || UtilMaterial.isInteractableByHand(clickedBlock.getType(), itemStack))) {
+                    return;
+                }
+
+                // Denies the material's own use by default, so an ender pearl activates without leaving the hand.
                 event.setUseItemInHand(activatableCustomItem.useItemInHand(player, itemStack, activateType));
-                event.setUseInteractedBlock(activatableCustomItem.useInteractedBlock(player, itemStack, event.getClickedBlock(), activateType));
+
+                // Leaves the block's response untouched by default, letting the item suppress it per block.
+                if (clickedBlock != null) {
+                    event.setUseInteractedBlock(activatableCustomItem.useInteractedBlock(player, itemStack, clickedBlock, activateType));
+                }
 
                 if (UtilEvent.supply(new ItemPreActivateEvent(activatableCustomItem, player, itemStack, activateType)).isCancelled()) {
                     return;
