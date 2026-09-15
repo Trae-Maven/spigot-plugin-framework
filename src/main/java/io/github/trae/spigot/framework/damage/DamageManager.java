@@ -145,6 +145,10 @@ public class DamageManager {
 
         if (damagee.isDeadOrDying()) {
             damagee.die(damageSource);
+        } else {
+            if (event.getSoundProvider() != null) {
+                event.getSoundProvider().play(bukkitDamagee.getLocation());
+            }
         }
     }
 
