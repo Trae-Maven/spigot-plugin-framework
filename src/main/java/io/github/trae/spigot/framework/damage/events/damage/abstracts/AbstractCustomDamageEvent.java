@@ -4,6 +4,7 @@ import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.displayname.DisplayName;
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
+import io.github.trae.spigot.framework.sound.SoundProvider;
 import lombok.Getter;
 import lombok.Setter;
 import net.kyori.adventure.text.Component;
@@ -103,6 +104,15 @@ public abstract class AbstractCustomDamageEvent extends CustomCancellableEvent {
     private final boolean critical;
 
     /**
+     * The sound played when the damage lands, or {@code null} for silence.
+     *
+     * <p>Seeded from the cause and settable, so an ability replaces the hit sound once here rather
+     * than playing its own alongside the default. Resolved at the post stage, so a listener that
+     * changes it earlier is still respected.</p>
+     */
+    private SoundProvider soundProvider;
+
+    /**
      * The base damage before modifiers. Set this to replace the base outright, which is what an
      * ability with a flat damage figure does.
      */
@@ -137,7 +147,35 @@ public abstract class AbstractCustomDamageEvent extends CustomCancellableEvent {
      */
     private Reason reason;
 
-    protected AbstractCustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final DisplayName damageeName, final DisplayName damagerName, final Component causeName, final Reason reason) {
+    /**
+     * Assigns every field of the pass.
+     *
+     * <p>The full state is passed explicitly rather than derived, since each stage builds the next
+     * from the one before it and nothing may be recomputed along the way. The modifier maps in
+     * particular are stored by reference, so a stage that receives them shares the contributions
+     * written into them earlier.</p>
+     *
+     * @param systemTime     when the pass began, in milliseconds
+     * @param additiveMap    the flat contributions, shared between stages
+     * @param multiplierMap  the proportional contributions, shared between stages
+     * @param damagee        the entity taking the damage
+     * @param damager        the entity dealing it, or {@code null} for environmental causes
+     * @param projectile     the projectile that carried it, or {@code null} for a direct attack
+     * @param source         the vanilla damage source
+     * @param cause          what caused the damage
+     * @param itemStack      the damager's held item, or {@code null}
+     * @param armourContents the damagee's worn armour, or {@code null}
+     * @param originalDamage what vanilla would have dealt
+     * @param critical       whether the attack was a critical hit
+     * @param soundProvider  the sound played when the damage lands, or {@code null}
+     * @param damage         the base damage before modifiers
+     * @param delay          the immunity period afterwards, in milliseconds
+     * @param damageeName    how the damagee is named in messages
+     * @param damagerName    how the damager is named in messages, or {@code null}
+     * @param causeName      how the cause reads in messages
+     * @param reason         what the damage is attributed to, or {@code null}
+     */
+    protected AbstractCustomDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final SoundProvider soundProvider, final double damage, final long delay, final DisplayName damageeName, final DisplayName damagerName, final Component causeName, final Reason reason) {
         this.systemTime = systemTime;
         this.additiveMap = additiveMap;
         this.multiplierMap = multiplierMap;
@@ -150,6 +188,7 @@ public abstract class AbstractCustomDamageEvent extends CustomCancellableEvent {
         this.armourContents = armourContents;
         this.originalDamage = originalDamage;
         this.critical = critical;
+        this.soundProvider = soundProvider;
         this.damage = damage;
         this.delay = delay;
         this.damageeName = damageeName;

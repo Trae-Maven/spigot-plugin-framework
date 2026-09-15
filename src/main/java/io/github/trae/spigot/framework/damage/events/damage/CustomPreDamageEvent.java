@@ -4,6 +4,7 @@ import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.displayname.DisplayName;
+import io.github.trae.spigot.framework.sound.SoundProvider;
 import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.utilities.UtilString;
@@ -34,8 +35,35 @@ import java.util.Optional;
  */
 public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
 
-    protected CustomPreDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final double damage, final long delay, final DisplayName damageeName, final DisplayName damagerName, final Component causeName, final Reason reason) {
-        super(systemTime, additiveMap, multiplierMap, damagee, damager, projectile, source, cause, itemStack, armourContents, originalDamage, critical, damage, delay, damageeName, damagerName, causeName, reason);
+    /**
+     * Assigns the pass state directly.
+     *
+     * <p>Protected because this stage is never built field by field from outside: use one of the
+     * {@code of} factories to take over a vanilla event, or a {@code create} factory to originate
+     * damage the framework owns.</p>
+     *
+     * @param systemTime     when the pass began, in milliseconds
+     * @param additiveMap    the flat contributions, shared between stages
+     * @param multiplierMap  the proportional contributions, shared between stages
+     * @param damagee        the entity taking the damage
+     * @param damager        the entity dealing it, or {@code null} for environmental causes
+     * @param projectile     the projectile that carried it, or {@code null} for a direct attack
+     * @param source         the vanilla damage source
+     * @param cause          what caused the damage
+     * @param itemStack      the damager's held item, or {@code null}
+     * @param armourContents the damagee's worn armour, or {@code null}
+     * @param originalDamage what vanilla would have dealt
+     * @param critical       whether the attack was a critical hit
+     * @param soundProvider  the sound played when the damage lands, or {@code null}
+     * @param damage         the base damage before modifiers
+     * @param delay          the immunity period afterwards, in milliseconds
+     * @param damageeName    how the damagee is named in messages
+     * @param damagerName    how the damager is named in messages, or {@code null}
+     * @param causeName      how the cause reads in messages
+     * @param reason         what the damage is attributed to, or {@code null}
+     */
+    protected CustomPreDamageEvent(final long systemTime, final Map<DamageModifier, Double> additiveMap, final Map<DamageModifier, Double> multiplierMap, final Entity damagee, final Entity damager, final Projectile projectile, final DamageSource source, final EntityDamageEvent.DamageCause cause, final ItemStack itemStack, final ItemStack[] armourContents, final double originalDamage, final boolean critical, final SoundProvider soundProvider, final double damage, final long delay, final DisplayName damageeName, final DisplayName damagerName, final Component causeName, final Reason reason) {
+        super(systemTime, additiveMap, multiplierMap, damagee, damager, projectile, source, cause, itemStack, armourContents, originalDamage, critical, soundProvider, damage, delay, damageeName, damagerName, causeName, reason);
     }
 
     /**
@@ -44,6 +72,9 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      * <p>There is no damager, projectile or held item on this path, and the attack is never
      * critical. The base is seeded with vanilla's figure, since nothing in the pipeline recomputes
      * damage for causes like fire or falling.</p>
+     *
+     * <p>The sound is seeded from the damagee, so it is whatever that entity type makes when struck,
+     * replaceable by anything that wants a different one.</p>
      *
      * @param entityDamageEvent the vanilla event being taken over
      * @return the pre stage event
@@ -64,6 +95,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 getArmorContents(entity),
                 entityDamageEvent.getDamage(),
                 false,
+                getHurtSound(entity),
                 entityDamageEvent.getDamage(),
                 0L,
                 getName(entity),
@@ -85,6 +117,9 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      * tooltip, so a death message can show what killed someone without rebuilding it. An empty hand
      * still produces a reason, but one with no name, so anything reading it should check the name
      * rather than the reason itself.</p>
+     *
+     * <p>The sound is seeded from the damagee rather than the weapon, so what a player hears is the
+     * thing being hit rather than the thing hitting it.</p>
      *
      * @param entityDamageByEntityEvent the vanilla event being taken over
      * @return the pre stage event
@@ -129,6 +164,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 getArmorContents(entity),
                 entityDamageByEntityEvent.getDamage(),
                 !damager.isOnGround(),
+                getHurtSound(entity),
                 entityDamageByEntityEvent.getDamage(),
                 0L,
                 getName(entity),
@@ -169,6 +205,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 getArmorContents(damagee),
                 damage,
                 false,
+                null,
                 damage,
                 0L,
                 getName(damagee),
@@ -209,6 +246,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 getArmorContents(damagee),
                 damage,
                 false,
+                null,
                 damage,
                 0L,
                 getName(damagee),
@@ -248,6 +286,25 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      */
     private static DisplayName getName(final Entity entity) {
         return DisplayName.of(Component.text(entity.getName()).color(UtilColor.toTextColor(ChatColor.YELLOW.getColor())));
+    }
+
+    /**
+     * The damagee's own hurt sound, or {@code null} when it has none.
+     *
+     * <p>Read from the entity rather than the cause, so a zombie grunts and a skeleton rattles
+     * without the pipeline keeping a table of its own. Non-living entities have no hurt sound at
+     * all, which is what the filter handles.</p>
+     *
+     * @param damagee the entity being damaged
+     * @return the hurt sound, or {@code null}
+     */
+    private static SoundProvider getHurtSound(final Entity damagee) {
+        return Optional.of(damagee)
+                .filter(LivingEntity.class::isInstance)
+                .map(LivingEntity.class::cast)
+                .map(LivingEntity::getHurtSound)
+                .map(SoundProvider::of)
+                .orElse(null);
     }
 
     /**
