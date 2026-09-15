@@ -200,12 +200,18 @@ public class ItemManager {
      * is converted into that item. Anything else is refreshed under its {@link DefaultItem}, which
      * writes nothing to it.
      * <p>
-     * Only the obtainable path replaces a stack outright, and it does so deliberately: the material
-     * is being reinterpreted as a custom item. Every other path returns the input by reference, so an
-     * identity comparison tells a caller whether the stack was replaced rather than merely altered.
+     * Two paths replace a stack outright rather than editing it. The obtainable path does so
+     * deliberately, since the material is being reinterpreted as a custom item. The default path does
+     * so for a stack still carrying an identifier or version from an item that is no longer
+     * registered, rebuilding it clean so the orphaned data does not follow it around: either key
+     * alone is enough, since a half-stamped stack is as stale as a fully stamped one. An orphan whose
+     * item asked to be deleted rather than reset returns {@code null} instead, which every caller
+     * carries out in whatever way its own context allows. Every other path returns the input by
+     * reference, so an identity comparison tells a caller whether the stack was replaced rather than
+     * merely altered.
      *
      * @param itemStack the stack to reconcile, may be {@code null} or empty
-     * @return the reconciled stack
+     * @return the reconciled stack, or {@code null} if the stack should be removed entirely
      */
     public final ItemStack apply(final ItemStack itemStack) {
         if (itemStack != null && !itemStack.isEmpty()) {
@@ -221,7 +227,17 @@ public class ItemManager {
                 return obtainableItem.create(itemStack);
             }
 
-            return this.defaultItemMap.computeIfAbsent(itemStack.getType(), DefaultItem::new).refresh(itemStack);
+            // Deletable Check
+            if (UtilItemStack.getPersistentData(itemStack, CustomItem.DELETABLE_KEY, PersistentDataType.BOOLEAN).orElse(false)) {
+                return null;
+            }
+
+            // Default Item Check
+            final DefaultItem defaultItem = this.defaultItemMap.computeIfAbsent(itemStack.getType(), DefaultItem::new);
+
+            final boolean isOldCustomItem = UtilItemStack.getPersistentData(itemStack, CustomItem.IDENTIFIER_KEY, PersistentDataType.STRING).isPresent() || UtilItemStack.getPersistentData(itemStack, CustomItem.VERSION_KEY, PersistentDataType.STRING).isPresent();
+
+            return isOldCustomItem ? defaultItem.create(itemStack) : defaultItem.refresh(itemStack);
         }
 
         return itemStack;
@@ -231,9 +247,10 @@ public class ItemManager {
      * Reconciles every slot in the given inventory against the item registry, writing back only
      * stacks that {@link #apply(ItemStack)} replaces.
      * <p>
-     * The check is by reference, so in practice only the obtainable path triggers a write. Every
-     * other path edits the stack in place and returns it, which for a live inventory stack is enough
-     * for the change to stick.
+     * The check is by reference, so in practice only the two replacing paths in
+     * {@link #apply(ItemStack)} trigger a write, along with a {@code null} return, which clears the
+     * slot. Every other path edits the stack in place and returns it, which for a live inventory
+     * stack is enough for the change to stick.
      *
      * @param inventory the inventory whose contents should be reconciled
      */

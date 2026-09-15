@@ -51,6 +51,12 @@ public abstract class CustomItem extends Item {
     public static final NamespacedKey VERSION_KEY = new NamespacedKey("custom", "item_version");
 
     /**
+     * Persistent data key marking a stack that should be deleted rather than reset once its item is
+     * no longer registered.
+     */
+    public static final NamespacedKey DELETABLE_KEY = new NamespacedKey("custom", "item_deletable");
+
+    /**
      * The opaque, permanent identity of this item, written onto every stack it produces, and the
      * readable key it is named by.
      * <p>
@@ -102,13 +108,17 @@ public abstract class CustomItem extends Item {
     /**
      * {@inheritDoc}
      *
-     * <p>Writes this item's identifier and version into the stack's persistent data. The namespace
-     * is not written, since it names the item rather than identifying it and may change.</p>
+     * <p>Writes this item's identifier, version, and deletable answer into the stack's persistent
+     * data. The answer is written either way rather than only when true, so flipping it off actually
+     * takes effect on existing stacks. The namespace is not written, since it names the item rather
+     * than identifying it and may change.</p>
      */
     @Override
     protected final void stamp(final ItemMeta itemMeta) {
         UtilItemStack.setPersistentDataType(itemMeta, IDENTIFIER_KEY, PersistentDataType.STRING, this.identifier);
         UtilItemStack.setPersistentDataType(itemMeta, VERSION_KEY, PersistentDataType.STRING, this.getVersion());
+
+        UtilItemStack.setPersistentDataType(itemMeta, DELETABLE_KEY, PersistentDataType.BOOLEAN, this.deleteIfRemoved());
     }
 
     /**
@@ -135,6 +145,25 @@ public abstract class CustomItem extends Item {
     }
 
     /**
+     * Returns what should happen to a stack this item produced once the item itself is gone from the
+     * registry. When {@code true}, the stack is deleted outright; when {@code false}, it is reset to
+     * a plain stack of its material. Defaults to {@code false}.
+     * <p>
+     * The answer is stamped onto each stack rather than read from the item at the time, since by then
+     * there is no item left to ask. A stack produced before this was enabled therefore carries the
+     * old answer until it is updated.
+     * <p>
+     * Deleting suits an item whose material is meaningless without it, where leaving the bare
+     * material behind would hand the player something they never earned. Resetting suits one built on
+     * a material that stands on its own.
+     *
+     * @return {@code true} to delete orphaned stacks rather than reset them
+     */
+    protected boolean deleteIfRemoved() {
+        return false;
+    }
+
+    /**
      * Returns the values the version hash is computed from, meaning every part of the description
      * that changes what the stack should look like.
      * <p>
@@ -156,6 +185,7 @@ public abstract class CustomItem extends Item {
                 UtilString.pair("Tooltip-Style", this.getTooltipStyle() != null ? this.getTooltipStyle().asString() : ""),
                 UtilString.pair("Hide-Attributes", Boolean.toString(this.hideAttributes())),
                 UtilString.pair("Naturally-Obtainable", Boolean.toString(this.naturallyObtainable())),
+                UtilString.pair("Delete-If-Removed", Boolean.toString(this.deleteIfRemoved())),
                 UtilString.pair("Style-Name", this.getStyle() != null ? this.getStyle().getName() : ""),
                 UtilString.pair("Style-Tag", this.getStyle() != null ? this.getStyle().getTag() : "")
         );

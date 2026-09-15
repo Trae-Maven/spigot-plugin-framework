@@ -15,10 +15,15 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.BlockInventoryHolder;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 /**
  * Reconciles stacks wherever one enters a player's possession or an inventory they open, delegating
  * all stack work to {@link ItemManager}.
+ * <p>
+ * A {@code null} from {@link ItemManager#apply(ItemStack)} means the stack should cease to exist,
+ * which each handler carries out in whatever way its own event allows: clearing a slot where one can
+ * be cleared, and cancelling the event where the API will not accept a missing stack.
  */
 @AllArgsConstructor
 @Singleton
@@ -32,6 +37,9 @@ public class ItemApplyListener implements Listener {
     /**
      * Reconciles a dropped stack as it is picked up, so an item obtained from the world arrives in
      * the inventory in its custom form.
+     * <p>
+     * A removed stack cancels the pickup and kills the item entity, since an item entity is required
+     * to hold a stack and cannot be emptied in place.
      *
      * @param event the pickup event
      */
@@ -43,12 +51,22 @@ public class ItemApplyListener implements Listener {
 
         final Item item = event.getItem();
 
-        item.setItemStack(this.itemManager.apply(item.getItemStack()));
+        final ItemStack itemStack = this.itemManager.apply(item.getItemStack());
+
+        if (itemStack == null) {
+            event.setCancelled(true);
+            item.remove();
+            return;
+        }
+
+        item.setItemStack(itemStack);
     }
 
     /**
      * Reconciles the crafting result while it is still a preview, so the player sees the custom item
      * on hover rather than the vanilla one, and receives it on click.
+     * <p>
+     * A removed result empties the output slot, so the recipe simply produces nothing.
      *
      * @param event the craft preparation event
      */
@@ -61,6 +79,9 @@ public class ItemApplyListener implements Listener {
 
     /**
      * Reconciles a smelting result before it is placed into the furnace's output slot.
+     * <p>
+     * A removed result cancels the smelt rather than clearing it, since the event's result cannot be
+     * set to nothing. The input is consumed either way, so the fuel and ore are still spent.
      *
      * @param event the smelt event
      */
@@ -70,7 +91,14 @@ public class ItemApplyListener implements Listener {
             return;
         }
 
-        event.setResult(this.itemManager.apply(event.getResult()));
+        final ItemStack itemStack = this.itemManager.apply(event.getResult());
+
+        if (itemStack == null) {
+            event.setCancelled(true);
+            return;
+        }
+
+        event.setResult(itemStack);
     }
 
     /**

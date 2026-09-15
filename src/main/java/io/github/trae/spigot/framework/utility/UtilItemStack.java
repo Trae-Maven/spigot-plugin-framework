@@ -39,6 +39,19 @@ public class UtilItemStack {
     }
 
     /**
+     * Removes the value stored under the given key from the meta's persistent data container.
+     * <p>
+     * A key carrying no value is left alone rather than treated as an error, so a caller can clear a
+     * key without checking whether it was ever written.
+     *
+     * @param itemMeta      the meta to remove from
+     * @param namespacedKey the key to clear
+     */
+    public static void removePersistentDataType(final ItemMeta itemMeta, final NamespacedKey namespacedKey) {
+        itemMeta.getPersistentDataContainer().remove(namespacedKey);
+    }
+
+    /**
      * Reads a value from the stack's persistent data container under the given key.
      *
      * @param <P>                the primitive type the value is stored as
