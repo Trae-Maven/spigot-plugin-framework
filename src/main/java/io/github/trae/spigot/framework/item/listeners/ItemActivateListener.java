@@ -14,6 +14,7 @@ import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilMaterial;
 import io.github.trae.spigot.framework.utility.UtilServer;
 import lombok.AllArgsConstructor;
+import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,9 +22,13 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -46,10 +51,21 @@ public class ItemActivateListener implements Listener {
     private final ItemManager itemManager;
 
     /**
+     * The tick each player last right clicked on, keyed by their identifier and cleared when they
+     * leave.
+     */
+    private final Map<UUID, Integer> rightClickTickMap = new HashMap<>();
+
+    /**
      * Resolves the clicked stack to its item and activates it when eligible.
      * <p>
      * Only the main hand is handled, since the interaction event fires once per hand and an item
      * held in one hand would otherwise activate again on the other hand's pass.
+     * <p>
+     * A denied right click desyncs the client, which answers with an arm swing the server reads as a
+     * left click, so a left click landing within a tick of a right click is discarded before anything
+     * else runs. Without it an item that suppresses its material's use would activate twice per
+     * click.
      * <p>
      * The handler deliberately does not ignore cancelled events. An air click carries no block to
      * interact with, so the event arrives already reporting itself as cancelled, and skipping those
@@ -75,20 +91,26 @@ public class ItemActivateListener implements Listener {
             return;
         }
 
+        final Player player = event.getPlayer();
+        final Action action = event.getAction();
+        final int tick = Bukkit.getCurrentTick();
+
+        if (action.isRightClick()) {
+            this.rightClickTickMap.put(player.getUniqueId(), tick);
+        } else if (tick - this.rightClickTickMap.getOrDefault(player.getUniqueId(), Integer.MIN_VALUE) <= 1) {
+            return;
+        }
+
         final ItemStack itemStack = event.getItem();
         if (itemStack == null || itemStack.isEmpty()) {
             return;
         }
-
-        final Action action = event.getAction();
 
         ActivateType.getByAction(action).ifPresent(activateType -> {
             this.itemManager.getItemByItemStack(itemStack).ifPresent(item -> {
                 if (!(item instanceof final ActivatableCustomItem activatableCustomItem)) {
                     return;
                 }
-
-                final Player player = event.getPlayer();
 
                 final Block clickedBlock = event.getClickedBlock();
 
@@ -125,6 +147,16 @@ public class ItemActivateListener implements Listener {
                 UtilEvent.dispatch(new ItemPostActivateEvent(activatableCustomItem, player, itemStack, activateType));
             });
         });
+    }
+
+    /**
+     * Drops the leaving player's recorded click tick, so the map holds only players who are online.
+     *
+     * @param event the quit event
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public final void onPlayerQuit(final PlayerQuitEvent event) {
+        this.rightClickTickMap.remove(event.getPlayer().getUniqueId());
     }
 
     /**
