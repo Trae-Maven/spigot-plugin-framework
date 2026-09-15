@@ -5,12 +5,14 @@ import io.github.trae.spigot.framework.event.CustomEvent;
 import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import lombok.Getter;
+import lombok.Setter;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -25,6 +27,7 @@ import java.util.Optional;
  * @see CustomDeathEvent
  */
 @Getter
+@Setter
 public class VanillaDeathEvent extends CustomEvent implements DeathEvent {
 
     /**
@@ -47,14 +50,31 @@ public class VanillaDeathEvent extends CustomEvent implements DeathEvent {
     private final ItemStack itemStack;
 
     /**
+     * The items that will be dropped as part of the death.
+     *
+     * <p>The list remains mutable so listeners can add, remove or replace drops before they are
+     * ultimately handled.</p>
+     */
+    private final List<ItemStack> drops;
+
+    /**
+     * The amount of experience that will be dropped as part of the death.
+     *
+     * <p>Mutable so listeners can change or suppress the experience awarded by the death.</p>
+     */
+    private int dropExp;
+
+    /**
      * Captures the held item at construction rather than on demand, since by the time a listener
      * reads it the killer may have swapped, dropped or broken what it killed with.
      *
-     * @param entity the entity that died
-     * @param killer the entity that killed it, or {@code null} for an environmental death
-     * @param cause  the damage cause behind the death
+     * @param entity  the entity that died
+     * @param killer  the entity that killed it, or {@code null} for an environmental death
+     * @param cause   the damage cause behind the death
+     * @param drops   the items that will be dropped as part of the death
+     * @param dropExp the amount of experience that will be dropped as part of the death
      */
-    public VanillaDeathEvent(final LivingEntity entity, final Entity killer, final DamageCause cause) {
+    public VanillaDeathEvent(final LivingEntity entity, final Entity killer, final DamageCause cause, final List<ItemStack> drops, final int dropExp) {
         this.entity = entity;
         this.killer = killer;
         this.cause = cause;
@@ -66,6 +86,9 @@ public class VanillaDeathEvent extends CustomEvent implements DeathEvent {
                 .map(EntityEquipment::getItemInMainHand)
                 .filter(value -> !value.isEmpty())
                 .orElse(null);
+
+        this.drops = drops;
+        this.dropExp = dropExp;
     }
 
     /**

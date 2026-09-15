@@ -36,6 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * credited with that instead of with whatever the killing hit happened to be, so a kill landed with
  * a sword moments after an ability still names the ability.</p>
  *
+ * <p>Drops and experience are passed through the framework event and then written back to the
+ * vanilla death, allowing listeners to change what the death ultimately drops.</p>
+ *
  * @see CustomDeathEvent
  * @see VanillaDeathEvent
  * @see CustomReason
@@ -84,6 +87,9 @@ public class DeathListener implements Listener {
      * <p>The cause falls back to {@code CUSTOM} when the entity kept no last damage cause, since a
      * death always has to be attributed to something.</p>
      *
+     * <p>Any changes listeners make to the drops or dropped experience are copied back to the vanilla
+     * death event after dispatch.</p>
+     *
      * @param event the vanilla death event
      */
     private void handleVanillaDeathEvent(final EntityDeathEvent event) {
@@ -92,7 +98,12 @@ public class DeathListener implements Listener {
         final Entity killer = event.getDamageSource().getCausingEntity();
         final EntityDamageEvent.DamageCause damageCause = entity.getLastDamageCause() != null ? entity.getLastDamageCause().getCause() : EntityDamageEvent.DamageCause.CUSTOM;
 
-        UtilEvent.dispatch(new VanillaDeathEvent(entity, killer, damageCause));
+        final VanillaDeathEvent vanillaDeathEvent = UtilEvent.supply(new VanillaDeathEvent(entity, killer, damageCause, event.getDrops(), event.getDroppedExp()));
+
+        event.getDrops().clear();
+        event.getDrops().addAll(vanillaDeathEvent.getDrops());
+
+        event.setDroppedExp(vanillaDeathEvent.getDropExp());
     }
 
     /**
@@ -100,6 +111,9 @@ public class DeathListener implements Listener {
      *
      * <p>Nothing is dispatched without that record, since a death with no damage behind it has
      * nothing to report beyond the entity itself.</p>
+     *
+     * <p>Any changes listeners make to the drops or dropped experience are copied back to the vanilla
+     * death event after dispatch.</p>
      *
      * <p>Both retained records are dropped only after the dispatch, so a listener reading either for
      * the same entity still finds them.</p>
@@ -126,7 +140,12 @@ public class DeathListener implements Listener {
             }
         }
 
-        UtilEvent.dispatch(new CustomDeathEvent(customPostDamageEvent, entity, reason));
+        final CustomDeathEvent customDeathEvent = UtilEvent.supply(new CustomDeathEvent(customPostDamageEvent, entity, reason, event.getDrops(), event.getDroppedExp()));
+
+        event.getDrops().clear();
+        event.getDrops().addAll(customDeathEvent.getDrops());
+
+        event.setDroppedExp(customDeathEvent.getDropExp());
 
         this.damageManager.getLastDamageMap().remove(entity.getUniqueId());
         this.damageManager.getLastCustomReasonMap().remove(entity.getUniqueId());
