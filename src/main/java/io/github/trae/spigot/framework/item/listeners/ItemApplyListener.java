@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.item.listeners;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.item.ItemManager;
 import lombok.AllArgsConstructor;
+import org.bukkit.block.DoubleChest;
 import org.bukkit.entity.Item;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -116,8 +117,10 @@ public class ItemApplyListener implements Listener {
      * Reconciles the contents of a block-backed inventory as it is opened, so stacks stored in a
      * chest, barrel, or shulker are brought up to date the moment a player looks at them.
      * <p>
-     * Restricted to {@link BlockInventoryHolder} inventories, which excludes crafting grids, anvils,
-     * and the framework's own windows, whose contents are transient or managed elsewhere.
+     * Restricted to {@link BlockInventoryHolder} inventories, which covers every container that
+     * exists as a block in the world, plus {@link DoubleChest}, whose halves are block-backed but
+     * whose combined inventory is not. That excludes crafting grids, anvils, and the framework's own
+     * windows, whose contents are transient or managed elsewhere.
      *
      * @param event the inventory open event
      */
@@ -129,7 +132,7 @@ public class ItemApplyListener implements Listener {
 
         final Inventory topInventory = event.getView().getTopInventory();
 
-        if (!(topInventory.getHolder() instanceof BlockInventoryHolder)) {
+        if (!(topInventory.getHolder() instanceof BlockInventoryHolder) && !(topInventory.getHolder() instanceof DoubleChest)) {
             return;
         }
 

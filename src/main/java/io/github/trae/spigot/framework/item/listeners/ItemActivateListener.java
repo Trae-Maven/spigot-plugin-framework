@@ -21,6 +21,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -51,10 +52,10 @@ public class ItemActivateListener implements Listener {
     private final ItemManager itemManager;
 
     /**
-     * The tick each player last right clicked on, keyed by their identifier and cleared when they
-     * leave.
+     * The tick each player last performed an action that provokes a phantom left click, keyed by
+     * their identifier and cleared when they leave.
      */
-    private final Map<UUID, Integer> rightClickTickMap = new HashMap<>();
+    private final Map<UUID, Integer> blockedClickTickMap = new HashMap<>();
 
     /**
      * Resolves the clicked stack to its item and activates it when eligible.
@@ -96,8 +97,8 @@ public class ItemActivateListener implements Listener {
         final int tick = Bukkit.getCurrentTick();
 
         if (action.isRightClick()) {
-            this.rightClickTickMap.put(player.getUniqueId(), tick);
-        } else if (tick - this.rightClickTickMap.getOrDefault(player.getUniqueId(), Integer.MIN_VALUE) <= 1) {
+            this.blockedClickTickMap.put(player.getUniqueId(), tick);
+        } else if (tick - this.blockedClickTickMap.getOrDefault(player.getUniqueId(), Integer.MIN_VALUE) <= 1) {
             return;
         }
 
@@ -150,13 +151,37 @@ public class ItemActivateListener implements Listener {
     }
 
     /**
-     * Drops the leaving player's recorded click tick, so the map holds only players who are online.
+     * Records a drop so the arm swing it provokes does not activate the item on its way out of the
+     * inventory.
+     * <p>
+     * Dropping sends a swing packet the server reads as a left click, which would otherwise reach the
+     * interact handler a tick later and fire the dropped item's left click action. Only a stack this
+     * framework recognises is recorded, so a plain drop leaves a player's next real left click
+     * untouched.
+     *
+     * @param event the drop event
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public final void onPlayerDropItem(final PlayerDropItemEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+
+        if (this.itemManager.getItemByItemStack(event.getItemDrop().getItemStack()).isEmpty()) {
+            return;
+        }
+
+        this.blockedClickTickMap.put(event.getPlayer().getUniqueId(), Bukkit.getCurrentTick());
+    }
+
+    /**
+     * Drops the leaving player's recorded tick, so the map holds only players who are online.
      *
      * @param event the quit event
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public final void onPlayerQuit(final PlayerQuitEvent event) {
-        this.rightClickTickMap.remove(event.getPlayer().getUniqueId());
+        this.blockedClickTickMap.remove(event.getPlayer().getUniqueId());
     }
 
     /**
