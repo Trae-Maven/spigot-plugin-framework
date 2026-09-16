@@ -2,10 +2,12 @@ package io.github.trae.spigot.framework.damage;
 
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.damage.configs.DamageConfig;
 import io.github.trae.spigot.framework.damage.data.CustomReason;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.utilities.UtilJava;
 import io.github.trae.utilities.mixins.ExpiredMixin;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.component.DataComponents;
@@ -56,6 +58,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @see CustomPostDamageEvent
  */
+@AllArgsConstructor
 @Getter
 @Singleton
 public class DamageManager {
@@ -81,6 +84,15 @@ public class DamageManager {
      * what attributes a death to the ability that caused it rather than to whatever landed last.</p>
      */
     private final ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, CustomReason>> lastCustomReasonMap = new ConcurrentHashMap<>();
+
+    /**
+     * The damage pipeline's settings, shared through the manager so every listener reads the same
+     * instance.
+     *
+     * <p>Reloading updates this instance in place, so a changed combat mode or delay is picked up on
+     * the next hit without anything being re-injected.</p>
+     */
+    private final DamageConfig damageConfig;
 
     /**
      * Drops retained records older than the retention window.

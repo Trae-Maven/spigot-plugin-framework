@@ -2,8 +2,10 @@ package io.github.trae.spigot.framework.damage.listeners;
 
 import io.github.trae.di.annotations.method.Scheduler;
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.damage.DamageManager;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPreDamageEvent;
+import lombok.AllArgsConstructor;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -17,31 +19,40 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Enforces how soon an entity can be damaged again by the same source.
+ * Enforces how soon an entity can be damaged again, under the configured combat rules.
  *
  * <p>Cancelling vanilla's damage handling also discards its invulnerability window, so this is the
  * only thing standing between a target and being hit every tick.</p>
  *
- * <p>Tracked per attacker rather than shared across all sources, so two players can hit the same
- * target simultaneously. That is a deliberate departure from vanilla, where one hit briefly protects
- * against every other, and it is what makes team fights work.</p>
+ * <p>How long a window lasts comes from the cause in either mode. What the combat rules decide is
+ * who the window applies to.</p>
  *
- * <p>Environmental causes are tracked per cause instead, so burning does not protect against
- * drowning.</p>
+ * <p>With old combat enabled, the window is tracked per attacker, so two players can hit the same
+ * target simultaneously, and per environmental cause, so burning does not protect against drowning.
+ * Both are deliberate departures from vanilla, and they are what make team fights work.</p>
+ *
+ * <p>With old combat disabled, the window matches vanilla: one per target, shared across every
+ * source, so a hit from anything protects against everything for as long as that hit's cause
+ * allows.</p>
  */
+@AllArgsConstructor
 @Singleton
 public class DamageDelayListener implements Listener {
 
-    private static final long DEFAULT_DELAY = 500L;
-    private static final long DEFAULT_ENTITY_ATTACK_DELAY = 500L;
+    private final DamageManager damageManager;
 
     /**
-     * Expiry per damagee, per environmental cause.
+     * Expiry per damagee, shared across every source, under vanilla combat.
+     */
+    private final Map<UUID, Long> delayMap = new HashMap<>();
+
+    /**
+     * Expiry per damagee, per environmental cause, under old combat.
      */
     private final Map<UUID, Map<DamageCause, Long>> delayByCauseMap = new HashMap<>();
 
     /**
-     * Expiry per damagee, per attacker.
+     * Expiry per damagee, per attacker, under old combat.
      */
     private final Map<UUID, Map<UUID, Long>> delayByEntityMap = new HashMap<>();
 
@@ -50,11 +61,14 @@ public class DamageDelayListener implements Listener {
      *
      * <p>Nothing else clears these, since an entity that is never hit again leaves its entry behind,
      * and mobs die or unload without notice. A stale entry is harmless because the check reads the
-     * expiry directly; this is purely to stop the maps growing.</p>
+     * expiry directly, including entries left in the other mode's maps after the setting changes;
+     * this is purely to stop the maps growing.</p>
      */
     @Scheduler(period = 10, unit = TimeUnit.SECONDS)
     public final void onScheduler() {
         final long now = System.currentTimeMillis();
+
+        this.delayMap.values().removeIf(expiry -> now >= expiry);
 
         this.delayByCauseMap.values().forEach(map -> map.values().removeIf(expiry -> now >= expiry));
         this.delayByCauseMap.values().removeIf(Map::isEmpty);
@@ -87,7 +101,8 @@ public class DamageDelayListener implements Listener {
     /**
      * Records the delay for damage that landed.
      *
-     * <p>A delay set explicitly on the event wins; otherwise one is picked from the cause.</p>
+     * <p>A delay set explicitly on the event wins; otherwise one is picked from the cause, falling
+     * back to the configured default for a cause with no value of its own.</p>
      *
      * @param event the completed post stage
      */
@@ -97,12 +112,7 @@ public class DamageDelayListener implements Listener {
             return;
         }
 
-        long delay = event.getDelay();
-
-        if (delay <= 0L) {
-            delay = this.getDefaultDelay(event);
-        }
-
+        final long delay = event.hasDelay() ? event.getDelay() : this.damageManager.getDamageConfig().getDelay().getValueByCause(event.getCause());
         if (delay <= 0L) {
             return;
         }
@@ -124,6 +134,11 @@ public class DamageDelayListener implements Listener {
 
         final UUID damageeId = event.getDamagee().getUniqueId();
 
+        if (!this.damageManager.getDamageConfig().isOldCombatEnabled()) {
+            // Shared
+            return this.isExpired(systemTime, this.delayMap.get(damageeId));
+        }
+
         if (event.getDamager() != null) {
             // Damager
             return this.isExpired(systemTime, this.delayByEntityMap.getOrDefault(damageeId, Collections.emptyMap()).get(event.getDamager().getUniqueId()));
@@ -134,7 +149,8 @@ public class DamageDelayListener implements Listener {
     }
 
     /**
-     * Stores when this damagee may next be hit by the same source.
+     * Stores when this damagee may next be hit, by any source under vanilla combat, or by the same
+     * source under old combat.
      *
      * @param event the completed post stage
      * @param delay the delay to enforce, in milliseconds
@@ -143,6 +159,12 @@ public class DamageDelayListener implements Listener {
         final long expiry = event.getSystemTime() + delay;
 
         final UUID damageeId = event.getDamagee().getUniqueId();
+
+        if (!this.damageManager.getDamageConfig().isOldCombatEnabled()) {
+            // Shared
+            this.delayMap.put(damageeId, expiry);
+            return;
+        }
 
         if (event.getDamager() != null) {
             // Damager
@@ -162,24 +184,5 @@ public class DamageDelayListener implements Listener {
      */
     private boolean isExpired(final long systemTime, final Long expiry) {
         return expiry == null || systemTime >= expiry;
-    }
-
-    /**
-     * The delay to enforce when the event did not set one.
-     *
-     * <p>Attacks get ten ticks, the pre-1.9 immunity window. Causes that tick on their own schedule
-     * get a delay matching that schedule, which is redundant while the source paces itself but holds
-     * if anything ever fires them faster.</p>
-     *
-     * @param event the completed post stage
-     * @return the delay in milliseconds
-     */
-    private long getDefaultDelay(final CustomPostDamageEvent event) {
-        return switch (event.getCause()) {
-            case ENTITY_ATTACK -> DEFAULT_ENTITY_ATTACK_DELAY;
-            case DROWNING, FIRE_TICK, POISON, WITHER -> 1000L;
-            case STARVATION -> 4000L;
-            default -> DEFAULT_DELAY;
-        };
     }
 }
