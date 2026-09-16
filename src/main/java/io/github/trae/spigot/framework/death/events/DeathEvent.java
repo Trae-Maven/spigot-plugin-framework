@@ -2,6 +2,7 @@ package io.github.trae.spigot.framework.death.events;
 
 import io.github.trae.spigot.framework.damage.data.CustomReason;
 import io.github.trae.spigot.framework.damage.data.Reason;
+import io.github.trae.spigot.framework.sound.SoundProvider;
 import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.UtilMessage;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
@@ -11,13 +12,17 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.inventory.ItemStack;
+
+import java.util.List;
 
 /**
  * What every death the framework dispatches has in common.
  *
  * <p>Implemented by both shapes of death event, so a listener that only cares who died, who killed
  * them and what it is attributed to can take either without knowing whether the damage pipeline was
- * involved.</p>
+ * involved. The same goes for the parts a listener can still change: drops, experience and the death
+ * sound are exposed here, so either shape can be adjusted through this interface alone.</p>
  *
  * <p>The message formatting lives here rather than in the listener, so both shapes read the same way
  * whichever produced them.</p>
@@ -66,6 +71,47 @@ public interface DeathEvent {
      * @return the reason, or {@code null} when there is nothing to attribute it to
      */
     Reason getReason();
+
+    /**
+     * The items that will be dropped as part of the death.
+     *
+     * <p>The list is mutable and is written back to the vanilla death after dispatch, so adding,
+     * removing or replacing entries changes what actually drops.</p>
+     *
+     * @return the drops
+     */
+    List<ItemStack> getDrops();
+
+    /**
+     * The amount of experience that will be dropped as part of the death.
+     *
+     * @return the experience to drop
+     */
+    int getDropExp();
+
+    /**
+     * Changes the amount of experience dropped as part of the death.
+     *
+     * @param dropExp the experience to drop, or {@code 0} to suppress it
+     */
+    void setDropExp(final int dropExp);
+
+    /**
+     * The sound played for the death.
+     *
+     * <p>Starts as the vanilla death sound. An entity with no death sound still gets a provider, one
+     * that plays nothing.</p>
+     *
+     * @return the sound, or {@code null} when a listener has cleared it to silence the death
+     */
+    SoundProvider getSoundProvider();
+
+    /**
+     * Changes the sound played for the death.
+     *
+     * @param soundProvider the sound to play, or {@code null} to keep the death silent
+     */
+    void setSoundProvider(final SoundProvider soundProvider);
 
     /**
      * The reason with an article in front of it, ready to drop into a sentence.

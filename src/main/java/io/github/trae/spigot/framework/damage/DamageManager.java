@@ -8,16 +8,25 @@ import io.github.trae.utilities.UtilJava;
 import io.github.trae.utilities.mixins.ExpiredMixin;
 import lombok.Getter;
 import net.minecraft.advancements.CriteriaTriggers;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.stats.Stats;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EntityEvent;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.DeathProtection;
 import net.minecraft.world.level.gameevent.GameEvent;
+import org.bukkit.craftbukkit.CraftEquipmentSlot;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.craftbukkit.damage.CraftDamageSource;
 import org.bukkit.craftbukkit.entity.CraftLivingEntity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.entity.EntityResurrectEvent;
 
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +36,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>The framework cancels vanilla's own damage handling, so everything vanilla would have done has
  * to be done here: health, absorption, the hurt animation and flash, mob aggro, the combat tracker
- * that names a killer in death messages, statistics, advancements and death itself.</p>
+ * that names a killer in death messages, statistics, advancements, death protection and death itself.</p>
  *
  * <p>Nothing here re-enters {@code EntityDamageEvent}, which is why no reentrancy guard is needed.
  * The tradeoff is that armour, enchantment and resistance reduction are not applied here; those are
@@ -40,9 +49,9 @@ import java.util.concurrent.TimeUnit;
  * attributed to an ability whose effect outlasted the hit that applied it.</p>
  *
  * <h2>Known gaps</h2>
- * <p>Three pieces of vanilla behaviour are unreachable from a plugin because the methods behind them
- * are not visible: totem of undying, the entity-specific hurt sound, and the damagee's
- * {@code getLastDamageSource}. Everything else is covered.</p>
+ * <p>Two pieces of vanilla behaviour are unreachable from a plugin because the methods behind them
+ * are not visible: the entity-specific hurt sound, and the damagee's {@code getLastDamageSource}.
+ * Everything else is covered.</p>
  *
  * @see CustomPostDamageEvent
  */
@@ -94,9 +103,9 @@ public class DamageManager {
      * Applies the resolved damage from a completed damage pass.
      *
      * <p>Runs the same sequence vanilla does, in vanilla's order: state flags, absorption, health,
-     * aggro, the hurt broadcast, then statistics, then death. Returns without doing anything if the
-     * damagee is not living, is already dead or removed, or is invulnerable to the source, which
-     * covers creative players, fire-immune mobs and fall-immune types in one call.</p>
+     * aggro, the hurt broadcast, then statistics, then death protection, then death. Returns without
+     * doing anything if the damagee is not living, is already dead or removed, or is invulnerable to
+     * the source, which covers creative players, fire-immune mobs and fall-immune types in one call.</p>
      *
      * @param event the completed post stage
      */
@@ -143,12 +152,13 @@ public class DamageManager {
         this.applyDamageeStatistics(damagee, damage);
         this.applyDamagerStatistics(event, damagee, damageSource, damage);
 
-        if (damagee.isDeadOrDying()) {
+        if (damagee.isDeadOrDying() && !this.applyDeathProtection(bukkitDamagee, damagee, damageSource)) {
             damagee.die(damageSource);
-        } else {
-            if (event.getSoundProvider() != null) {
-                event.getSoundProvider().play(bukkitDamagee.getLocation());
-            }
+            return;
+        }
+
+        if (event.getSoundProvider() != null) {
+            event.getSoundProvider().play(bukkitDamagee.getLocation());
         }
     }
 
@@ -228,6 +238,58 @@ public class DamageManager {
         serverPlayer.awardStat(Stats.DAMAGE_DEALT, Math.round(damage * 10.0F));
 
         CriteriaTriggers.PLAYER_HURT_ENTITY.trigger(serverPlayer, damagee, damageSource, damage, damage, false);
+    }
+
+    /**
+     * Saves the damagee from death with a held death protection item, mirroring vanilla's private totem check.
+     *
+     * <p>Scans main hand then off hand for any item carrying the death protection component, then
+     * fires {@link EntityResurrectEvent}, cancelled up front when nothing was found so plugins can
+     * still force or veto a resurrection. On success the item is consumed, health is set to half a
+     * heart, the item's effects are applied and the totem animation is broadcast. Sources that bypass
+     * invulnerability, such as the void, are never protected against.</p>
+     *
+     * @param bukkitDamagee the Bukkit view of the damagee, for the event
+     * @param damagee       the entity taking the damage
+     * @param damageSource  the killing source
+     * @return {@code true} if the damagee was saved and must not die
+     */
+    private boolean applyDeathProtection(final LivingEntity bukkitDamagee, final net.minecraft.world.entity.LivingEntity damagee, final DamageSource damageSource) {
+        if (damageSource.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            return false;
+        }
+
+        final InteractionHand hand = Arrays.stream(InteractionHand.values()).filter(interactionHand -> damagee.getItemInHand(interactionHand).has(DataComponents.DEATH_PROTECTION)).findFirst().orElse(null);
+
+        final ItemStack itemInHand = hand != null ? damagee.getItemInHand(hand) : ItemStack.EMPTY;
+        final ItemStack itemStack = itemInHand.copy();
+        final DeathProtection deathProtection = itemStack.get(DataComponents.DEATH_PROTECTION);
+
+        final EntityResurrectEvent resurrectEvent = new EntityResurrectEvent(bukkitDamagee, hand != null ? CraftEquipmentSlot.getHand(hand) : null);
+        resurrectEvent.setCancelled(hand == null);
+
+        if (!resurrectEvent.callEvent()) {
+            return false;
+        }
+
+        if (hand != null) {
+            itemInHand.shrink(1);
+
+            if (damagee instanceof final ServerPlayer serverPlayer) {
+                serverPlayer.awardStat(Stats.ITEM_USED.get(itemStack.getItem()));
+                CriteriaTriggers.USED_TOTEM.trigger(serverPlayer, itemStack);
+                damagee.gameEvent(GameEvent.ITEM_INTERACT_FINISH);
+            }
+        }
+
+        damagee.setHealth(1.0F);
+
+        if (deathProtection != null) {
+            deathProtection.applyEffects(itemStack, damagee);
+        }
+
+        damagee.level().broadcastEntityEvent(damagee, EntityEvent.PROTECTED_FROM_DEATH);
+        return true;
     }
 
     /**

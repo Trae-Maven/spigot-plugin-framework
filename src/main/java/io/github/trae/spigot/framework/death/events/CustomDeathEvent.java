@@ -4,6 +4,7 @@ import io.github.trae.spigot.framework.damage.data.CustomReason;
 import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.event.CustomEvent;
+import io.github.trae.spigot.framework.sound.SoundProvider;
 import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.entity.Entity;
@@ -16,8 +17,10 @@ import java.util.List;
 /**
  * An entity has died, with the damage pass that killed it attached.
  *
- * <p>Fired after the vanilla death events, so drops and death handling have already run. Not
- * cancellable for that reason: by the time this reaches a listener the death is settled.</p>
+ * <p>Fired from inside the vanilla death event at its last priority, so the death itself is settled
+ * and this event is not cancellable. Drops, experience and the death sound are still open at that
+ * point: all three are carried here, and whatever listeners leave them as is written back to the
+ * vanilla death.</p>
  *
  * <p>The names of both sides live on the damage pass, so a plugin that renamed either during the
  * damage sees that carried through. The reason is the exception: it is resolved by the death system
@@ -37,10 +40,16 @@ public class CustomDeathEvent extends CustomEvent implements DeathEvent {
     private final CustomPostDamageEvent damageEvent;
 
     /**
-     * The entity that died, and the entity that killed it. The killer is {@code null} for
-     * environmental deaths, and is taken from the damage pass rather than resolved again.
+     * The entity that died.
      */
     private final LivingEntity entity;
+
+    /**
+     * The entity that killed it, or {@code null} for an environmental death.
+     *
+     * <p>Taken from the damage pass rather than resolved again, so it always agrees with the pass
+     * attached to this event.</p>
+     */
     private final Entity killer;
 
     /**
@@ -68,24 +77,32 @@ public class CustomDeathEvent extends CustomEvent implements DeathEvent {
     private int dropExp;
 
     /**
+     * The sound played for the death, or {@code null} for none.
+     *
+     * <p>Mutable so listeners can replace the sound, or clear it to keep the death silent.</p>
+     */
+    private SoundProvider soundProvider;
+
+    /**
      * Takes the reason already resolved rather than resolving it here, since the lookup needs the
      * damage manager's retained state and this event is meant to be readable without it.
      *
-     * @param damageEvent the damage pass that killed the entity
-     * @param entity      the entity that died
-     * @param reason      what the death is attributed to, or {@code null} when there is nothing to
-     *                    name
-     * @param drops       the items that will be dropped as part of the death
-     * @param dropExp     the amount of experience that will be dropped as part of the death
+     * @param damageEvent   the damage pass that killed the entity
+     * @param entity        the entity that died
+     * @param reason        what the death is attributed to, or {@code null} when there is nothing to
+     *                      name
+     * @param drops         the items that will be dropped as part of the death
+     * @param dropExp       the amount of experience that will be dropped as part of the death
+     * @param soundProvider the sound played for the death, or {@code null} for none
      */
-    public CustomDeathEvent(final CustomPostDamageEvent damageEvent, final LivingEntity entity, final Reason reason, final List<ItemStack> drops, final int dropExp) {
+    public CustomDeathEvent(final CustomPostDamageEvent damageEvent, final LivingEntity entity, final Reason reason, final List<ItemStack> drops, final int dropExp, final SoundProvider soundProvider) {
         this.damageEvent = damageEvent;
-
         this.entity = entity;
         this.killer = damageEvent.getDamager();
         this.reason = reason;
         this.drops = drops;
         this.dropExp = dropExp;
+        this.soundProvider = soundProvider;
     }
 
     /**
