@@ -9,6 +9,8 @@ import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.utilities.UtilString;
 import net.kyori.adventure.text.Component;
+import org.bukkit.SoundCategory;
+import org.bukkit.craftbukkit.entity.CraftLivingEntity;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.Entity;
@@ -289,21 +291,22 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
     }
 
     /**
-     * The damagee's own hurt sound, or {@code null} when it has none.
+     * The damagee's own hurt sound, or {@code null} when it is not a living entity.
      *
      * <p>Read from the entity rather than the cause, so a zombie grunts and a skeleton rattles
-     * without the pipeline keeping a table of its own. Non-living entities have no hurt sound at
-     * all, which is what the filter handles.</p>
+     * without the pipeline keeping a table of its own. The sound plays under the entity's own
+     * category, matching vanilla, so it follows the same client volume slider. Non-living entities
+     * have no hurt sound at all, which is what the filter handles, while a living entity with no hurt
+     * sound still gets a provider, one that plays nothing.</p>
      *
      * @param damagee the entity being damaged
-     * @return the hurt sound, or {@code null}
+     * @return the hurt sound, or {@code null} for a non-living entity
      */
     private static SoundProvider getHurtSound(final Entity damagee) {
         return Optional.of(damagee)
                 .filter(LivingEntity.class::isInstance)
-                .map(LivingEntity.class::cast)
-                .map(LivingEntity::getHurtSound)
-                .map(SoundProvider::of)
+                .map(CraftLivingEntity.class::cast)
+                .map(damageeLivingEntity -> SoundProvider.of(damageeLivingEntity.getHurtSound(), SoundCategory.valueOf(damageeLivingEntity.getHandle().getSoundSource().name())))
                 .orElse(null);
     }
 
