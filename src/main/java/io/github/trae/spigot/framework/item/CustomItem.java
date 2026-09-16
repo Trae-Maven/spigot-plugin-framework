@@ -133,6 +133,16 @@ public abstract class CustomItem extends Item {
     }
 
     /**
+     * Returns whether the material's vanilla use cooldown should be removed from
+     * stacks of this item.
+     *
+     * @return {@code true} to remove the vanilla use cooldown
+     */
+    public boolean removeUseCooldown() {
+        return true;
+    }
+
+    /**
      * Returns whether players obtain this item through normal gameplay: mining, crafting, smelting,
      * or picking it up. When {@code true}, the item is registered under its material and any vanilla
      * stack of that type is converted into this item on the way into a player's inventory. Defaults
@@ -184,6 +194,7 @@ public abstract class CustomItem extends Item {
                 UtilString.pair("Model", this.getModel() != null ? this.getModel().asString() : ""),
                 UtilString.pair("Tooltip-Style", this.getTooltipStyle() != null ? this.getTooltipStyle().asString() : ""),
                 UtilString.pair("Hide-Attributes", Boolean.toString(this.hideAttributes())),
+                UtilString.pair("Remove-Use-Cooldown", Boolean.toString(this.removeUseCooldown())),
                 UtilString.pair("Naturally-Obtainable", Boolean.toString(this.naturallyObtainable())),
                 UtilString.pair("Delete-If-Removed", Boolean.toString(this.deleteIfRemoved())),
                 UtilString.pair("Style-Name", this.getStyle() != null ? this.getStyle().getName() : ""),

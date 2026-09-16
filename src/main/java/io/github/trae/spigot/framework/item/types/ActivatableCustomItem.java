@@ -116,18 +116,6 @@ public abstract class ActivatableCustomItem extends CustomItem {
     }
 
     /**
-     * Returns whether the vanilla material cooldown should be cleared after activation.
-     *
-     * @param player       the player activating the item
-     * @param itemStack    the specific stack being activated
-     * @param activateType the kind of click
-     * @return {@code true} to clear the material's client-visible cooldown
-     */
-    public boolean clearMaterialCooldown(final Player player, final ItemStack itemStack, final ActivateType activateType) {
-        return true;
-    }
-
-    /**
      * Returns whether this item may activate for the given player, stack, and click type (e.g. gated
      * behind a cooldown, a permission, or a durability threshold). Defaults to {@code true}.
      * <p>
