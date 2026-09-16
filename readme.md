@@ -23,10 +23,17 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Damage modifiers filed under named keys so a weapon's damage, a critical multiplier and an armour reduction all compose instead of overwriting one another
 - Vanilla-accurate defaults for armour, toughness, protection, resistance, weapon damage, critical hits, knockback, durability and immunity windows, each replaceable per piece or per item through its own event
 - Pre-1.9 combat by default, with the attack cooldown removed and immunity tracked per attacker rather than shared
-- Death system that knows who killed whom and with what, including attributions that outlive the hit that set them
+- Death system that knows who killed whom and with what, including attributions that outlive the hit that set them, and works with or without the damage pipeline
+- Death drops, experience and death sound rewritable per death, with resource pack sounds played in place of vanilla's
+- Hit sounds carried on the damage pass, seeded from the entity being struck and replaceable by an ability
+- Totem of undying and any other death protection item honoured under custom damage
 - Three-part display names, so a consumer takes just the name where a prefix would be noise and the full thing where it would not
-- Declarative item system with identity stamping and automatic version reconciliation, so stacks in player inventories update themselves when the definition changes
+- Declarative item system with identity stamping and automatic version reconciliation, so stacks in player inventories and containers update themselves when the definition changes
+- Orphaned stacks, whose item is no longer registered, reset to a plain stack or deleted outright per item
+- Custom items protected from anvils and enchanting tables, as the item or as the reagent
 - Opt-in item activation, so a custom item gains a click action with its own gate, cancellable events, and control over the vanilla behaviour it replaces
+- Vanilla-aware activation defaults, so a chest still opens, a hoe still tills, and a consumable is not spent when its item activates
+- Sound abstraction held by key rather than enum, so vanilla and resource pack sounds are played the same way
 - Inventory window system with slot-bound buttons, open and close gating, and full click and drag protection
 - NMS utilities for direct packet sending and Adventure-to-vanilla component conversion
 - Custom event base classes with cancellation reasons
@@ -181,7 +188,7 @@ public class CorePlugin extends SpigotPlugin {
 
 | Package | Provides |
 |---|---|
-| `io.github.trae.spigot.framework.item` | `ItemManager`, `ItemApplyListener`, `ItemActivateListener` |
+| `io.github.trae.spigot.framework.item` | `ItemManager`, `ItemApplyListener`, `ItemActivateListener`, `ItemPreventionListener` |
 | `io.github.trae.spigot.framework.window` | `WindowManager`, `WindowListener` |
 | `io.github.trae.spigot.framework.sidebar` | `SidebarManager`, `SidebarListener` |
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
@@ -695,6 +702,8 @@ Holding right click requires the item to have a use action. Many materials have 
 
 Actions with no matching type, such as physical pressure plate triggers, activate nothing. Only the main hand is handled, since the interaction event fires once per hand and an item would otherwise activate twice.
 
+The client sends an arm swing in two places where no left click was meant: after a right click the server denied, and when a stack is dropped. The server reads both as `LEFT_CLICK_AIR`. A left click landing in the same or the next tick as a right click, or as a drop of a stack the framework recognises, is discarded, so a right click ability does not fire its left click twin and a dropped item does not activate on its way out.
+
 Branch on the type when an item does different things per click:
 
 ```java
@@ -775,9 +784,39 @@ public void onItemChannel(final ItemChannelEvent event) {
 
 Cancelling ends the channel outright rather than pausing it: `onChannel` does not run for that tick, `onStop` fires, and the player is dropped from the item's active set. The event is evaluated first, so `canChannel` never runs in a context the server has already refused.
 
+### Competing With Vanilla
+
+A right click can mean something to the world as well as to the item. Two defaults decide who wins, and both are chosen so a custom item behaves the way a player expects without writing anything:
+
+| Situation | Default | Example |
+|---|---|---|
+| The material has a use of its own | The item activates, and the material's use is denied | A custom ender pearl fires its ability and is not thrown |
+| The clicked block responds on its own | The block wins, and the item does not activate | A chest opens, a lever toggles, a hoe tills dirt |
+| Neither | The item activates | A custom sword clicked at air or stone |
+
+A block counts as responding when it reacts to any click, such as a chest or a door, or when it reacts to the item being held, such as dirt under a hoe. A sneaking player is exempt from the block check, since vanilla skips the block's response when sneaking with a full hand. Left clicks compete with nothing and are never gated here.
+
+Each side has a hook to flip its default:
+
+```java
+// Let the material win, so a custom golden apple is eaten rather than activated
+@Override
+public boolean activateOnItemUse(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    return false;
+}
+
+// Activate even when the clicked block would respond, such as a wand used on a chest
+@Override
+public boolean activateOnBlockUse(final Player player, final ItemStack itemStack, final Block block, final ActivateType activateType) {
+    return true;
+}
+```
+
+`activateOnItemUse` defaults to `true` and `activateOnBlockUse` to `false`. The material and block classification behind both lives in `UtilMaterial`.
+
 ### Suppressing Vanilla Behaviour
 
-An activation runs alongside whatever the material and the clicked block would normally do. Return `Event.Result.DENY` from either hook to suppress that:
+Once an activation is going ahead, two more hooks decide what vanilla still does alongside it. Return `Event.Result.DENY` from either to suppress that:
 
 ```java
 // Stop the material's own use, such as a right-clickable food item being eaten
@@ -793,14 +832,27 @@ public Event.Result useInteractedBlock(final Player player, final ItemStack item
 }
 ```
 
-Both default to `Event.Result.DEFAULT`, leaving vanilla behaviour untouched. The block is passed so the decision can depend on what was clicked, and is `null` when the player clicked air:
+`useItemInHand` denies a right click on a material that has a use of its own, which is what keeps the pearl in hand, and returns `Event.Result.DEFAULT` otherwise. Return `DEFAULT` from it for an item whose material should still be used, such as a pearl that fires an ability and is thrown as well. `useInteractedBlock` defaults to `Event.Result.DEFAULT`, leaving the block untouched, and is only consulted when a block was clicked. The block is passed so the decision can depend on what was clicked:
 
 ```java
 @Override
 public Event.Result useInteractedBlock(final Player player, final ItemStack itemStack, final Block block, final ActivateType activateType) {
-    return block != null && block.getType() == Material.CHEST ? Event.Result.DENY : Event.Result.DEFAULT;
+    return block.getType() == Material.CHEST ? Event.Result.DENY : Event.Result.DEFAULT;
 }
 ```
+
+### Anvils and Enchanting Tables
+
+A custom item's tooltip is authored rather than generated, so an enchantment or a player-set name would not survive the next reconciliation. `ItemPreventionListener` refuses both outright:
+
+| Station | Behaviour |
+|---|---|
+| Anvil | The output is cleared when either input slot holds a custom item, covering renaming, repairing and combining alike |
+| Enchanting table | No offers are shown, and the enchantment itself is refused, when the item or the lapis slot holds a custom item |
+
+The enchanting check runs twice on purpose. An offer suppressed at preparation can be restored by another plugin, and the slot can change between the offer being shown and the button being pressed, so the same check is repeated at the point the enchantment would be applied.
+
+A custom item is refused as a reagent too, not only as the thing being worked on, so a custom item built on lapis or on an enchanted book is never consumed by a station.
 
 ### Versioning and Reconciliation
 
@@ -816,9 +868,23 @@ Reconciliation runs automatically at every point a stack enters a player's posse
 | Crafting result preview and craft | `PrepareItemCraftEvent` |
 | Furnace smelt result | `FurnaceSmeltEvent` |
 | Player join | `PlayerJoinEvent` |
+| Opening a chest, double chest, barrel, shulker or other block-backed container | `InventoryOpenEvent` |
 | Every 30 seconds, all online inventories | Scheduler |
 
-The scheduler covers the remaining case: a stack sitting untouched in an inventory when an item's definition changes at runtime.
+The scheduler covers the remaining case: a stack sitting untouched in a player's inventory when an item's definition changes at runtime. Containers are reconciled as they are opened rather than on a timer, and crafting grids, anvils and the framework's own windows are left out, since their contents are transient or managed elsewhere.
+
+### Removed Items
+
+A stack still carrying an identifier or version from an item that is no longer registered is an orphan. By default it is rebuilt as a plain stack of its material, with the stale data stripped. An item built on a material that is meaningless without it can ask for its stacks to be deleted instead:
+
+```java
+@Override
+protected boolean deleteIfRemoved() {
+    return true;
+}
+```
+
+The answer is stamped onto every stack rather than read from the item at the time, since by then there is no item left to ask. It is part of the version hash, so flipping it marks existing stacks outdated and they pick up the new answer on their next update, and the mark is cleared rather than left behind when an item stops asking for it.
 
 ### Extending the Version Hash
 
@@ -850,16 +916,20 @@ this.itemManager.getItemByIdentifier(identifier).ifPresent(item -> player.getInv
 this.itemManager.searchItem(sender, input, true).ifPresent(item -> player.getInventory().addItem(item.create()));
 ```
 
-`apply` takes one of three routes, and only one of them replaces the stack:
+`apply` takes one of these routes:
 
 | Stack | Route |
 |---|---|
 | Known identifier, outdated version | `update`, rewriting the description in place |
 | Known identifier, current version | `refresh`, dispatching the events and nothing else |
 | No identifier, obtainable material | `create`, building a fresh stack |
+| Orphan marked deletable | `null`, removing the stack |
+| Orphan otherwise | `create` under its `DefaultItem`, building a clean stack |
 | Anything else | `refresh` under its `DefaultItem` |
 
-Only the obtainable route replaces a stack outright, and it does so deliberately: the material is being reinterpreted as a custom item, so enchantments and other data do not carry across. Every other route returns the input by reference, so an identity comparison tells a caller whether the stack was replaced rather than merely altered.
+Two routes replace a stack outright, and both do so deliberately. The obtainable route reinterprets the material as a custom item, and the orphan route strips data that belongs to an item that no longer exists, so enchantments and other data do not carry across either. Either an identifier or a version alone is enough to count as an orphan, since a half-stamped stack is as stale as a fully stamped one.
+
+A `null` return means the stack should be removed, and every caller carries that out in whatever way its own context allows. `updateInventory` clears the slot. Every other route returns the input by reference, so an identity comparison tells a caller whether the stack was replaced rather than merely altered.
 
 The refresh route exists so a listener still runs against a stack that needed no rewriting. An item's version hash covers its own description and knows nothing about what a listener adds on top, so version-gating alone would leave those stacks permanently missing it.
 
@@ -1557,6 +1627,25 @@ public void onCustomDamage(final CustomDamageEvent event) {
 
 The post stage applies armour, protection and resistance early, then durability, knockback and the delay record at the end. Once it completes, `DamageManager` deals what is left.
 
+### Hit Sounds
+
+Cancelling vanilla's damage handling also cancels the sound an entity makes when struck, so the pass carries one of its own as a `SoundProvider`. It is seeded from the damagee rather than the weapon, so a zombie grunts and a skeleton rattles, and it plays under the entity's own sound category, so it follows the same client volume slider vanilla's would.
+
+The sound is settable at any stage and read only once the damage lands, so an ability replaces it rather than playing its own alongside it:
+
+```java
+@EventHandler
+public void onCustomDamage(final CustomDamageEvent event) {
+    if (!this.isFrostbite(event)) {
+        return;
+    }
+
+    event.setSoundProvider(SoundProvider.of(Sound.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 1.0F, 1.6F));
+}
+```
+
+Set it to `null` for a silent hit. It is skipped on a hit that kills, since the death sound covers that, and a non-living damagee has none to begin with.
+
 ### Modifiers
 
 The damage figure is a base plus a set of named contributions, rather than a single number listeners fight over. Each key holds at most one additive and one multiplier, so two things writing to different keys compose and two things writing to the same key do not.
@@ -1599,7 +1688,7 @@ UtilEvent.dispatch(CustomPreDamageEvent.create(target, DamageCause.MAGIC, 4.0D, 
 UtilEvent.dispatch(CustomPreDamageEvent.create(target, player, DamageCause.MAGIC, 4.0D, Reason.of(Component.text("Ignite"))));
 ```
 
-Both go through the full chain, so a delay still applies, armour still reduces, and the death system still sees it.
+Both go through the full chain, so a delay still applies, armour still reduces, and the death system still sees it. Neither carries a hit sound, since there is no swing behind it, so set one on the event before dispatching if the damage should be heard.
 
 ### Reasons
 
@@ -1663,11 +1752,13 @@ Cancelling either excludes that item from the calculation entirely.
 
 ### Applying Damage
 
-`DamageManager` deals the resolved figure and reproduces what vanilla would have done: health and absorption, the hurt animation and flash, the combat tracker that names a killer in death messages, mob aggro, statistics, advancements, and death itself.
+`DamageManager` deals the resolved figure and reproduces what vanilla would have done: health and absorption, the hurt animation and flash, the combat tracker that names a killer in death messages, mob aggro, statistics, advancements, death protection, and death itself.
 
 Aggro is the one worth knowing about. Marking the attacker as the damagee's last attacker is a single field write, and it is what makes a spider turn on a player who hits it in daylight, and what angers neutral mobs. Without it, custom damage would be invisible to mob behaviour.
 
-Three pieces of vanilla behaviour are unreachable from a plugin because the methods behind them are not visible: totem of undying, the entity-specific hurt sound, and the damagee's own last damage source.
+Death protection is the other. Vanilla's totem check is private, so it is reproduced here: when a hit would kill, a death protection item in either hand fires `EntityResurrectEvent`, and on success the item is consumed, health is set to half a heart, the item's effects are applied and the totem animation plays. The entity never dies, so no death event fires. Any item carrying the death protection component counts, not only a totem, and sources that bypass invulnerability, such as the void, are never protected against.
+
+One piece of vanilla behaviour remains unreachable from a plugin, because the method behind it is not visible: the damagee's own last damage source. The retained damage pass stands in for it, which is what the death system reads.
 
 ---
 
@@ -1677,13 +1768,33 @@ The death system turns a vanilla death into one that knows what caused it.
 
 Vanilla's own death handling only knows that an entity died. The damage pipeline knows who dealt the blow, with what item, and for what reason, so the two are joined here: `DamageManager` retains the last damage pass that landed on each entity, and the death listener reads it.
 
-Requires `@Scan("io.github.trae.spigot.framework.death")`.
+Requires `@Scan("io.github.trae.spigot.framework.death")`. The damage system is optional.
 
-### Reacting to a Death
+### Two Shapes of Death
+
+Which event a death gets depends on whether the damage system is registered:
+
+| Event | Dispatched When | Knows |
+|---|---|---|
+| `CustomDeathEvent` | The damage system is registered and has a record of the killing pass | The pass itself, with the item, both names, the cause and the resolved reason |
+| `VanillaDeathEvent` | The damage system is not registered | Only what the entity and the vanilla damage source still hold, with the killer's held item standing in for the reason |
+
+With the damage system registered, a death the pipeline has no record of dispatches nothing, since there is no damage behind it to report.
+
+Both implement `DeathEvent`, which carries the entity, the killer, the cause, the reason, and the parts a listener can still change. Code that only needs those takes the interface and works whichever shape produced it:
 
 ```java
 @EventHandler
 public void onCustomDeath(final CustomDeathEvent event) {
+    this.onDeath(event);
+}
+
+@EventHandler
+public void onVanillaDeath(final VanillaDeathEvent event) {
+    this.onDeath(event);
+}
+
+private void onDeath(final DeathEvent event) {
     final Entity killer = event.getKiller();
     if (killer == null) {
         return;
@@ -1693,9 +1804,34 @@ public void onCustomDeath(final CustomDeathEvent event) {
 }
 ```
 
-Fired after the vanilla death events, so drops and death handling have already run. Not cancellable for that reason.
+Both are dispatched from inside the vanilla death event at its last priority, so the death itself is settled and neither is cancellable. A vanilla death another plugin cancelled is skipped outright, since nothing actually died.
 
-Attribution is resolved before the event is dispatched rather than read straight off the damage pass. A killer with an unexpired `CustomReason` standing against the target is credited with that instead of with whatever the killing hit happened to be, so a kill landed with a sword moments after an ability still names the ability.
+Attribution is resolved before `CustomDeathEvent` is dispatched rather than read straight off the damage pass. A killer with an unexpired `CustomReason` standing against the target is credited with that instead of with whatever the killing hit happened to be, so a kill landed with a sword moments after an ability still names the ability. Both retained records are dropped only after dispatch, so a listener reading them for the same entity still finds them.
+
+### Drops, Experience and Sound
+
+Three things are still open when the event fires, and whatever listeners leave them as is written back to the vanilla death:
+
+```java
+@EventHandler
+public void onCustomDeath(final CustomDeathEvent event) {
+    event.getDrops().removeIf(itemStack -> itemStack.getType() == Material.ROTTEN_FLESH);
+    event.setDropExp(event.getDropExp() * 2);
+    event.setSoundProvider(SoundProvider.of("custom:entity.boss.death", SoundCategory.HOSTILE, 2.0F, 1.0F));
+}
+```
+
+The drop list is the event's own copy, and replaces the vanilla list wholesale once dispatch ends. Experience is copied back as it stands.
+
+The death sound starts as the vanilla one, and how it is written back depends on what it names:
+
+| Sound | Result |
+|---|---|
+| A sound the server knows | Replaces vanilla's death sound, with its category, volume and pitch |
+| A sound only a resource pack knows | Vanilla's is silenced, and this one is played at the entity's location instead |
+| `null` | The death is silent |
+
+A death vanilla already keeps silent, such as a silent entity's, stays silent whatever the listener sets.
 
 ### Death Messages
 
@@ -1710,11 +1846,54 @@ public void onCustomDeathMessage(final CustomDeathMessageEvent event) {
 }
 ```
 
-Both names are seeded from the damage pass and settable per recipient, so a team colour or a rank replaces only their copy.
+The event carries the `DeathEvent` behind it, so a listener reads the entity and killer the same way whichever shape produced the death. Both names are `DisplayName`s, settable per recipient, so a team colour, a rank or a class tag replaces only that recipient's copy:
+
+```java
+@EventHandler
+public void onCustomDeathMessage(final CustomDeathMessageEvent event) {
+    if (event.getDeathEvent().getEntity() instanceof final Player player) {
+        event.setEntityName(DisplayName.of(this.getRankPrefix(player), Component.text(player.getName()), null));
+    }
+}
+```
 
 The message takes one of three shapes: a self-inflicted death names nobody, a death with a killer names them and what it was attributed to, and anything else names the cause.
 
-Messages are only produced for player deaths. Mob deaths still fire `CustomDeathEvent`, so a plugin wanting to announce those listens to it directly.
+Messages are only produced for player deaths. Mob deaths still fire the death events, so a plugin wanting to announce those listens to them directly.
+
+---
+
+## Sounds
+
+A `SoundProvider` is a sound together with the category, volume and pitch to play it at, built once and replayable anywhere. The damage pass and both death events carry one.
+
+The sound is held as its namespaced key rather than as a `Sound`, so a sound that exists only in a resource pack is named as easily as a vanilla one, and the value survives being written to configuration and read back:
+
+```java
+// A vanilla sound, converted to its key through the registry
+SoundProvider.of(Sound.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0F, 1.2F);
+
+// A resource pack sound, by key
+SoundProvider.of("custom:ui.unlock", SoundCategory.MASTER, 1.0F, 1.0F);
+
+// Full volume and normal pitch
+SoundProvider.of(Sound.BLOCK_NOTE_BLOCK_PLING, SoundCategory.RECORDS);
+```
+
+```java
+// Heard by everyone in range of a location
+soundProvider.play(location);
+
+// Heard by one player, following them as they move
+soundProvider.play(player);
+
+// Heard by every online player from their own position
+soundProvider.broadcast();
+```
+
+Pick the category vanilla would use for the same kind of sound, so players can turn it down with the slider they expect: `PLAYERS` for anything a player's own gear or body makes, `HOSTILE` or `NEUTRAL` for mobs, and `MASTER` only for something that must always be heard.
+
+Nothing here throws. A `null` sound, a sound with no registered key, a `null` key or a `null` category all yield a provider that plays nothing, so a provider can be built straight from a nullable source, such as the death sound of an entity that has none, without a guard. `getSound()` resolves the key back to a `Sound`, and is empty for a resource pack sound, which still plays.
 
 ---
 
@@ -1732,9 +1911,14 @@ DisplayName.of(rankComponent, nameComponent, tagComponent);
 DisplayName.of(nameComponent);
 ```
 
-`getFullName()` joins the parts with a single space, skipping the absent ones so a name with no prefix does not start with one.
+`getFullName()` joins the parts with no separator and skips the absent ones, so any spacing a caller wants between the parts belongs in the prefix or suffix itself:
 
-The damage pipeline carries one for each side of a hit, so a plugin with display names, ranks or nicknames writes them once at the pre stage rather than at every message site.
+```java
+// Renders as "[Admin] Steve"
+DisplayName.of(Component.text("[Admin] "), Component.text("Steve"), null);
+```
+
+The damage pipeline carries one for each side of a hit, so a plugin with display names, ranks or nicknames writes them once at the pre stage rather than at every message site. The death message event carries one for each side too, settable per recipient.
 
 ---
 
@@ -1769,6 +1953,7 @@ The damage system reaches deeper than this, driving vanilla's own damage interna
 | `UtilWindow` | Opening a `Window` for a player, honouring the open event and gate |
 | `UtilHologram` | Spawning, updating and despawning a `Hologram` for a single player |
 | `UtilDamage` | Resolving whether an attack qualifies as a critical hit |
+| `UtilMaterial` | Classifying materials by whether a block responds to a click, to a held item, or whether an item has a use of its own |
 | `UtilAdventure` | Joining components with a separator and an inclusion filter, skipping nulls and empties |
 | `UtilColor` | Converting between AWT, Adventure and Bukkit colours, and wrapping text in MiniMessage colour tags |
 | `UtilServer` | Server and online player access |
@@ -1922,9 +2107,10 @@ The three stages exist so the framework, consuming plugins and reductions each h
 | Event | Fired When |
 |---|---|
 | `CustomDeathEvent` | An entity has died, with the damage pass that killed it attached |
+| `VanillaDeathEvent` | An entity has died and the damage system is not registered |
 | `CustomDeathMessageEvent` | A death message is about to be sent to one player |
 
-`CustomDeathEvent` is not cancellable, since the vanilla death events have already run by the time it fires. `CustomDeathMessageEvent` is, and is dispatched once per recipient, so a message can be suppressed or reworded for some players and not others.
+Neither death event is cancellable, since both are dispatched from inside the vanilla death once it is settled. Their drops, experience and death sound are still writable, and are written back to the vanilla death after dispatch. `CustomDeathMessageEvent` is cancellable, and is dispatched once per recipient, so a message can be suppressed or reworded for some players and not others.
 
 ---
 
@@ -1938,6 +2124,7 @@ The three stages exist so the framework, consuming plugins and reductions each h
 | `IBaseCommand` | Command contract with subcommand management |
 | `Activatable` | Capability a `CustomItem` implements to gain a click action |
 | `ICustomCancellableEvent` | Cancellable event with reason support |
+| `DeathEvent` | Shared contract of both death events: entity, killer, cause, reason, drops, experience and death sound |
 | `SystemTimeMixin` | Carries a timestamp of when something was created or started |
 | `DurationMixin` | Carries a duration, with `-1` meaning permanent |
 | `ExpiredMixin` | Reports whether a duration has elapsed |

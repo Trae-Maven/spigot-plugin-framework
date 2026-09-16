@@ -115,6 +115,11 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      * arrow. Both names are seeded from the entities themselves and can be replaced by a plugin that
      * displays something other than the raw name.</p>
      *
+     * <p>Whether the attack is critical is taken from the vanilla event rather than worked out here,
+     * so it is vanilla's own decision: the attacker falling, not climbing, swimming, blinded, riding
+     * or sprinting, against a living target. Reading it off the event also keeps it server-side,
+     * where a client-reported ground state could be spoofed.</p>
+     *
      * <p>The reason is seeded from the damager's held item, carrying its display name and hover
      * tooltip, so a death message can show what killed someone without rebuilding it. An empty hand
      * still produces a reason, but one with no name, so anything reading it should check the name
@@ -165,7 +170,7 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 itemStack,
                 getArmorContents(entity),
                 entityDamageByEntityEvent.getDamage(),
-                !damager.isOnGround(),
+                entityDamageByEntityEvent.isCritical(),
                 getHurtSound(entity),
                 entityDamageByEntityEvent.getDamage(),
                 0L,

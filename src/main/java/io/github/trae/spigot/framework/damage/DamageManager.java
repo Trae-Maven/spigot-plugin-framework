@@ -36,7 +36,8 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>The framework cancels vanilla's own damage handling, so everything vanilla would have done has
  * to be done here: health, absorption, the hurt animation and flash, mob aggro, the combat tracker
- * that names a killer in death messages, statistics, advancements, death protection and death itself.</p>
+ * that names a killer in death messages, statistics, advancements, death protection, the hit sound
+ * and death itself.</p>
  *
  * <p>Nothing here re-enters {@code EntityDamageEvent}, which is why no reentrancy guard is needed.
  * The tradeoff is that armour, enchantment and resistance reduction are not applied here; those are
@@ -49,9 +50,9 @@ import java.util.concurrent.TimeUnit;
  * attributed to an ability whose effect outlasted the hit that applied it.</p>
  *
  * <h2>Known gaps</h2>
- * <p>Two pieces of vanilla behaviour are unreachable from a plugin because the methods behind them
- * are not visible: the entity-specific hurt sound, and the damagee's {@code getLastDamageSource}.
- * Everything else is covered.</p>
+ * <p>One piece of vanilla behaviour is unreachable from a plugin because the method behind it is not
+ * visible: the damagee's {@code getLastDamageSource}. The retained damage pass stands in for it.
+ * The entity's own hurt sound is carried on the pass instead, seeded at the pre stage.</p>
  *
  * @see CustomPostDamageEvent
  */
@@ -106,6 +107,9 @@ public class DamageManager {
      * aggro, the hurt broadcast, then statistics, then death protection, then death. Returns without
      * doing anything if the damagee is not living, is already dead or removed, or is invulnerable to
      * the source, which covers creative players, fire-immune mobs and fall-immune types in one call.</p>
+     *
+     * <p>The pass's hit sound plays last, and only when the damagee survives, including when death
+     * protection saved it. A killing hit skips it, since the death sound covers that.</p>
      *
      * @param event the completed post stage
      */
@@ -254,6 +258,7 @@ public class DamageManager {
      * @param damageSource  the killing source
      * @return {@code true} if the damagee was saved and must not die
      */
+    @SuppressWarnings("UnstableApiUsage")
     private boolean applyDeathProtection(final LivingEntity bukkitDamagee, final net.minecraft.world.entity.LivingEntity damagee, final DamageSource damageSource) {
         if (damageSource.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return false;
