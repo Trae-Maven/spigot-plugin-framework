@@ -22,11 +22,12 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Staged damage pipeline that replaces vanilla damage entirely, with a gate stage, an ability stage and a reduction stage, each cancellable
 - Damage modifiers filed under named keys so a weapon's damage, a critical multiplier and an armour reduction all compose instead of overwriting one another
 - Vanilla-accurate defaults for armour, toughness, protection, resistance, weapon damage, critical hits, knockback, durability and immunity windows, each replaceable per piece or per item through its own event
-- Pre-1.9 combat by default, with the attack cooldown removed and immunity tracked per attacker rather than shared
+- Vanilla 1.21 combat by default, with a config toggle for pre-1.9 combat, where the attack cooldown is removed and immunity is tracked per attacker rather than shared
 - Death system that knows who killed whom and with what, including attributions that outlive the hit that set them, and works with or without the damage pipeline
 - Death drops, experience and death sound rewritable per death, with resource pack sounds played in place of vanilla's
 - Hit sounds carried on the damage pass, seeded from the entity being struck and replaceable by an ability
 - Totem of undying and any other death protection item honoured under custom damage
+- Channel-based chat that replaces vanilla chat, with the channel resolved from plugin-owned state on every message, and cancellable send and per-recipient receive events
 - Three-part display names, so a consumer takes just the name where a prefix would be noise and the full thing where it would not
 - Declarative item system with identity stamping and automatic version reconciliation, so stacks in player inventories and containers update themselves when the definition changes
 - Orphaned stacks, whose item is no longer registered, reset to a plain stack or deleted outright per item
@@ -61,7 +62,7 @@ Commands and subcommands integrate directly into the hierarchy as Nodes, each wi
 | `BaseCommand` | Node under a Manager | Registered with `CommandMap` |
 | `BaseSubCommand` | Node under a command | Attached to parent command |
 
-The damage, death, sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
+The damage, death, chat, sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
 
 ---
 
@@ -196,6 +197,7 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.hologram` | `HologramManager`, `HologramListener` |
 | `io.github.trae.spigot.framework.damage` | `DamageManager`, `DamageListener`, `CustomDamageListener`, and the reduction, durability, knockback, critical, delay and attack-speed listeners |
 | `io.github.trae.spigot.framework.death` | `DeathListener`, `DeathMessageListener` |
+| `io.github.trae.spigot.framework.chat` | `ChatManager`, `PreChatListener`, `CustomChatListener` |
 | `io.github.trae.spigot.framework.blocking` | `SwordBlockListener` |
 
 Your own `@Application` class's package is always scanned, so the sidebars, items, windows, and teams you define alongside it are discovered without any extra declaration. `@Scan` is only for pulling in packages you do not own.
@@ -1080,7 +1082,7 @@ public class SettingsWindow extends Window {
 this.windowManager.getWindowByPlayer(player).ifPresent(window -> window.refresh());
 
 // Which window owns this inventory
-this.windowManager.getWindowByInventory(inventory);
+this.windowManager.getWindowByInventory(inventory).ifPresent(window -> window.refresh());
 ```
 
 Click dispatch never consults these maps. A window is its own `InventoryHolder`, so a click resolves straight off the event and a momentarily stale map can never misroute one.
@@ -1718,12 +1720,26 @@ Because the pipeline owns everything, every piece of vanilla behaviour it replac
 | `DamageWeaponDurabilityListener` | One durability point per hit on the attacker's item |
 | `DamageArmourDurabilityListener` | A quarter of the damage, floored at one, on each worn piece |
 | `DamageKnockbackListener` | Knockback away from the attacker, with resistance applied |
-| `DamageDelayListener` | The immunity window, per attacker and per environmental cause |
-| `DamageAttackSpeedListener` | Removal of the 1.9 attack cooldown |
+| `DamageDelayListener` | The immunity window, shared or per source depending on the combat mode |
+| `DamageAttackSpeedListener` | The attack cooldown, restored or removed depending on the combat mode |
 
 The figures match vanilla: armour points and toughness by material, the twenty-point cap and the division by twenty-five, twenty percent per resistance level, and the displayed attack damage for every weapon including copper. Each cause carries its own rules about which reductions apply, mirroring vanilla's damage type tags, so armour does nothing against drowning or poison and resistance does nothing against the void.
 
-Combat is pre-1.9 by default. Attack speed is raised high enough that every swing lands at full strength, the immunity window is ten ticks rather than twenty, and it is tracked per attacker rather than shared, so two players can hit the same target at once.
+### Combat Mode
+
+`Damage.json` decides which combat rules apply. It is a system configuration, so it lives in the data folder of the first plugin that scans the damage package, and a reload takes effect immediately.
+
+| Setting | Default | Controls |
+|---|---|---|
+| `oldCombatEnabled` | `false` | Whether combat follows pre-1.9 rules rather than vanilla's |
+| `delay.defaultValue` | `500` | The immunity window, in milliseconds, for any cause without its own value |
+| `delay.damageCauseValues` | Per cause | The immunity window per damage cause, by cause name |
+
+With old combat disabled, combat matches vanilla 1.21: the attack cooldown applies, and each target has one immunity window shared by every source, so a hit from anything briefly protects against everything.
+
+With old combat enabled, attack speed is raised high enough that every swing lands at full strength, and the immunity window is tracked per attacker and per environmental cause instead, so two players can hit the same target at once and burning does not protect against drowning.
+
+The window's length comes from the cause in both modes. A value only matters when it is longer than the gap between the cause's own hits, so lowering poison's window does not make poison tick faster. Under the shared window a long value blocks every source for its full length, which is worth keeping in mind for a slow cause such as starvation.
 
 ### Rebalancing
 
@@ -1863,6 +1879,171 @@ Messages are only produced for player deaths. Mob deaths still fire the death ev
 
 ---
 
+## Chat System
+
+The chat system takes vanilla chat over and routes every message through a channel, such as global, staff, faction or ally chat.
+
+The framework keeps no record of who is in which channel. That state belongs to the plugin, such as a channel stored on the player's account, and the framework asks for it on every message. That keeps one source of truth, and lets any number of plugins take part in deciding where a message goes.
+
+Requires `@Scan("io.github.trae.spigot.framework.chat")`, and a `DefaultChatChannel` declared by the plugin that owns chat.
+
+### The Flow
+
+Vanilla's chat event is cancelled at its last priority, so every other plugin sees it first and vanilla never sends the message. Three events carry it from there, in order:
+
+| Event | For |
+|---|---|
+| `ChatChannelEvent` | Resolving which channel the message is sent in |
+| `ChatSendEvent` | Refusing or changing the message for everyone |
+| `ChatReceiveEvent` | Refusing or changing one recipient's copy |
+
+Each copy that survives its receive event is delivered to its recipient.
+
+`ChatSwitchChannelEvent` sits outside that flow. It is how a player moves between channels, and is dispatched by the plugin rather than the framework.
+
+A message another plugin already cancelled on the vanilla event is left alone.
+
+### Defining a Channel
+
+A channel decides who receives a message and how it reads, both per sender, so one implementation serves every player in it:
+
+```java
+@Singleton
+public class StaffChatChannel implements ChatChannel {
+
+    @Override
+    public String getName() {
+        return "Staff";
+    }
+
+    @Override
+    public List<Player> getRecipients(final Player sender) {
+        return UtilServer.getOnlinePlayers().stream().filter(player -> player.hasPermission("core.staffchat")).toList();
+    }
+
+    @Override
+    public Component getFormat(final Player sender, final String message) {
+        return Component.text("[Staff] ", NamedTextColor.RED).append(Component.text(sender.getName(), NamedTextColor.YELLOW)).append(Component.text(": " + message, NamedTextColor.WHITE));
+    }
+}
+```
+
+The sender is not added to the recipients automatically, so include them if they should see their own message. A faction channel resolves the sender's own faction inside `getRecipients` rather than existing once per faction.
+
+### The Default Channel
+
+Exactly one channel implements `DefaultChatChannel`. It is what every message starts in, and what a player chats in when their state names no other channel:
+
+```java
+@Singleton
+public class GlobalChatChannel implements DefaultChatChannel {
+
+    @Override
+    public String getName() {
+        return "Global";
+    }
+
+    @Override
+    public List<Player> getRecipients(final Player sender) {
+        return UtilServer.getOnlinePlayers();
+    }
+
+    @Override
+    public Component getFormat(final Player sender, final String message) {
+        return Component.text(sender.getName(), NamedTextColor.YELLOW).append(Component.text(": " + message, NamedTextColor.WHITE));
+    }
+}
+```
+
+`ChatManager` takes it through its constructor, so a plugin that enables the chat package without declaring one fails at startup rather than silently dropping every message.
+
+### Resolving the Channel
+
+`ChatChannelEvent` is fired for every message, seeded with the default channel. A listener reads the plugin's own state and sets the channel to match:
+
+```java
+@EventHandler(priority = EventPriority.LOW)
+public void onChatChannel(final ChatChannelEvent event) {
+    this.accountManager.getAccount(event.getSender()).map(Account::getChatChannel).ifPresent(event::setChannel);
+}
+```
+
+Several listeners may set the channel, and the last to run wins, so priority decides between them. A state that should override a player's own choice sets it later:
+
+```java
+@EventHandler(priority = EventPriority.HIGH)
+public void onChatChannelWhileJailed(final ChatChannelEvent event) {
+    if (this.jailManager.isJailed(event.getSender())) {
+        event.setChannel(this.jailChatChannel);
+    }
+}
+```
+
+The event is not cancellable, since every message needs a channel. Refusing a message belongs on the send event.
+
+### Switching Channels
+
+A command that moves a player between channels dispatches `ChatSwitchChannelEvent`, so every switch passes through one event whichever command caused it:
+
+```java
+@Override
+public void execute(final Player player, final String[] args) {
+    UtilEvent.dispatch(new ChatSwitchChannelEvent(player, this.staffChatChannel));
+}
+```
+
+The framework does not act on it. The plugin records the new channel once the event survives, which is the state `ChatChannelEvent` reads back on the next message:
+
+```java
+@EventHandler
+public void onChatSwitchChannel(final ChatSwitchChannelEvent event) {
+    if (event.isCancelled()) {
+        return;
+    }
+
+    this.accountManager.getAccount(event.getPlayer()).ifPresent(account -> account.setChatChannel(event.getChannel()));
+    
+    UtilMessage.message(event.getPlayer(), "Chat", "You are now chatting in <green>%s</green>.".formatted(event.getChannel().getName()));
+}
+```
+
+Cancelling refuses the switch, such as a player without the rank for staff chat or with no faction to chat in.
+
+### Sending and Receiving
+
+`ChatSendEvent` is fired once per message, after the channel is settled. Cancel it to refuse the message for everyone, or change the message to change it for everyone:
+
+```java
+@EventHandler
+public void onChatSend(final ChatSendEvent event) {
+    if (this.punishmentManager.isMuted(event.getSender())) {
+        event.setCancelled(true);
+        UtilMessage.message(event.getSender(), "Chat", "You are muted.");
+    }
+}
+```
+
+A message that survives is split into one `ChatReceiveEvent` per recipient the channel names. Cancel one to hide the message from that recipient alone, or change its message to vary it for them:
+
+```java
+@EventHandler
+public void onChatReceive(final ChatReceiveEvent event) {
+    if (this.ignoreManager.isIgnoring(event.getRecipient(), event.getSender())) {
+        event.setCancelled(true);
+    }
+}
+```
+
+Each copy that survives its own event is delivered to its recipient as a server message.
+
+The channel is fixed once the send event fires. A listener that needs a different channel sets it on `ChatChannelEvent` instead.
+
+### Threading
+
+A message a player types is handled off the main thread, so the channel, send and receive events, and a channel's `getRecipients` and `getFormat`, all run there. Keep them to state that is safe to read from another thread, and schedule anything that touches the world back onto the main thread.
+
+---
+
 ## Sounds
 
 A `SoundProvider` is a sound together with the category, volume and pitch to play it at, built once and replayable anywhere. The damage pass and both death events carry one.
@@ -1977,6 +2158,8 @@ The damage system reaches deeper than this, driving vanilla's own damage interna
 | `Hologram` | Define a packet-based floating text display with per-player text and visibility |
 | `Reason` | Describe what a hit is attributed to in messages |
 | `CustomReason` | Describe an attribution that outlives the hit that set it |
+| `ChatChannel` | Define a chat channel with its own recipients and format |
+| `DefaultChatChannel` | Define the channel every message starts in, exactly once |
 
 ---
 
@@ -2111,6 +2294,19 @@ The three stages exist so the framework, consuming plugins and reductions each h
 | `CustomDeathMessageEvent` | A death message is about to be sent to one player |
 
 Neither death event is cancellable, since both are dispatched from inside the vanilla death once it is settled. Their drops, experience and death sound are still writable, and are written back to the vanilla death after dispatch. `CustomDeathMessageEvent` is cancellable, and is dispatched once per recipient, so a message can be suppressed or reworded for some players and not others.
+
+---
+
+## Chat Events
+
+| Event | Fired When |
+|---|---|
+| `ChatChannelEvent` | A message is about to be sent, to resolve which channel it goes in |
+| `ChatSendEvent` | A message is about to be sent in its channel, before anyone receives it |
+| `ChatReceiveEvent` | One recipient is about to receive a message |
+| `ChatSwitchChannelEvent` | A player is switching channels, dispatched by the plugin |
+
+All but `ChatChannelEvent` are cancellable. Cancelling a send refuses the message for everyone, cancelling a receive hides it from that recipient alone, and cancelling a switch keeps the player in their current channel. `ChatChannelEvent` is not, since every message needs a channel; the last listener to set one wins.
 
 ---
 
