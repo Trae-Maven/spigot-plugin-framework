@@ -1,6 +1,6 @@
 # Spigot-Plugin-Framework
 
-A Spigot/Paper plugin framework providing structured command systems, event utilities, a staged damage and death pipeline, packet-based sidebars, tablists, teams and holograms, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
+A Spigot/Paper plugin framework providing structured command systems, event utilities, a staged damage and death pipeline, channel-based chat, packet-based sidebars, tablists, teams and holograms, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
 
 Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-based hierarchy architecture, automatically handling registration and teardown of listeners, commands, and subcommands as components are initialized and shut down.
 
@@ -138,7 +138,7 @@ Add the dependency to your Maven project:
 
 ## Enabling Subsystems
 
-The sidebar, tablist, team, hologram, item, and window systems each ship their own manager and listener as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
+The damage, death, chat, sidebar, tablist, team, hologram, item, and window systems each ship their own managers and listeners as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
 
 Declare the packages you want with `@Scan` on your `@Application` class, or on any interface or superclass in its hierarchy. The `ScanResolver` walks the full type graph of the bootstrap class and collects every `@Scan` it finds, so each layer can declare what it owns.
 
@@ -1082,7 +1082,7 @@ public class SettingsWindow extends Window {
 this.windowManager.getWindowByPlayer(player).ifPresent(window -> window.refresh());
 
 // Which window owns this inventory
-this.windowManager.getWindowByInventory(inventory).ifPresent(window -> window.refresh());
+this.windowManager.getWindowByInventory(inventory);
 ```
 
 Click dispatch never consults these maps. A window is its own `InventoryHolder`, so a click resolves straight off the event and a momentarily stale map can never misroute one.
@@ -1897,7 +1897,7 @@ Vanilla's chat event is cancelled at its last priority, so every other plugin se
 | `ChatSendEvent` | Refusing or changing the message for everyone |
 | `ChatReceiveEvent` | Refusing or changing one recipient's copy |
 
-Each copy that survives its receive event is delivered to its recipient.
+Each copy that survives its receive event is formatted by its channel and delivered to its recipient.
 
 `ChatSwitchChannelEvent` sits outside that flow. It is how a player moves between channels, and is dispatched by the plugin rather than the framework.
 
@@ -1922,8 +1922,8 @@ public class StaffChatChannel implements ChatChannel {
     }
 
     @Override
-    public Component getFormat(final Player sender, final String message) {
-        return Component.text("[Staff] ", NamedTextColor.RED).append(Component.text(sender.getName(), NamedTextColor.YELLOW)).append(Component.text(": " + message, NamedTextColor.WHITE));
+    public Component getFormat(final Player sender, final Component message) {
+        return Component.text("[Staff] ", NamedTextColor.RED).append(Component.text(sender.getName(), NamedTextColor.YELLOW)).append(Component.text(": ", NamedTextColor.WHITE).append(message.colorIfAbsent(NamedTextColor.WHITE)));
     }
 }
 ```
@@ -1949,8 +1949,8 @@ public class GlobalChatChannel implements DefaultChatChannel {
     }
 
     @Override
-    public Component getFormat(final Player sender, final String message) {
-        return Component.text(sender.getName(), NamedTextColor.YELLOW).append(Component.text(": " + message, NamedTextColor.WHITE));
+    public Component getFormat(final Player sender, final Component message) {
+        return Component.text(sender.getName(), NamedTextColor.YELLOW).append(Component.text(": ", NamedTextColor.WHITE).append(message.colorIfAbsent(NamedTextColor.WHITE)));
     }
 }
 ```
@@ -1995,19 +1995,19 @@ public void execute(final Player player, final String[] args) {
 The framework does not act on it. The plugin records the new channel once the event survives, which is the state `ChatChannelEvent` reads back on the next message:
 
 ```java
-@EventHandler
+@EventHandler(priority = EventPriority.MONITOR)
 public void onChatSwitchChannel(final ChatSwitchChannelEvent event) {
     if (event.isCancelled()) {
         return;
     }
 
     this.accountManager.getAccount(event.getPlayer()).ifPresent(account -> account.setChatChannel(event.getChannel()));
-    
+
     UtilMessage.message(event.getPlayer(), "Chat", "You are now chatting in <green>%s</green>.".formatted(event.getChannel().getName()));
 }
 ```
 
-Cancelling refuses the switch, such as a player without the rank for staff chat or with no faction to chat in.
+Recording at `MONITOR` keeps the state in step with the outcome, since a listener that cancels the switch at any earlier priority has already had its say. Cancelling refuses the switch, such as a player without the rank for staff chat or with no faction to chat in.
 
 ### Sending and Receiving
 
@@ -2034,7 +2034,7 @@ public void onChatReceive(final ChatReceiveEvent event) {
 }
 ```
 
-Each copy that survives its own event is delivered to its recipient as a server message.
+Each copy that survives its own event is passed through the channel's `getFormat` and delivered to its recipient as a server message. The format is applied last, to the message that recipient's event settled on, so a listener changing one copy changes only the message inside the line, and the channel's wrapping stays the same for everyone.
 
 The channel is fixed once the send event fires. A listener that needs a different channel sets it on `ChatChannelEvent` instead.
 
@@ -2184,9 +2184,9 @@ The damage system reaches deeper than this, driving vanilla's own damage interna
 | Event Type | Description |
 |---|---|
 | `CustomEvent` | Base synchronous event with `Void` key type |
-| `CustomAsyncEvent` | Base asynchronous event with `Void` key type |
+| `CustomAsynchronousEvent` | Base asynchronous event with `Void` key type |
 | `CustomCancellableEvent` | Synchronous event with cancellation and reason |
-| `CustomCancellableAsyncEvent` | Asynchronous event with cancellation and reason |
+| `CustomAsynchronousCancellableEvent` | Asynchronous event with cancellation and reason |
 
 ---
 

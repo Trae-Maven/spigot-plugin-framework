@@ -1,6 +1,7 @@
 package io.github.trae.spigot.framework.chat.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.chat.channel.ChatChannel;
 import io.github.trae.spigot.framework.chat.events.ChatReceiveEvent;
 import io.github.trae.spigot.framework.chat.events.ChatSendEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
@@ -14,8 +15,9 @@ import org.bukkit.event.Listener;
  * Delivers a sent message to its recipients.
  *
  * <p>A message that survives {@link ChatSendEvent} is split into one {@link ChatReceiveEvent} per
- * recipient, and each copy that survives its own event is delivered. That split is what lets a
- * plugin hide or change a message for one player without affecting anyone else.</p>
+ * recipient, and each copy that survives its own event is formatted by its channel and delivered.
+ * That split is what lets a plugin hide or change a message for one player without affecting anyone
+ * else.</p>
  *
  * @see PreChatListener
  */
@@ -41,9 +43,10 @@ public class CustomChatListener implements Listener {
     }
 
     /**
-     * Delivers one recipient's copy of the message.
+     * Formats one recipient's copy of the message through its channel and delivers it.
      *
-     * <p>Runs at {@code MONITOR} so the copy is final before it is sent.</p>
+     * <p>Runs at {@code MONITOR} so the copy is final before it is formatted, which is what keeps the
+     * channel's wrapping out of reach of listeners that only meant to change the message.</p>
      *
      * @param event the receive event
      */
@@ -53,6 +56,8 @@ public class CustomChatListener implements Listener {
             return;
         }
 
-        UtilMessage.message(event.getRecipient(), event.getMessage());
+        final ChatChannel chatChannel = event.getChannel();
+
+        UtilMessage.message(event.getRecipient(), chatChannel.getFormat(event.getSender(), event.getMessage()));
     }
 }

@@ -44,12 +44,17 @@ public interface ChatChannel {
      * How a message the given player sends reads in this channel.
      *
      * <p>Wraps the message with whatever the channel puts around it, such as a channel tag, the
-     * sender's name and a separator, so every recipient sees the same line unless a listener on
-     * {@link io.github.trae.spigot.framework.chat.events.ChatReceiveEvent} changes their copy.</p>
+     * sender's name and a separator. Applied at delivery, once per recipient, to the message that
+     * recipient's {@link io.github.trae.spigot.framework.chat.events.ChatReceiveEvent} settled on,
+     * so a listener that changes one recipient's copy changes only the message inside the line, and
+     * the channel's wrapping stays the same for everyone.</p>
+     *
+     * <p>Called off the main thread for a message a player typed, so an implementation must only
+     * read state that is safe to read there.</p>
      *
      * @param sender  the player sending the message
-     * @param message the message as the player typed it
+     * @param message the message as it stands for the recipient being delivered to
      * @return the formatted line
      */
-    Component getFormat(final Player sender, final String message);
+    Component getFormat(final Player sender, final Component message);
 }
