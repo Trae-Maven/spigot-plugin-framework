@@ -145,6 +145,10 @@ public class ItemActivateListener implements Listener {
 
                 activatableCustomItem.onActivate(player, itemStack, activateType);
 
+                if (activatableCustomItem.clearMaterialCooldown(player, itemStack, activateType)) {
+                    player.setCooldown(itemStack, 0);
+                }
+
                 UtilEvent.dispatch(new ItemPostActivateEvent(activatableCustomItem, player, itemStack, activateType));
             });
         });
