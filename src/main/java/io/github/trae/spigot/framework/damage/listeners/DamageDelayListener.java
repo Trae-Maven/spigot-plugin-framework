@@ -5,7 +5,9 @@ import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.damage.DamageManager;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPreDamageEvent;
+import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import lombok.AllArgsConstructor;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -25,15 +27,16 @@ import java.util.concurrent.TimeUnit;
  * only thing standing between a target and being hit every tick.</p>
  *
  * <p>How long a window lasts comes from the cause in either mode. What the combat rules decide is
- * who the window applies to.</p>
+ * who the window applies to, and they only ever decide it for PvP.</p>
  *
- * <p>With old combat enabled, the window is tracked per attacker, so two players can hit the same
- * target simultaneously, and per environmental cause, so burning does not protect against drowning.
- * Both are deliberate departures from vanilla, and they are what make team fights work.</p>
+ * <p>Outside PvP, and for every hit with old combat enabled, the window is tracked per attacker, so
+ * two players can hit the same target simultaneously, and per environmental cause, so burning does
+ * not protect against drowning.</p>
  *
- * <p>With old combat disabled, the window matches vanilla: one per target, shared across every
- * source, so a hit from anything protects against everything for as long as that hit's cause
- * allows.</p>
+ * <p>For PvP with old combat disabled, the window matches vanilla: one per player, shared by every
+ * player hitting them, so a hit from one briefly protects against all of them. It is kept apart from
+ * the other windows, so a mob or the environment never blocks a player's hit, and a player's hit
+ * never blocks them.</p>
  */
 @AllArgsConstructor
 @Singleton
@@ -42,17 +45,17 @@ public class DamageDelayListener implements Listener {
     private final DamageManager damageManager;
 
     /**
-     * Expiry per damagee, shared across every source, under vanilla combat.
+     * Expiry per player, shared by every player hitting them, under vanilla combat.
      */
     private final Map<UUID, Long> delayMap = new HashMap<>();
 
     /**
-     * Expiry per damagee, per environmental cause, under old combat.
+     * Expiry per damagee, per environmental cause.
      */
     private final Map<UUID, Map<DamageCause, Long>> delayByCauseMap = new HashMap<>();
 
     /**
-     * Expiry per damagee, per attacker, under old combat.
+     * Expiry per damagee, per attacker.
      */
     private final Map<UUID, Map<UUID, Long>> delayByEntityMap = new HashMap<>();
 
@@ -61,8 +64,8 @@ public class DamageDelayListener implements Listener {
      *
      * <p>Nothing else clears these, since an entity that is never hit again leaves its entry behind,
      * and mobs die or unload without notice. A stale entry is harmless because the check reads the
-     * expiry directly, including entries left in the other mode's maps after the setting changes;
-     * this is purely to stop the maps growing.</p>
+     * expiry directly, including entries left in the shared map after the setting changes; this is
+     * purely to stop the maps growing.</p>
      */
     @Scheduler(period = 10, unit = TimeUnit.SECONDS)
     public final void onScheduler() {
@@ -134,7 +137,7 @@ public class DamageDelayListener implements Listener {
 
         final UUID damageeId = event.getDamagee().getUniqueId();
 
-        if (!this.damageManager.getDamageConfig().isOldCombatEnabled()) {
+        if (this.isShared(event)) {
             // Shared
             return this.isExpired(systemTime, this.delayMap.get(damageeId));
         }
@@ -149,8 +152,8 @@ public class DamageDelayListener implements Listener {
     }
 
     /**
-     * Stores when this damagee may next be hit, by any source under vanilla combat, or by the same
-     * source under old combat.
+     * Stores when this damagee may next be hit, by any player for vanilla PvP, or by the same source
+     * otherwise.
      *
      * @param event the completed post stage
      * @param delay the delay to enforce, in milliseconds
@@ -160,7 +163,7 @@ public class DamageDelayListener implements Listener {
 
         final UUID damageeId = event.getDamagee().getUniqueId();
 
-        if (!this.damageManager.getDamageConfig().isOldCombatEnabled()) {
+        if (this.isShared(event)) {
             // Shared
             this.delayMap.put(damageeId, expiry);
             return;
@@ -173,6 +176,25 @@ public class DamageDelayListener implements Listener {
             // Cause
             this.delayByCauseMap.computeIfAbsent(damageeId, __ -> new EnumMap<>(DamageCause.class)).put(event.getCause(), expiry);
         }
+    }
+
+    /**
+     * Whether this hit uses the shared vanilla window: a player hitting a player, with old combat
+     * disabled.
+     *
+     * @param event the damage pass
+     * @return whether the window is shared by every player hitting the damagee
+     */
+    private boolean isShared(final AbstractCustomDamageEvent event) {
+        if (!(event.getDamagee() instanceof Player)) {
+            return false;
+        }
+
+        if (!(event.getDamager() instanceof Player)) {
+            return false;
+        }
+
+        return !this.damageManager.getDamageConfig().isOldCombatEnabled();
     }
 
     /**

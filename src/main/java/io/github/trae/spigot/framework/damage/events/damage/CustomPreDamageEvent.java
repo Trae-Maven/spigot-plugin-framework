@@ -15,6 +15,7 @@ import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -128,6 +129,12 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
      * <p>The sound is seeded from the damagee rather than the weapon, so what a player hears is the
      * thing being hit rather than the thing hitting it.</p>
      *
+     * <p>A player's melee hit starts from a base of zero rather than vanilla's figure. Vanilla's
+     * figure already carries the held item's damage, sharpness, the attack charge and the critical
+     * multiplier, all of which the pipeline resolves itself, so seeding the base with it would count
+     * each of them twice. Every other attack keeps vanilla's figure as its base, since a mob's damage
+     * comes from its own attributes rather than from anything the pipeline resolves.</p>
+     *
      * @param entityDamageByEntityEvent the vanilla event being taken over
      * @return the pre stage event
      */
@@ -158,6 +165,10 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 .map(component -> component.colorIfAbsent(UtilColor.toTextColor(ChatColor.GREEN.getColor())))
                 .orElse(null);
 
+        final DamageCause damageCause = entityDamageByEntityEvent.getCause();
+
+        final double damage = damager instanceof Player && projectile == null && (damageCause == DamageCause.ENTITY_ATTACK || damageCause == DamageCause.ENTITY_SWEEP_ATTACK) ? 0.0D : entityDamageByEntityEvent.getDamage();
+
         return new CustomPreDamageEvent(
                 System.currentTimeMillis(),
                 new EnumMap<>(DamageModifier.class),
@@ -166,17 +177,17 @@ public class CustomPreDamageEvent extends AbstractCustomDamageEvent {
                 damager,
                 projectile,
                 entityDamageByEntityEvent.getDamageSource(),
-                entityDamageByEntityEvent.getCause(),
+                damageCause,
                 itemStack,
                 getArmorContents(entity),
                 entityDamageByEntityEvent.getDamage(),
                 entityDamageByEntityEvent.isCritical(),
                 getHurtSound(entity),
-                entityDamageByEntityEvent.getDamage(),
+                damage,
                 0L,
                 getName(entity),
                 getName(damager),
-                getCauseName(entityDamageByEntityEvent.getCause()),
+                getCauseName(damageCause),
                 Reason.of(reasonName)
         );
     }

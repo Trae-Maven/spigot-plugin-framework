@@ -24,8 +24,9 @@ public class DamageConfig {
      */
     @Comment({
             "Whether combat follows pre-1.9 rules.",
-            "When enabled, the attack cooldown is removed, and each attacker and environmental cause has its own immunity window on a target.",
-            "When disabled, combat matches vanilla: the attack cooldown applies, and each target has one immunity window shared by every source."
+            "When enabled, the attack cooldown is removed, and every target has its own immunity window per attacker and per environmental cause.",
+            "When disabled, the attack cooldown applies, and a player hit by a player gets one immunity window shared by every player, as vanilla does.",
+            "Hits that are not PvP use the per attacker and per cause windows in both modes."
     })
     private boolean oldCombatEnabled = false;
 

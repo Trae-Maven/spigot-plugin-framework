@@ -8,10 +8,12 @@ import lombok.Setter;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * Fired to establish what the attacker's held item is worth in damage.
+ * Fired to establish what a player's held item is worth in melee damage.
  *
- * <p>The amount is the item's damage contribution, not a reduction. Set it to rebalance a weapon
- * without touching the item itself, or cancel to have the item contribute nothing.</p>
+ * <p>The amount is the item's damage contribution for a fully charged swing, not a reduction. Set it
+ * to rebalance a weapon without touching the item itself, or cancel to have the item contribute
+ * nothing. With old combat disabled, a partially charged swing is scaled from whatever amount this
+ * event settles on.</p>
  *
  * <p>This lands under {@link io.github.trae.spigot.framework.damage.modifier.DamageModifier#WEAPON},
  * so an ability with a flat damage figure can discard it.</p>
@@ -29,7 +31,7 @@ public class WeaponReductionEvent extends CustomCancellableEvent {
     private final AbstractCustomDamageEvent damageEvent;
 
     /**
-     * The item being valued.
+     * The item being valued. An empty stack for a bare hand, never {@code null}.
      */
     private final ItemStack itemStack;
 
@@ -39,7 +41,7 @@ public class WeaponReductionEvent extends CustomCancellableEvent {
     private final double originalAmount;
 
     /**
-     * The item's damage contribution. Zero or below contributes nothing.
+     * The item's damage contribution for a fully charged swing. Zero or below contributes nothing.
      */
     private double amount;
 }
