@@ -2,8 +2,11 @@ package io.github.trae.spigot.framework.damage.listeners;
 
 import com.destroystokyo.paper.event.server.ServerTickEndEvent;
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.damage.DamageManager;
+import io.github.trae.spigot.framework.damage.configs.DamageConfig;
 import io.github.trae.utilities.UtilJava;
 import io.papermc.paper.event.entity.EntityEffectTickEvent;
+import lombok.RequiredArgsConstructor;
 import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.EntityTypeTags;
@@ -38,11 +41,11 @@ import java.util.Set;
  * configured delay for that cause decides which of those hits land. The delay is therefore the rate,
  * down to one tick.</p>
  *
- * <p>Every hit goes through vanilla's own damage call, with the damage source, cause and amount
- * vanilla uses, so it enters the damage pipeline like any other and keeps vanilla's own checks, such
- * as fire resistance and fire immunity. Poison and wither are applied through the effect itself,
- * which keeps poison's floor of one health, and fire {@link EntityEffectTickEvent} first, as vanilla
- * does.</p>
+ * <p>Every hit goes through vanilla's own damage call, with the damage source and cause vanilla uses
+ * and the amount set in {@link DamageConfig.Interval}, so it enters the damage pipeline like any
+ * other and keeps vanilla's own checks, such as fire resistance and fire immunity. Poison and wither
+ * are applied through the effect itself, which keeps their own damage and poison's floor of one
+ * health, and fire {@link EntityEffectTickEvent} first, as vanilla does.</p>
  *
  * <p>Vanilla's own interval hits still run alongside, and the delay refuses them like any other hit
  * inside the window, so nothing is dealt twice.</p>
@@ -51,19 +54,13 @@ import java.util.Set;
  * vanilla deals any timed cause to it, and dropped once it is gone or no timed cause applies any
  * more. Drowning, freezing and starvation therefore begin after their first vanilla hit.</p>
  */
+@RequiredArgsConstructor
 @Singleton
 public class DamageIntervalListener implements Listener {
 
     private static final Set<DamageCause> DAMAGE_CAUSE_SET = EnumSet.of(DamageCause.POISON, DamageCause.WITHER, DamageCause.FIRE_TICK, DamageCause.DROWNING, DamageCause.FREEZE, DamageCause.STARVATION);
 
-    private static final float FIRE_TICK_DAMAGE = 1.0F;
-    private static final float DROWNING_DAMAGE = 2.0F;
-    private static final float FREEZE_DAMAGE = 1.0F;
-    private static final float FREEZE_EXTRA_DAMAGE = 5.0F;
-    private static final float STARVATION_DAMAGE = 1.0F;
-
-    private static final double STARVATION_EASY_MINIMUM_HEALTH = 10.0D;
-    private static final double STARVATION_NORMAL_MINIMUM_HEALTH = 1.0D;
+    private final DamageManager damageManager;
 
     /**
      * Every entity currently known to be under a timed cause.
@@ -135,12 +132,14 @@ public class DamageIntervalListener implements Listener {
      *
      * <p>Runs at the end of each tick, on the main thread. Entities are visited through a copy, so a
      * hit that starts a timed cause on another entity cannot disturb the loop. An entity that is gone,
-     * or under no timed cause, is dropped.</p>
+     * or under no timed cause, is dropped. The settings are read once per pass.</p>
      *
      * @param event the tick end event
      */
     @EventHandler
     public final void onServerTickEnd(final ServerTickEndEvent event) {
+        final DamageConfig.Interval interval = this.damageManager.getDamageConfig().getInterval();
+
         for (final LivingEntity livingEntity : List.copyOf(this.livingEntitySet)) {
             if (!livingEntity.isValid()) {
                 this.livingEntitySet.remove(livingEntity);
@@ -153,7 +152,7 @@ public class DamageIntervalListener implements Listener {
             boolean active = false;
 
             for (final DamageCause damageCause : DAMAGE_CAUSE_SET) {
-                if (!this.isActive(livingEntity, handle, damageCause)) {
+                if (!this.isActive(livingEntity, handle, damageCause, interval)) {
                     continue;
                 }
 
@@ -163,7 +162,7 @@ public class DamageIntervalListener implements Listener {
                     break;
                 }
 
-                this.hurt(livingEntity, handle, serverLevel, damageCause);
+                this.hurt(livingEntity, handle, serverLevel, damageCause, interval);
             }
 
             if (!active) {
@@ -176,15 +175,16 @@ public class DamageIntervalListener implements Listener {
      * Whether the entity is still in the state that causes the given timed damage.
      *
      * <p>Starvation keeps vanilla's own limits, which live in the hunger timer rather than the damage
-     * call: it stops at ten health on peaceful and easy, at one on normal, and never stops on
-     * hard.</p>
+     * call: it stops at the configured easy floor on peaceful and easy, at the configured normal floor
+     * on normal, and never stops on hard.</p>
      *
      * @param livingEntity the Bukkit view of the entity
      * @param handle       the entity's handle
      * @param damageCause  the timed cause
+     * @param interval     the timed damage settings
      * @return whether the cause still applies
      */
-    private boolean isActive(final LivingEntity livingEntity, final net.minecraft.world.entity.LivingEntity handle, final DamageCause damageCause) {
+    private boolean isActive(final LivingEntity livingEntity, final net.minecraft.world.entity.LivingEntity handle, final DamageCause damageCause, final DamageConfig.Interval interval) {
         return switch (damageCause) {
             case POISON -> handle.hasEffect(MobEffects.POISON);
             case WITHER -> handle.hasEffect(MobEffects.WITHER);
@@ -192,8 +192,8 @@ public class DamageIntervalListener implements Listener {
             case DROWNING -> livingEntity.getRemainingAir() <= 0;
             case FREEZE -> livingEntity.isFrozen() && handle.canFreeze();
             case STARVATION -> livingEntity instanceof final Player player && player.getFoodLevel() <= 0 && switch (player.getWorld().getDifficulty()) {
-                case PEACEFUL, EASY -> player.getHealth() > STARVATION_EASY_MINIMUM_HEALTH;
-                case NORMAL -> player.getHealth() > STARVATION_NORMAL_MINIMUM_HEALTH;
+                case PEACEFUL, EASY -> player.getHealth() > interval.getStarvationEasyMinimumHealth();
+                case NORMAL -> player.getHealth() > interval.getStarvationNormalMinimumHealth();
                 case HARD -> true;
             };
             default -> false;
@@ -201,21 +201,22 @@ public class DamageIntervalListener implements Listener {
     }
 
     /**
-     * Deals one hit of the given timed cause, the way vanilla deals it.
+     * Deals one hit of the given timed cause, the way vanilla deals it, with the configured amount.
      *
      * @param livingEntity the Bukkit view of the entity
      * @param handle       the entity's handle
      * @param serverLevel  the level the entity is in
      * @param damageCause  the timed cause
+     * @param interval     the timed damage settings
      */
-    private void hurt(final LivingEntity livingEntity, final net.minecraft.world.entity.LivingEntity handle, final ServerLevel serverLevel, final DamageCause damageCause) {
+    private void hurt(final LivingEntity livingEntity, final net.minecraft.world.entity.LivingEntity handle, final ServerLevel serverLevel, final DamageCause damageCause, final DamageConfig.Interval interval) {
         switch (damageCause) {
             case POISON -> this.applyEffect(livingEntity, handle, serverLevel, PotionEffectType.POISON, MobEffects.POISON);
             case WITHER -> this.applyEffect(livingEntity, handle, serverLevel, PotionEffectType.WITHER, MobEffects.WITHER);
-            case FIRE_TICK -> handle.hurtServer(serverLevel, handle.damageSources().onFire().knownCause(DamageCause.FIRE_TICK), FIRE_TICK_DAMAGE);
-            case DROWNING -> handle.hurtServer(serverLevel, handle.damageSources().drown().knownCause(DamageCause.DROWNING), DROWNING_DAMAGE);
-            case FREEZE -> handle.hurtServer(serverLevel, handle.damageSources().freeze().knownCause(DamageCause.FREEZE), handle.getType().is(EntityTypeTags.FREEZE_HURTS_EXTRA_TYPES) ? FREEZE_EXTRA_DAMAGE : FREEZE_DAMAGE);
-            case STARVATION -> handle.hurtServer(serverLevel, handle.damageSources().starve().knownCause(DamageCause.STARVATION), STARVATION_DAMAGE);
+            case FIRE_TICK -> handle.hurtServer(serverLevel, handle.damageSources().onFire().knownCause(DamageCause.FIRE_TICK), interval.getFireTickDamage());
+            case DROWNING -> handle.hurtServer(serverLevel, handle.damageSources().drown().knownCause(DamageCause.DROWNING), interval.getDrowningDamage());
+            case FREEZE -> handle.hurtServer(serverLevel, handle.damageSources().freeze().knownCause(DamageCause.FREEZE), handle.getType().is(EntityTypeTags.FREEZE_HURTS_EXTRA_TYPES) ? interval.getFreezeExtraDamage() : interval.getFreezeDamage());
+            case STARVATION -> handle.hurtServer(serverLevel, handle.damageSources().starve().knownCause(DamageCause.STARVATION), interval.getStarvationDamage());
         }
     }
 

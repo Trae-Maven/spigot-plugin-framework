@@ -2,6 +2,7 @@ package io.github.trae.spigot.framework.damage.listeners.reduction;
 
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.damage.DamageManager;
+import io.github.trae.spigot.framework.damage.configs.DamageConfig;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPreDamageEvent;
 import io.github.trae.spigot.framework.damage.events.reduction.WeaponReductionEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
@@ -34,21 +35,18 @@ import java.util.UUID;
  * mob's damage comes from its own attributes and is already the base of its pass.</p>
  *
  * <p>With old combat disabled, the contribution is scaled by how charged the swing was, as vanilla
- * scales it: the item's damage by a fifth plus four fifths of the charge squared, and sharpness by
- * the charge alone. Vanilla resets the charge before the damage event fires, so it is captured when
- * the attack begins and consumed by the pass that attack produces.</p>
+ * scales it: the item's damage by the configured minimum plus the configured range times the charge
+ * squared, and sharpness by the charge alone. Vanilla resets the charge before the damage event
+ * fires, so it is captured when the attack begins and consumed by the pass that attack produces.</p>
+ *
+ * <p>The sharpness and charge figures are read from {@link DamageConfig.WeaponReduction} on each hit,
+ * so a reload takes effect on the next one.</p>
  *
  * @see WeaponReductionEvent
  */
 @RequiredArgsConstructor
 @Singleton
 public class DamageWeaponReductionListener implements Listener {
-
-    private static final double SHARPNESS_BASE = 0.5D;
-    private static final double SHARPNESS_PER_LEVEL = 0.5D;
-
-    private static final double CHARGE_MINIMUM = 0.2D;
-    private static final double CHARGE_RANGE = 0.8D;
 
     private final DamageManager damageManager;
 
@@ -100,10 +98,13 @@ public class DamageWeaponReductionListener implements Listener {
             return;
         }
 
+        final DamageConfig damageConfig = this.damageManager.getDamageConfig();
+        final DamageConfig.WeaponReduction weaponReduction = damageConfig.getWeaponReduction();
+
         final ItemStack itemStack = event.getItemStack().orElse(ItemStack.empty());
 
         final double weaponDamage = this.getWeaponDamage(itemStack.getType());
-        final double sharpness = this.getSharpness(itemStack);
+        final double sharpness = this.getSharpness(itemStack, weaponReduction);
         final double damage = weaponDamage + sharpness;
 
         final WeaponReductionEvent weaponReductionEvent = UtilEvent.supply(new WeaponReductionEvent(event, itemStack, damage, damage));
@@ -116,13 +117,13 @@ public class DamageWeaponReductionListener implements Listener {
             return;
         }
 
-        if (attackCharge == null || this.damageManager.getDamageConfig().isOldCombatEnabled()) {
+        if (attackCharge == null || damageConfig.isOldCombatEnabled()) {
             event.setModifier(DamageModifier.WEAPON, amount);
             return;
         }
 
         final double charge = Math.clamp(attackCharge, 0.0D, 1.0D);
-        final double scale = (weaponDamage * (CHARGE_MINIMUM + charge * charge * CHARGE_RANGE) + sharpness * charge) / damage;
+        final double scale = (weaponDamage * (weaponReduction.getChargeMinimum() + charge * charge * weaponReduction.getChargeRange()) + sharpness * charge) / damage;
 
         event.setModifier(DamageModifier.WEAPON, amount * scale);
     }
@@ -138,15 +139,17 @@ public class DamageWeaponReductionListener implements Listener {
     }
 
     /**
-     * The bonus from sharpness: half a point for the first level, half a point for each after.
+     * The bonus from sharpness: the configured base for the first level, plus the configured amount
+     * for each level after.
      *
-     * @param itemStack the held item
+     * @param itemStack       the held item
+     * @param weaponReduction the weapon settings
      * @return the bonus damage
      */
-    private double getSharpness(final ItemStack itemStack) {
+    private double getSharpness(final ItemStack itemStack, final DamageConfig.WeaponReduction weaponReduction) {
         final int level = itemStack.getEnchantmentLevel(Enchantment.SHARPNESS);
 
-        return level <= 0 ? 0.0D : SHARPNESS_BASE + (level - 1) * SHARPNESS_PER_LEVEL;
+        return level <= 0 ? 0.0D : weaponReduction.getSharpnessBase() + (level - 1) * weaponReduction.getSharpnessPerLevel();
     }
 
     /**

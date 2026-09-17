@@ -18,9 +18,9 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 /**
  * Sets the attack cooldown to match the configured combat rules.
  *
- * <p>With old combat enabled, attack speed is raised far above vanilla, so the swing meter refills
- * within a tick and every hit lands at full strength with no glancing blows. With it disabled, the
- * attribute is restored to its default, so the 1.9 cooldown applies again.</p>
+ * <p>With old combat enabled, attack speed is raised to the configured value, high enough that the
+ * swing meter refills within a tick and every hit lands at full strength with no glancing blows.
+ * With it disabled, the attribute is restored to its default, so the 1.9 cooldown applies again.</p>
  *
  * <p>The base value is saved with the player, which is why it is restored explicitly rather than
  * left alone. Attributes survive world changes but are reset on respawn, which is why both join and
@@ -29,8 +29,6 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 @AllArgsConstructor
 @Singleton
 public class DamageAttackSpeedListener implements Listener {
-
-    private static final double ATTACK_SPEED = 1024.0D;
 
     private final DamageManager damageManager;
 
@@ -80,6 +78,8 @@ public class DamageAttackSpeedListener implements Listener {
             return;
         }
 
-        attributeInstance.setBaseValue(this.damageManager.getDamageConfig().isOldCombatEnabled() ? ATTACK_SPEED : attributeInstance.getDefaultValue());
+        final DamageConfig damageConfig = this.damageManager.getDamageConfig();
+
+        attributeInstance.setBaseValue(damageConfig.isOldCombatEnabled() ? damageConfig.getOldCombatAttackSpeed() : attributeInstance.getDefaultValue());
     }
 }

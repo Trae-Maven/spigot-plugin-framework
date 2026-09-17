@@ -21,8 +21,10 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Packet-based hologram system built on text displays rather than armour stands, with per-player text, per-player visibility, and no entity in the world
 - Staged damage pipeline that replaces vanilla damage entirely, with a gate stage, an ability stage and a reduction stage, each cancellable
 - Damage modifiers filed under named keys so a weapon's damage, a critical multiplier and an armour reduction all compose instead of overwriting one another
-- Vanilla-accurate defaults for armour, toughness, protection, resistance, weapon damage, critical hits, knockback, durability and immunity windows, each replaceable per piece or per item through its own event
-- Vanilla 1.21 combat by default, with a config toggle for pre-1.9 combat, where the attack cooldown is removed and immunity is tracked per attacker rather than shared
+- Vanilla-accurate defaults for armour, toughness, protection, resistance, strength, weakness, weapon damage, critical hits, knockback, durability and immunity windows, each replaceable per piece or per item through its own event
+- Every combat figure tunable in one `Damage.json`, from critical multipliers and knockback to the armour formula, applied on the next hit after a reload
+- Vanilla 1.21 combat by default, with melee damage scaled by attack charge and a shared PvP immunity window, and a config toggle for pre-1.9 combat, where the attack cooldown is removed and immunity is tracked per attacker
+- Configurable immunity windows per damage cause, where poison, wither, burning, drowning, freezing and starvation hit at exactly their configured rate rather than vanilla's hardcoded one
 - Death system that knows who killed whom and with what, including attributions that outlive the hit that set them, and works with or without the damage pipeline
 - Death drops, experience and death sound rewritable per death, with resource pack sounds played in place of vanilla's
 - Hit sounds carried on the damage pass, seeded from the entity being struck and replaceable by an ability
@@ -195,7 +197,7 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
 | `io.github.trae.spigot.framework.team` | `TeamManager`, `TeamListener` |
 | `io.github.trae.spigot.framework.hologram` | `HologramManager`, `HologramListener` |
-| `io.github.trae.spigot.framework.damage` | `DamageManager`, `DamageListener`, `CustomDamageListener`, and the reduction, durability, knockback, critical, delay and attack-speed listeners |
+| `io.github.trae.spigot.framework.damage` | `DamageManager`, `DamageListener`, `CustomDamageListener`, and the reduction, durability, knockback, critical, potion effect, delay, interval and attack-speed listeners |
 | `io.github.trae.spigot.framework.death` | `DeathListener`, `DeathMessageListener` |
 | `io.github.trae.spigot.framework.chat` | `ChatManager`, `PreChatListener`, `CustomChatListener` |
 | `io.github.trae.spigot.framework.blocking` | `SwordBlockListener` |
@@ -1613,6 +1615,8 @@ Every hit passes through three stages, each its own event, each cancellable. Can
 
 The pre stage is where the damage delay is enforced, where the weapon's contribution is resolved from the held item, and where a critical hit is recognised. By the time it ends, the base reflects what the attack is worth before anything custom touches it.
 
+A player's melee hit starts from a base of zero, since vanilla's own figure already carries the held item, sharpness, the attack charge and the critical multiplier, all of which the pipeline resolves itself. Every other hit, a mob's attack included, starts from vanilla's figure, since that damage comes from attributes the pipeline does not resolve.
+
 The damage stage is reserved. Nothing in the framework writes damage there, so an ability has the field to itself:
 
 ```java
@@ -1656,7 +1660,7 @@ The damage figure is a base plus a set of named contributions, rather than a sin
 |---|---|
 | `WEAPON` | The attacking item's own damage |
 | `CRITICAL` | The critical hit multiplier |
-| `POTION` | Contributions from effects on the attacker |
+| `POTION` | Strength and weakness on the attacker |
 | `ARMOUR` | The reduction from worn armour |
 | `PROTECTION` | The reduction from protection enchantments |
 | `RESISTANCE` | The reduction from the resistance effect |
@@ -1714,32 +1718,81 @@ Because the pipeline owns everything, every piece of vanilla behaviour it replac
 
 | Listener | Provides |
 |---|---|
-| `DamageWeaponReductionListener` | The weapon's damage, by material, plus sharpness |
+| `DamageWeaponReductionListener` | A player's melee damage from the held item, by material, plus sharpness, scaled by attack charge in vanilla combat |
 | `DamageCriticalListener` | The critical hit multiplier |
-| `DamageArmourReductionListener` | Armour, toughness, protection and resistance reduction |
+| `DamageArmourReductionListener` | Armour, toughness and protection reduction |
+| `DamagePotionEffectListener` | Strength and weakness on a player's melee hit, and resistance on the damagee |
 | `DamageWeaponDurabilityListener` | One durability point per hit on the attacker's item |
 | `DamageArmourDurabilityListener` | A quarter of the damage, floored at one, on each worn piece |
 | `DamageKnockbackListener` | Knockback away from the attacker, with resistance applied |
-| `DamageDelayListener` | The immunity window, shared or per source depending on the combat mode |
+| `DamageDelayListener` | The immunity window for every cause, shared for PvP in vanilla combat and per source otherwise |
+| `DamageIntervalListener` | A hit offered every tick for causes vanilla times itself, so their window sets their rate |
 | `DamageAttackSpeedListener` | The attack cooldown, restored or removed depending on the combat mode |
 
-The figures match vanilla: armour points and toughness by material, the twenty-point cap and the division by twenty-five, twenty percent per resistance level, and the displayed attack damage for every weapon including copper. Each cause carries its own rules about which reductions apply, mirroring vanilla's damage type tags, so armour does nothing against drowning or poison and resistance does nothing against the void.
+The figures match vanilla: armour points and toughness by material, the twenty-point cap and the division by twenty-five, a point for the first level of sharpness and half a point for each after, three damage per level of strength and four less per level of weakness, twenty percent per resistance level, and the displayed attack damage for every weapon including copper. Whether armour, protection and resistance apply is decided by the damage type's tags, as vanilla decides it, so armour does nothing against drowning or poison, protection does nothing against starvation, and resistance does nothing against `/kill`.
+
+Every formula figure is read from `Damage.json` on each hit, while the per-material tables stay in code, since per-item balance already has its own events. See [Rebalancing](#rebalancing).
+
+### Configuration
+
+`Damage.json` holds every combat setting. It is a system configuration, so it lives in the data folder of the first plugin that scans the damage package. The defaults match vanilla.
+
+| Setting | Controls |
+|---|---|
+| `oldCombatEnabled` | Whether combat follows pre-1.9 rules rather than vanilla's, `false` by default |
+| `oldCombatAttackSpeed` | The attack speed players are given while old combat is enabled |
+| `delay` | The immunity window per damage cause, and the default for any cause without one |
+| `interval` | What each extra hit of burning, drowning, freezing and starvation deals, and the health starvation stops at |
+| `critical` | Whether critical hits deal extra damage, and the multiplier |
+| `knockback` | The strength of the push and the most upward velocity a grounded target is given |
+| `weaponReduction` | The sharpness bonus, and the attack charge curve for the weapon's damage |
+| `armourReduction` | The armour cap and divisor, the toughness formula, and the protection cap and divisor |
+| `potionEffect` | Strength and weakness per level, resistance per level, and the attack charge curve for strength and weakness |
+
+A reload takes effect on the next hit, since every listener reads the same instance and a reload updates it in place. Attack speed is the exception, being written onto each player rather than read per hit, so it is pushed to everyone online when the file is reloaded.
+
+A section added in a later version is written into an existing file on its next load. A value already in the file is kept, including the `delay` map, so a cause added to its defaults later only appears in a fresh file.
 
 ### Combat Mode
 
-`Damage.json` decides which combat rules apply. It is a system configuration, so it lives in the data folder of the first plugin that scans the damage package, and a reload takes effect immediately.
+`oldCombatEnabled` decides which combat rules apply.
 
-| Setting | Default | Controls |
+With old combat disabled, combat matches vanilla 1.21. The attack cooldown applies, and a player's melee damage is scaled by how charged the swing was: the item's damage and any strength or weakness by a fifth plus four fifths of the charge squared, and sharpness by the charge alone. Both curves are configurable, under `weaponReduction` and `potionEffect`. A player hit by a player gets one immunity window shared by every player, so a hit from one briefly protects against all of them.
+
+With old combat enabled, attack speed is raised to `oldCombatAttackSpeed`, high enough that every swing lands at full strength, and PvP uses the same per attacker windows as everything else, so two players can hit the same target at once.
+
+Every hit that is not PvP is windowed per attacker and per environmental cause in both modes. A mob or the environment never blocks a player's hit, a player's hit never blocks them, and burning does not protect against drowning.
+
+### Immunity Windows
+
+The window's length comes from the hit's cause in both modes, falling back to `defaultValue` for a cause with no value of its own. The window is the only thing spacing hits out, since cancelling vanilla's damage also discards its invulnerability frames.
+
+Vanilla fires some causes on intervals of its own, hardcoded into the game, and a window could only ever slow those down. `DamageIntervalListener` offers each of them a hit on every tick for as long as the entity is still in the state that causes it, so for those causes the window is the actual rate:
+
+| Cause | Default | Vanilla's own interval |
 |---|---|---|
-| `oldCombatEnabled` | `false` | Whether combat follows pre-1.9 rules rather than vanilla's |
-| `delay.defaultValue` | `500` | The immunity window, in milliseconds, for any cause without its own value |
-| `delay.damageCauseValues` | Per cause | The immunity window per damage cause, by cause name |
+| `POISON` | `1250` | 25 ticks, halved per level |
+| `WITHER` | `2000` | 40 ticks, halved per level |
+| `FIRE_TICK` | `1000` | 20 ticks |
+| `DROWNING` | `1000` | 20 ticks |
+| `FREEZE` | `2000` | 40 ticks |
+| `STARVATION` | `4000` | 80 ticks |
 
-With old combat disabled, combat matches vanilla 1.21: the attack cooldown applies, and each target has one immunity window shared by every source, so a hit from anything briefly protects against everything.
+The defaults match vanilla at the first effect level. Setting `POISON` to `100` makes poison hit every two ticks, whatever its level, since the window alone now sets the pace. Nothing can hit more than once a tick, so any value under `50` behaves as `50`.
 
-With old combat enabled, attack speed is raised high enough that every swing lands at full strength, and the immunity window is tracked per attacker and per environmental cause instead, so two players can hit the same target at once and burning does not protect against drowning.
+Each extra hit goes through vanilla's own damage call, with vanilla's source and cause, so it keeps vanilla's own checks: fire resistance and fire immunity, poison stopping at one health, and starvation stopping at a floor on peaceful, easy and normal. Burning, drowning, freezing and starvation deal the amounts set under `interval`, as do their starvation floors. Poison and wither deal what their effect deals, since their hits run inside the effect's own code. Poison and wither fire `EntityEffectTickEvent` first, as vanilla does. Vanilla's own interval hits still run alongside, and the window refuses them like any other, so nothing is dealt twice.
 
-The window's length comes from the cause in both modes. A value only matters when it is longer than the gap between the cause's own hits, so lowering poison's window does not make poison tick faster. Under the shared window a long value blocks every source for its full length, which is worth keeping in mind for a slow cause such as starvation.
+Poison, wither and burning are picked up the moment they start. Drowning, freezing and starvation are picked up from their first vanilla hit, so they begin one vanilla interval in.
+
+Every other cause already fires as often as vanilla allows. Contact damage, such as lava, fire, cactus and magma, fires every tick once invulnerability frames are gone, so its window is already its rate.
+
+### Potion Effects
+
+A player's melee hit starts from a base of zero, so the effects vanilla folds into the attack damage attribute are added back by `DamagePotionEffectListener`, under `POTION`. Strength adds and weakness removes a set amount per level, scaled by the attack charge in vanilla combat. Weakness never takes the hit below what the weapon itself deals, as vanilla floors the attribute at zero. A mob's attack already carries both in vanilla's figure, so only players are resolved.
+
+Resistance reduces damage by a share per level, under `RESISTANCE`, floored at total immunity.
+
+Everything else is left to what already handles it: poison and wither to `DamageIntervalListener`, absorption to `DamageManager`, fire resistance to vanilla's own invulnerability check, and jump boost and slow falling to vanilla's fall damage, which they reduce before the event fires.
 
 ### Rebalancing
 

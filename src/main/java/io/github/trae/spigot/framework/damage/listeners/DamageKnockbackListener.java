@@ -1,9 +1,12 @@
 package io.github.trae.spigot.framework.damage.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.damage.DamageManager;
+import io.github.trae.spigot.framework.damage.configs.DamageConfig;
 import io.github.trae.spigot.framework.damage.events.CustomKnockbackEvent;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.utility.UtilEvent;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
@@ -21,17 +24,20 @@ import org.bukkit.util.Vector;
  * capped only while grounded so an airborne target is not launched further.</p>
  *
  * <p>Split across two handlers so the calculation and the application are separately overridable: a
- * listener adjusts the vector on the knockback event without having to recompute it.</p>
+ * listener adjusts the vector on the knockback event without having to recompute it. The strength
+ * and vertical cap are read from {@link DamageConfig.Knockback} on each hit, so a reload takes effect
+ * on the next one.</p>
  *
  * @see CustomKnockbackEvent
  */
+@RequiredArgsConstructor
 @Singleton
 public class DamageKnockbackListener implements Listener {
 
-    private static final double DEFAULT_KNOCKBACK = 0.4D;
-    private static final double DEFAULT_VERTICAL_LIMIT = 0.4D;
     private static final double DEFAULT_RESISTANCE = 0.0D;
     private static final double MINIMUM_DISTANCE_SQUARED = 1.0E-5D;
+
+    private final DamageManager damageManager;
 
     /**
      * Calculates the knockback and dispatches it for review.
@@ -56,7 +62,9 @@ public class DamageKnockbackListener implements Listener {
             return;
         }
 
-        final double knockback = DEFAULT_KNOCKBACK * (1.0D - this.getResistance(damagee));
+        final DamageConfig.Knockback knockbackConfig = this.damageManager.getDamageConfig().getKnockback();
+
+        final double knockback = knockbackConfig.getStrength() * (1.0D - this.getResistance(damagee));
         if (knockback <= 0.0D) {
             return;
         }
@@ -67,7 +75,7 @@ public class DamageKnockbackListener implements Listener {
 
         final Vector velocity = new Vector(
                 currentVelocity.getX() / 2.0D + direction.getX() * knockback,
-                damagee.isOnGround() ? Math.min(DEFAULT_VERTICAL_LIMIT, currentVelocity.getY() / 2.0D + knockback) : currentVelocity.getY(),
+                damagee.isOnGround() ? Math.min(knockbackConfig.getVerticalLimit(), currentVelocity.getY() / 2.0D + knockback) : currentVelocity.getY(),
                 currentVelocity.getZ() / 2.0D + direction.getZ() * knockback
         );
 

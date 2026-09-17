@@ -1,28 +1,34 @@
 package io.github.trae.spigot.framework.damage.listeners;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.damage.DamageManager;
+import io.github.trae.spigot.framework.damage.configs.DamageConfig;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPreDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 
 /**
  * Applies the critical hit multiplier.
  *
- * <p>Whether an attack qualifies is decided once at the pre stage and carried on the event, so this
- * only reads that flag rather than re-testing the attacker's state.</p>
+ * <p>Whether an attack qualifies is decided once at the pre stage, taken from vanilla's own decision,
+ * and carried on the event, so this only reads that flag rather than re-testing the attacker's
+ * state.</p>
  *
  * <p>Sweep attacks are excluded: a sweep only happens on a grounded swing, which is the opposite of
  * what a critical requires.</p>
  *
- * @see io.github.trae.spigot.framework.utility.UtilDamage
+ * <p>Whether criticals count, and what they multiply by, are read from {@link DamageConfig.Critical}
+ * on each hit, so a reload takes effect on the next one.</p>
  */
+@RequiredArgsConstructor
 @Singleton
 public class DamageCriticalListener implements Listener {
 
-    private static final double CRITICAL_MULTIPLIER = 1.5D;
+    private final DamageManager damageManager;
 
     /**
      * Files the critical multiplier under {@link DamageModifier#CRITICAL}.
@@ -38,14 +44,15 @@ public class DamageCriticalListener implements Listener {
             return;
         }
 
-        if (event.getCause() != EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
+        if (event.getCause() != DamageCause.ENTITY_ATTACK || !event.isCritical()) {
             return;
         }
 
-        if (!event.isCritical()) {
+        final DamageConfig.Critical critical = this.damageManager.getDamageConfig().getCritical();
+        if (!critical.isEnabled()) {
             return;
         }
 
-        event.setMultiplier(DamageModifier.CRITICAL, CRITICAL_MULTIPLIER);
+        event.setMultiplier(DamageModifier.CRITICAL, critical.getMultiplier());
     }
 }

@@ -1,54 +1,53 @@
 package io.github.trae.spigot.framework.damage.listeners.reduction;
 
 import io.github.trae.di.annotations.type.component.Singleton;
+import io.github.trae.spigot.framework.damage.DamageManager;
+import io.github.trae.spigot.framework.damage.configs.DamageConfig;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.damage.events.reduction.ArmourReductionEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.enums.ArmourType;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Material;
+import org.bukkit.Tag;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
+import org.bukkit.tag.DamageTypeTags;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Reduces incoming damage by armour, protection enchantments and resistance.
+ * Reduces incoming damage by armour and protection enchantments.
  *
  * <p>Runs early in the post stage, so it acts on whatever an ability decided at the damage stage
- * rather than on the weapon's raw contribution. Each of the three has its own set of causes it does
- * not apply to, mirroring vanilla's damage type tags.</p>
+ * rather than on the weapon's raw contribution. Whether each applies is decided by the damage type's
+ * tags, as vanilla decides it, rather than by the cause. Resistance is applied alongside by the
+ * potion effect listener.</p>
  *
  * <p>Armour values come from a per-piece event rather than the entity's armour attribute, which is
- * what lets a game mode rebalance armour by class without replacing this listener.</p>
+ * what lets a game mode rebalance armour by class without replacing this listener. The formula's
+ * figures are read from {@link DamageConfig.ArmourReduction} on each hit, so a reload takes effect on
+ * the next one.</p>
  *
  * @see ArmourReductionEvent
+ * @see io.github.trae.spigot.framework.damage.listeners.DamagePotionEffectListener
  */
+@RequiredArgsConstructor
 @Singleton
 public class DamageArmourReductionListener implements Listener {
 
-    private static final double ARMOUR_CAP = 20.0D;
-    private static final double ARMOUR_DIVISOR = 25.0D;
-    private static final double ARMOUR_MINIMUM_DIVISOR = 5.0D;
-    private static final double TOUGHNESS_BASE = 2.0D;
-    private static final double TOUGHNESS_DIVISOR = 4.0D;
-
-    private static final double PROTECTION_CAP = 20.0D;
-    private static final double PROTECTION_DIVISOR = 25.0D;
-
-    private static final double RESISTANCE_PER_LEVEL = 0.2D;
-    private static final int RESISTANCE_CAP = 5;
+    private final DamageManager damageManager;
 
     /**
-     * Applies all three reductions, in vanilla's order.
+     * Applies both reductions, in vanilla's order.
      *
      * @param event the post stage
      */
@@ -58,13 +57,14 @@ public class DamageArmourReductionListener implements Listener {
             return;
         }
 
-        if (!(event.getDamagee() instanceof final LivingEntity damagee)) {
+        if (!(event.getDamagee() instanceof LivingEntity)) {
             return;
         }
 
-        this.applyArmour(event);
-        this.applyProtection(event);
-        this.applyResistance(event, damagee);
+        final DamageConfig.ArmourReduction armourReduction = this.damageManager.getDamageConfig().getArmourReduction();
+
+        this.applyArmour(event, armourReduction);
+        this.applyProtection(event, armourReduction);
     }
 
     /**
@@ -72,13 +72,15 @@ public class DamageArmourReductionListener implements Listener {
      *
      * <p>Each piece reports its own value and toughness through its event; the totals then go
      * through vanilla's curve, where heavier hits cut through more armour and toughness blunts that
-     * effect. The floor at a fifth of the total is what stops a large hit negating armour
-     * entirely.</p>
+     * effect. The floor at a share of the total is what stops a large hit negating armour entirely,
+     * and the cap is applied last, so a total too large for the floor to fit under still resolves to
+     * the cap rather than failing.</p>
      *
-     * @param event the post stage
+     * @param event           the post stage
+     * @param armourReduction the armour settings
      */
-    private void applyArmour(final CustomPostDamageEvent event) {
-        if (this.bypassesArmour(event.getCause())) {
+    private void applyArmour(final CustomPostDamageEvent event, final DamageConfig.ArmourReduction armourReduction) {
+        if (this.isTagged(event.getSource(), DamageTypeTags.BYPASSES_ARMOR)) {
             return;
         }
 
@@ -113,9 +115,10 @@ public class DamageArmourReductionListener implements Listener {
         }
 
         final double damage = event.getFinalDamage();
-        final double resolved = Math.clamp(armour - damage / (TOUGHNESS_BASE + Math.max(0.0D, toughness) / TOUGHNESS_DIVISOR), armour / ARMOUR_MINIMUM_DIVISOR, ARMOUR_CAP);
+        final double worn = armour - damage / (armourReduction.getToughnessBase() + Math.max(0.0D, toughness) / armourReduction.getToughnessDivisor());
+        final double resolved = Math.min(Math.max(worn, armour / armourReduction.getArmourMinimumDivisor()), armourReduction.getArmourCap());
 
-        event.addModifier(DamageModifier.ARMOUR, -(damage * (resolved / ARMOUR_DIVISOR)));
+        event.addModifier(DamageModifier.ARMOUR, -(damage * (resolved / armourReduction.getArmourDivisor())));
     }
 
     /**
@@ -125,10 +128,11 @@ public class DamageArmourReductionListener implements Listener {
      * protection, are not handled, so armour enchanted against a specific damage type behaves as if
      * it were not.</p>
      *
-     * @param event the post stage
+     * @param event           the post stage
+     * @param armourReduction the armour settings
      */
-    private void applyProtection(final CustomPostDamageEvent event) {
-        if (this.bypassesEnchantments(event.getCause())) {
+    private void applyProtection(final CustomPostDamageEvent event, final DamageConfig.ArmourReduction armourReduction) {
+        if (this.isTagged(event.getSource(), DamageTypeTags.BYPASSES_ENCHANTMENTS)) {
             return;
         }
 
@@ -142,30 +146,7 @@ public class DamageArmourReductionListener implements Listener {
             return;
         }
 
-        event.setMultiplier(DamageModifier.PROTECTION, 1.0D - Math.min(PROTECTION_CAP, points) / PROTECTION_DIVISOR);
-    }
-
-    /**
-     * Reduces by the damagee's resistance effect, twenty percent per level.
-     *
-     * <p>Capped at five levels, which is total immunity.</p>
-     *
-     * @param event   the post stage
-     * @param damagee the entity taking the damage
-     */
-    private void applyResistance(final CustomPostDamageEvent event, final LivingEntity damagee) {
-        if (this.bypassesResistance(event.getCause())) {
-            return;
-        }
-
-        final PotionEffect potionEffect = damagee.getPotionEffect(PotionEffectType.RESISTANCE);
-        if (potionEffect == null) {
-            return;
-        }
-
-        final int level = Math.min(RESISTANCE_CAP, potionEffect.getAmplifier() + 1);
-
-        event.setMultiplier(DamageModifier.RESISTANCE, Math.max(0.0D, 1.0D - level * RESISTANCE_PER_LEVEL));
+        event.setMultiplier(DamageModifier.PROTECTION, Math.max(0.0D, 1.0D - Math.min(armourReduction.getProtectionCap(), points) / armourReduction.getProtectionDivisor()));
     }
 
     /**
@@ -230,44 +211,16 @@ public class DamageArmourReductionListener implements Listener {
     }
 
     /**
-     * Whether armour protects against this cause.
+     * Whether the damage source's type carries the given tag.
      *
-     * <p>Mirrors vanilla's rule that armour is physical: it stops nothing already inside you, and
-     * nothing a helmet could not block.</p>
+     * <p>A pass with no source is treated as untagged, matching the generic source the damage
+     * manager falls back to when it applies one.</p>
      *
-     * @param damageCause the cause of the damage
-     * @return whether armour is skipped
+     * @param damageSource the damage source, or {@code null}
+     * @param tag          the damage type tag to test
+     * @return whether the source's type is tagged
      */
-    private boolean bypassesArmour(final DamageCause damageCause) {
-        return switch (damageCause) {
-            case DROWNING, STARVATION, SUFFOCATION, VOID, POISON, WITHER, MAGIC, FREEZE, DRYOUT, KILL, SUICIDE, CUSTOM -> true;
-            default -> false;
-        };
-    }
-
-    /**
-     * Whether protection enchantments apply to this cause.
-     *
-     * @param damageCause the cause of the damage
-     * @return whether enchantments are skipped
-     */
-    private boolean bypassesEnchantments(final DamageCause damageCause) {
-        return switch (damageCause) {
-            case VOID, KILL, SUICIDE, CUSTOM, STARVATION -> true;
-            default -> false;
-        };
-    }
-
-    /**
-     * Whether resistance applies to this cause.
-     *
-     * @param damageCause the cause of the damage
-     * @return whether resistance is skipped
-     */
-    private boolean bypassesResistance(final DamageCause damageCause) {
-        return switch (damageCause) {
-            case VOID, KILL, SUICIDE, CUSTOM, STARVATION -> true;
-            default -> false;
-        };
+    private boolean isTagged(final DamageSource damageSource, final Tag<DamageType> tag) {
+        return damageSource != null && tag.isTagged(damageSource.getDamageType());
     }
 }
