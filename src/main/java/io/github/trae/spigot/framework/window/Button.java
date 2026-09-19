@@ -5,6 +5,7 @@ import io.github.trae.utilities.UtilJava;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
@@ -124,7 +125,7 @@ public abstract class Button<Window extends io.github.trae.spigot.framework.wind
                         list.add(Component.empty());
                     }
 
-                    this.getLore().forEach(line -> list.add(UtilMessage.deserialize(line).decoration(TextDecoration.ITALIC, false)));
+                    this.getLore().forEach(line -> list.add(UtilMessage.deserialize(line).applyFallbackStyle(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)));
                 });
 
                 itemMeta.lore(lore);

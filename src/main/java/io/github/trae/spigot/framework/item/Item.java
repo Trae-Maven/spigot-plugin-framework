@@ -343,7 +343,7 @@ public abstract class Item {
 
         // Display Name
         if (this.getDisplayName() != null) {
-            itemMeta.displayName(UtilMessage.deserialize(this.getDisplayName()).colorIfAbsent(UtilColor.toTextColor(this.getColor())).decoration(TextDecoration.ITALIC, false));
+            itemMeta.displayName(UtilMessage.deserialize(this.getDisplayName()).applyFallbackStyle(UtilColor.toTextColor(this.getColor())).decoration(TextDecoration.ITALIC, false));
         }
 
         // Lore
@@ -353,13 +353,13 @@ public abstract class Item {
                     list.addAll(this.getLore());
                 }
 
-                if (this.getStyle() != null) {
+                if (this.getStyle() != null && this.getStyle().getTag() != null) {
                     list.add("");
                     list.add("<font:custom:tags>%s</font>".formatted(this.getStyle().getTag()));
                 }
             });
 
-            itemMeta.lore(lore.stream().map(line -> UtilMessage.deserialize(line).colorIfAbsent(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)).toList());
+            itemMeta.lore(lore.stream().map(line -> UtilMessage.deserialize(line).applyFallbackStyle(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)).toList());
         }
 
         // Model
