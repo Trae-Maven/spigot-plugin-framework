@@ -232,8 +232,8 @@ public abstract class Effect {
      * Returns the users whose entity is currently resolvable, keyed by the entity itself.
      * <p>
      * This is an immutable snapshot rebuilt per call, and it silently omits any user whose entity is
-     * offline or unloaded even though their entry still exists. {@link #getUsers()} remains the
-     * source of truth for membership, counts, and removal.
+     * offline or unloaded even though their entry still exists. The user map remains the source of
+     * truth for membership, counts, and removal.
      *
      * @return the resolvable users and their effect data
      */
