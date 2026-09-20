@@ -38,6 +38,9 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Vanilla-aware activation defaults, so a chest still opens, a hoe still tills, and a consumable is not spent when its item activates
 - Sound abstraction held by key rather than enum, so vanilla and resource pack sounds are played the same way
 - Inventory window system with slot-bound buttons, open and close gating, and full click and drag protection
+- Timed effect system for any living entity, with per-entity amplifier and duration, cancellable add, update and remove stages, and per-tick and expiry hooks
+- Effects optionally bound to a vanilla potion effect, kept in sync across every transition, so a custom effect carries its vanilla presentation without the plugin tracking two things
+- Duration changes that credit time already served, so refreshing an effect extends what is left instead of discarding it or granting the whole duration again
 - NMS utilities for direct packet sending and Adventure-to-vanilla component conversion
 - Custom event base classes with cancellation reasons
 - Opt-in subsystems through `@Scan`, so a plugin enables only the packages it wants
@@ -64,7 +67,7 @@ Commands and subcommands integrate directly into the hierarchy as Nodes, each wi
 | `BaseCommand` | Node under a Manager | Registered with `CommandMap` |
 | `BaseSubCommand` | Node under a command | Attached to parent command |
 
-The damage, death, chat, sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
+The damage, death, chat, effect, sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
 
 ---
 
@@ -140,7 +143,7 @@ Add the dependency to your Maven project:
 
 ## Enabling Subsystems
 
-The damage, death, chat, sidebar, tablist, team, hologram, item, and window systems each ship their own managers and listeners as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
+The damage, death, chat, effect, sidebar, tablist, team, hologram, item, and window systems each ship their own managers and listeners as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
 
 Declare the packages you want with `@Scan` on your `@Application` class, or on any interface or superclass in its hierarchy. The `ScanResolver` walks the full type graph of the bootstrap class and collects every `@Scan` it finds, so each layer can declare what it owns.
 
@@ -200,6 +203,7 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.damage` | `DamageManager`, `DamageListener`, `CustomDamageListener`, and the reduction, durability, knockback, critical, potion effect, delay, interval and attack-speed listeners |
 | `io.github.trae.spigot.framework.death` | `DeathListener`, `DeathMessageListener` |
 | `io.github.trae.spigot.framework.chat` | `ChatManager`, `PreChatListener`, `CustomChatListener` |
+| `io.github.trae.spigot.framework.effect` | `EffectManager`, `EffectListener` |
 | `io.github.trae.spigot.framework.blocking` | `SwordBlockListener` |
 
 Your own `@Application` class's package is always scanned, so the sidebars, items, windows, and teams you define alongside it are discovered without any extra declaration. `@Scan` is only for pulling in packages you do not own.
@@ -1932,6 +1936,209 @@ Messages are only produced for player deaths. Mob deaths still fire the death ev
 
 ---
 
+## Effect System
+
+The framework provides a timed effect system for any `LivingEntity`. An effect holds its own users, each with an amplifier and a duration, and can bind itself to a vanilla potion effect that the framework keeps in sync across every transition.
+
+Requires `@Scan("io.github.trae.spigot.framework.effect")`.
+
+### Defining an Effect
+
+Extend `Effect`, passing a name, and register it as a component. `EffectManager` discovers every subclass automatically through the dependency injector:
+
+```java
+@Singleton
+public class BleedEffect extends Effect {
+
+    public BleedEffect() {
+        super("Bleed");
+    }
+
+    @Override
+    protected void onTick(final LivingEntity livingEntity, final EffectData effectData) {
+        livingEntity.damage(effectData.getAmplifier() * 0.5D);
+    }
+}
+```
+
+Effects are collected once the server has finished starting rather than on plugin enable, so an effect registered by any plugin is picked up regardless of enable order.
+
+### Applying an Effect
+
+```java
+// Amplifier 2 for 10 seconds
+this.bleedEffect.addUser(player, 2, TimeUnit.SECONDS.toMillis(10L));
+
+// Amplifier 0, so no potion effect is sent
+this.bleedEffect.addUser(player, TimeUnit.SECONDS.toMillis(10L));
+```
+
+Amplifiers are one-based, so `1` is level I, matching how a player reads it rather than how Bukkit stores it. Durations are milliseconds throughout, converted to ticks only where a packet needs them.
+
+### Binding a Potion Effect
+
+Override `getPotionEffectType()` and the framework applies, re-applies and clears the vanilla effect alongside its own state:
+
+```java
+@Singleton
+public class FrostEffect extends Effect {
+
+    public FrostEffect() {
+        super("Frost");
+    }
+
+    @Override
+    protected PotionEffectType getPotionEffectType() {
+        return PotionEffectType.SLOWNESS;
+    }
+}
+```
+
+Left unbound, which is the default, the effect is purely logical and nothing vanilla is sent.
+
+### Updating an Effect
+
+`updateUser` hands the stored `EffectData` to a consumer and reconciles the potion effect with whatever the consumer leaves behind:
+
+```java
+// Extend by 5 seconds, keeping the time already served
+this.frostEffect.updateUser(player, true, effectData -> effectData.setDuration(effectData.getDuration() + TimeUnit.SECONDS.toMillis(5L)));
+
+// Raise the amplifier and start the new duration from scratch
+this.frostEffect.updateUser(player, false, effectData -> {
+    effectData.setAmplifier(effectData.getAmplifier() + 1);
+    effectData.setDuration(TimeUnit.SECONDS.toMillis(30L));
+});
+```
+
+The `carryOver` flag decides what happens to time already served when the duration grows. With it set, the potion effect is re-applied for the time remaining plus the increase, so a player 30 seconds into a one minute effect that is raised to two minutes ends up with a minute and a half. Without it, the new duration replaces what was left outright.
+
+Zeroing the duration clears the potion effect but keeps the entry, so an effect can sit dormant and be revived by a later update. Zeroing the amplifier ends the effect entirely.
+
+### Guards and Hooks
+
+Each transition has a guard that can refuse it and a hook that runs once it has happened:
+
+| Override | Runs |
+|---|---|
+| `canAdd` | Before the effect is stored, to refuse it |
+| `canRemove` | Before a deliberate removal, to refuse it |
+| `canUpdate` | Before the update consumer runs, to refuse it |
+| `onAdd` | Once the effect is stored and its potion effect sent |
+| `onUpdate` | Once the data is mutated and the potion effect reconciled |
+| `onRemove` | Once the effect is removed, expiry aside |
+| `onExpire` | Once the duration has elapsed |
+| `onRemoveOrExpire` | On every path that ends the effect, after the path's own hook |
+| `onTick` | Every tick, for each live holder that has not expired |
+
+`onRemoveOrExpire` is the one to use for teardown that must happen however the effect ended, rather than duplicating it across `onRemove` and `onExpire`.
+
+### Effects as Listeners
+
+An effect is a component like any other, so it can implement `Listener` and be registered alongside everything else. That suits an effect whose whole behaviour is a reaction to something rather than a per-tick one, since the effect's state and the handler that reads it live in the same class:
+
+```java
+@Singleton
+public class NoFallEffect extends Effect implements Listener {
+
+    public NoFallEffect() {
+        super("No Fall");
+    }
+
+    @EventHandler
+    public void onEntityDamage(final EntityDamageEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+
+        if (event.getCause() != EntityDamageEvent.DamageCause.FALL) {
+            return;
+        }
+
+        if (!(event.getEntity() instanceof final LivingEntity livingEntity)) {
+            return;
+        }
+
+        if (this.getUserByLivingEntity(livingEntity).isEmpty()) {
+            return;
+        }
+
+        event.setCancelled(true);
+    }
+}
+```
+
+`getUserByLivingEntity` is the membership check, and it doubles as the read when the handler needs the amplifier or the time left:
+
+```java
+this.getUserByLivingEntity(livingEntity).ifPresent(effectData -> event.setDamage(event.getDamage() / effectData.getAmplifier()));
+```
+
+The handler runs on whatever thread the event does, so an effect that is also a listener can read entity state directly, unlike `onTick`, which runs on the manager's own schedule.
+
+### Ending an Effect
+
+```java
+// Deliberate removal, the one path a listener can refuse
+this.frostEffect.removeUser(player);
+```
+
+Everything else is the framework's own doing, and carries a reason:
+
+| Reason | Cause |
+|---|---|
+| `NORMAL` | A deliberate `removeUser` call |
+| `EXPIRE` | The duration elapsed |
+| `CONDITIONAL` | `removeOnCondition` returned true during the tick |
+| `DEATH` | The holder died and the effect overrides `removeOnDeath` |
+| `QUIT` | The holder disconnected and the effect overrides `removeOnQuit` |
+
+Only `NORMAL` consults `canRemove` and `EffectPreRemoveEvent`, since it is the one case where the removal is still a proposal. The rest report something that has already happened and are applied unconditionally.
+
+`removeOnCondition` is checked every tick, for state the effect wants to end itself on:
+
+```java
+@Override
+protected boolean removeOnCondition(final LivingEntity livingEntity, final EffectData effectData) {
+    return livingEntity.isInWater();
+}
+
+@Override
+public boolean removeOnDeath() {
+    return true;
+}
+
+@Override
+public boolean removeOnQuit() {
+    return true;
+}
+```
+
+Both `removeOnDeath` and `removeOnQuit` default to false, so an effect survives a death or a reconnect unless it says otherwise.
+
+### Querying
+
+```java
+// Every user, including entities that are currently unloaded
+final Map<UUID, EffectData> users = this.frostEffect.getUsers();
+
+// Only the users whose entity can be resolved right now
+final Map<LivingEntity, EffectData> activeUsers = this.frostEffect.getActiveUsers();
+
+// One user
+final Optional<EffectData> effectData = this.frostEffect.getUserByLivingEntity(player);
+```
+
+`getActiveUsers` is a snapshot rebuilt per call, and it silently omits any user whose entity is offline or unloaded, so `getUsers` stays the source of truth for membership and counts.
+
+### Cost
+
+The manager ticks every 50ms and walks each effect's users, resolving the entity, checking expiry and dispatching the tick event. An effect with no users costs a map iteration and nothing else, so the cost scales with how many entities actually hold an effect rather than with how many effects exist.
+
+The user map is pruned in place during that walk, so a hook invoked from it must not add or remove users of the same effect directly.
+
+---
+
 ## Chat System
 
 The chat system takes vanilla chat over and routes every message through a channel, such as global, staff, faction or ally chat.
@@ -2347,6 +2554,25 @@ The three stages exist so the framework, consuming plugins and reductions each h
 | `CustomDeathMessageEvent` | A death message is about to be sent to one player |
 
 Neither death event is cancellable, since both are dispatched from inside the vanilla death once it is settled. Their drops, experience and death sound are still writable, and are written back to the vanilla death after dispatch. `CustomDeathMessageEvent` is cancellable, and is dispatched once per recipient, so a message can be suppressed or reworded for some players and not others.
+
+---
+
+## Effect Events
+
+| Event | Fired When |
+|---|---|
+| `EffectPreAddEvent` | An effect is about to be applied to an entity |
+| `EffectPostAddEvent` | An effect has been applied and its potion effect sent |
+| `EffectPreUpdateEvent` | An entity's effect data is about to be mutated |
+| `EffectPostUpdateEvent` | The data has been mutated and the potion effect reconciled |
+| `EffectPreRemoveEvent` | An effect is about to be deliberately removed |
+| `EffectPostRemoveEvent` | An effect has been removed and its potion effect cleared |
+| `EffectExpireEvent` | An effect's duration has elapsed |
+| `EffectTickEvent` | Every tick, for each live holder that has not expired |
+
+The three pre events are cancellable. Cancelling an add leaves the effect unapplied, cancelling an update means the consumer never runs, and cancelling a remove leaves the effect in place. `EffectPreRemoveEvent` only fires for a deliberate removal, so expiry, death, a disconnect and a conditional removal cannot be refused.
+
+Expiry reports through `EffectExpireEvent` in place of `EffectPostRemoveEvent`, so a listener wanting both listens to each. `EffectTickEvent` fires for every holder of every effect on each pass, so a listener on it should stay proportionate to that.
 
 ---
 
