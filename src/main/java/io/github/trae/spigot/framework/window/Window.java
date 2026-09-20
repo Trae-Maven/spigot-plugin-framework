@@ -2,6 +2,7 @@ package io.github.trae.spigot.framework.window;
 
 import io.github.trae.spigot.framework.window.listeners.WindowListener;
 import lombok.Getter;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -50,6 +51,25 @@ public abstract class Window implements InventoryHolder {
      */
     public Window(final Component title, final int rows) {
         this.inventory = Bukkit.getServer().createInventory(this, rows * 9, title);
+    }
+
+    /**
+     * Creates a window whose title carries a custom background texture, drawn by a resource pack
+     * font glyph rendered ahead of the title text.
+     * <p>
+     * The client has no notion of a container texture, so {@code glyphs} is the literal character
+     * sequence the pack's {@code font} resolves: typically a negative space, the bitmap glyph
+     * holding the background image, then a second space returning the cursor so {@code title}
+     * still lands in its usual position. Because the title is baked into the inventory at creation,
+     * the texture is fixed for the window's lifetime; a different one needs a new instance.
+     *
+     * @param title  the inventory title, drawn over the texture
+     * @param rows   the number of rows, each nine slots wide
+     * @param font   the pack font providing the glyphs
+     * @param glyphs the glyph sequence drawing the background
+     */
+    public Window(final Component title, final int rows, final Key font, final String glyphs) {
+        this(Component.text(glyphs).font(font).append(title), rows);
     }
 
     /**
