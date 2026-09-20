@@ -18,7 +18,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
  */
 @AllArgsConstructor
 @Singleton
-public class TeamListener implements Listener {
+public final class TeamListener implements Listener {
 
     /**
      * The manager every team packet and lookup is delegated to.

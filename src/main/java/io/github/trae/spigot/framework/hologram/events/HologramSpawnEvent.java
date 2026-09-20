@@ -20,7 +20,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class HologramSpawnEvent extends CustomCancellableEvent {
+public final class HologramSpawnEvent extends CustomCancellableEvent {
 
     private final Hologram hologram;
     private final Player player;

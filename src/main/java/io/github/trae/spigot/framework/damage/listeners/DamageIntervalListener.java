@@ -56,7 +56,7 @@ import java.util.Set;
  */
 @RequiredArgsConstructor
 @Singleton
-public class DamageIntervalListener implements Listener {
+public final class DamageIntervalListener implements Listener {
 
     private static final Set<DamageCause> DAMAGE_CAUSE_SET = EnumSet.of(DamageCause.POISON, DamageCause.WITHER, DamageCause.FIRE_TICK, DamageCause.DROWNING, DamageCause.FREEZE, DamageCause.STARVATION);
 
@@ -75,7 +75,7 @@ public class DamageIntervalListener implements Listener {
      * @param event the vanilla damage event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onEntityDamage(final EntityDamageEvent event) {
+    public void onEntityDamage(final EntityDamageEvent event) {
         if (event.isCancelled() || event instanceof EntityDamageByEntityEvent) {
             return;
         }
@@ -93,7 +93,7 @@ public class DamageIntervalListener implements Listener {
      * @param event the potion effect event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onEntityPotionEffect(final EntityPotionEffectEvent event) {
+    public void onEntityPotionEffect(final EntityPotionEffectEvent event) {
         if (event.isCancelled() || event.getNewEffect() == null) {
             return;
         }
@@ -115,7 +115,7 @@ public class DamageIntervalListener implements Listener {
      * @param event the combust event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onEntityCombust(final EntityCombustEvent event) {
+    public void onEntityCombust(final EntityCombustEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -137,7 +137,7 @@ public class DamageIntervalListener implements Listener {
      * @param event the tick end event
      */
     @EventHandler
-    public final void onServerTickEnd(final ServerTickEndEvent event) {
+    public void onServerTickEnd(final ServerTickEndEvent event) {
         final DamageConfig.Interval interval = this.damageManager.getDamageConfig().getInterval();
 
         for (final LivingEntity livingEntity : List.copyOf(this.livingEntitySet)) {

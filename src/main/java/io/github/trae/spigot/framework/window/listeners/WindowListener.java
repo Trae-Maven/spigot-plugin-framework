@@ -34,7 +34,7 @@ import java.time.temporal.ChronoUnit;
  */
 @AllArgsConstructor
 @Singleton
-public class WindowListener implements Listener {
+public final class WindowListener implements Listener {
 
     /**
      * The manager whose tracking maps this listener keeps in step with the inventory events.
@@ -51,7 +51,7 @@ public class WindowListener implements Listener {
      * @param event the inventory open event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onInventoryOpen(final InventoryOpenEvent event) {
+    public void onInventoryOpen(final InventoryOpenEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -83,7 +83,7 @@ public class WindowListener implements Listener {
      * @param event the inventory close event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onInventoryClose(final InventoryCloseEvent event) {
+    public void onInventoryClose(final InventoryCloseEvent event) {
         final Inventory inventory = event.getInventory();
 
         if (!(event.getPlayer() instanceof final Player player)) {
@@ -111,7 +111,7 @@ public class WindowListener implements Listener {
      * @param event the player quit event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onPlayerQuit(final PlayerQuitEvent event) {
+    public void onPlayerQuit(final PlayerQuitEvent event) {
         final Window window = this.windowManager.getWindowByPlayerMap().remove(event.getPlayer().getUniqueId());
         if (window != null) {
             this.windowManager.getWindowByInventoryMap().remove(window.getInventory(), window);
@@ -134,7 +134,7 @@ public class WindowListener implements Listener {
      * @param event the inventory click event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onInventoryClick(final InventoryClickEvent event) {
+    public void onInventoryClick(final InventoryClickEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -179,7 +179,7 @@ public class WindowListener implements Listener {
      * @param event the inventory drag event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onInventoryDrag(final InventoryDragEvent event) {
+    public void onInventoryDrag(final InventoryDragEvent event) {
         if (event.isCancelled()) {
             return;
         }

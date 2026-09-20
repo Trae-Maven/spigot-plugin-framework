@@ -30,7 +30,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
  */
 @AllArgsConstructor
 @Singleton
-public class HologramListener implements Listener {
+public final class HologramListener implements Listener {
 
     private final HologramManager hologramManager;
 
@@ -40,7 +40,7 @@ public class HologramListener implements Listener {
      * @param event the quit event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerQuit(final PlayerQuitEvent event) {
+    public void onPlayerQuit(final PlayerQuitEvent event) {
         this.hologramManager.forget(event.getPlayer());
     }
 
@@ -50,7 +50,7 @@ public class HologramListener implements Listener {
      * @param event the world change event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerChangedWorld(final PlayerChangedWorldEvent event) {
+    public void onPlayerChangedWorld(final PlayerChangedWorldEvent event) {
         this.hologramManager.forget(event.getPlayer());
     }
 
@@ -60,7 +60,7 @@ public class HologramListener implements Listener {
      * @param event the respawn event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerRespawn(final PlayerRespawnEvent event) {
+    public void onPlayerRespawn(final PlayerRespawnEvent event) {
         this.hologramManager.forget(event.getPlayer());
     }
 }

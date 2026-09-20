@@ -22,7 +22,7 @@ import org.bukkit.event.Listener;
  * @see PreChatListener
  */
 @Singleton
-public class CustomChatListener implements Listener {
+public final class CustomChatListener implements Listener {
 
     /**
      * Dispatches a receive event for every recipient the channel names.
@@ -32,7 +32,7 @@ public class CustomChatListener implements Listener {
      * @param event the send event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onChatSend(final ChatSendEvent event) {
+    public void onChatSend(final ChatSendEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -51,7 +51,7 @@ public class CustomChatListener implements Listener {
      * @param event the receive event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onChatReceive(final ChatReceiveEvent event) {
+    public void onChatReceive(final ChatReceiveEvent event) {
         if (event.isCancelled()) {
             return;
         }

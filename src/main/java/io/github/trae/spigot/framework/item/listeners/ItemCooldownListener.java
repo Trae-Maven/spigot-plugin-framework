@@ -25,7 +25,7 @@ import org.bukkit.inventory.ItemStack;
  * state is already correct.
  */
 @Singleton
-public class ItemCooldownListener implements Listener {
+public final class ItemCooldownListener implements Listener {
 
     /**
      * Synchronizes the use cooldown component of an updated custom item stack.
@@ -39,7 +39,7 @@ public class ItemCooldownListener implements Listener {
      */
     @SuppressWarnings("UnstableApiUsage")
     @EventHandler
-    public final void onItemStackUpdate(final ItemStackUpdateEvent event) {
+    public void onItemStackUpdate(final ItemStackUpdateEvent event) {
         if (!(event.getItem() instanceof final CustomItem customItem)) {
             return;
         }

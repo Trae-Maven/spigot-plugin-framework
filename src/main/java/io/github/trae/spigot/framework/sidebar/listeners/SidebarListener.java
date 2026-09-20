@@ -20,7 +20,7 @@ import java.util.Optional;
  */
 @AllArgsConstructor
 @Singleton
-public class SidebarListener implements Listener {
+public final class SidebarListener implements Listener {
 
     /**
      * The manager every sidebar packet and lookup is delegated to.

@@ -27,7 +27,7 @@ import org.bukkit.event.Listener;
  */
 @AllArgsConstructor
 @Singleton
-public class PreChatListener implements Listener {
+public final class PreChatListener implements Listener {
 
     private final ChatManager chatManager;
 
@@ -40,7 +40,7 @@ public class PreChatListener implements Listener {
      * @param event the vanilla chat event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onAsyncChat(final AsyncChatEvent event) {
+    public void onAsyncChat(final AsyncChatEvent event) {
         if (event.isCancelled()) {
             return;
         }

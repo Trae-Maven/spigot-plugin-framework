@@ -21,7 +21,7 @@ import java.util.function.Supplier;
  * Results are presented by display name in the item's own colour, so a player reading them sees the
  * item as it appears in game even though they searched by namespace.
  */
-public class ItemSearchEngine extends SpigotSearchEngine<CustomItem> {
+public final class ItemSearchEngine extends SpigotSearchEngine<CustomItem> {
 
     /**
      * Creates a search engine over the items the given supplier yields.

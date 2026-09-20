@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
  */
 @AllArgsConstructor
 @Singleton
-public class ItemActivateListener implements Listener {
+public final class ItemActivateListener implements Listener {
 
     /**
      * The registry a clicked stack is resolved against, and the source of the items whose channels
@@ -87,7 +87,7 @@ public class ItemActivateListener implements Listener {
      * @param event the interaction event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onPlayerInteract(final PlayerInteractEvent event) {
+    public void onPlayerInteract(final PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
@@ -162,7 +162,7 @@ public class ItemActivateListener implements Listener {
      * @param event the drop event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerDropItem(final PlayerDropItemEvent event) {
+    public void onPlayerDropItem(final PlayerDropItemEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -180,7 +180,7 @@ public class ItemActivateListener implements Listener {
      * @param event the quit event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerQuit(final PlayerQuitEvent event) {
+    public void onPlayerQuit(final PlayerQuitEvent event) {
         this.blockedClickTickMap.remove(event.getPlayer().getUniqueId());
     }
 
@@ -202,7 +202,7 @@ public class ItemActivateListener implements Listener {
      * player as channelling long after they stopped.
      */
     @Scheduler(period = 50, unit = TimeUnit.MILLISECONDS)
-    public final void onScheduler() {
+    public void onScheduler() {
         for (final CustomItem item : this.itemManager.getItems()) {
             if (!(item instanceof final ChannelCustomItem channelCustomItem)) {
                 continue;

@@ -30,7 +30,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
  * @see CustomDeathMessageEvent
  */
 @Singleton
-public class DeathMessageListener implements Listener {
+public final class DeathMessageListener implements Listener {
 
     /**
      * Suppresses vanilla's death message.
@@ -41,7 +41,7 @@ public class DeathMessageListener implements Listener {
      * @param event the vanilla death event
      */
     @EventHandler(priority = EventPriority.LOWEST)
-    public final void onPlayerDeath(final PlayerDeathEvent event) {
+    public void onPlayerDeath(final PlayerDeathEvent event) {
         event.deathMessage(null);
     }
 
@@ -54,7 +54,7 @@ public class DeathMessageListener implements Listener {
      * @param event the death
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onCustomDeath(final CustomDeathEvent event) {
+    public void onCustomDeath(final CustomDeathEvent event) {
         if (!(event.getEntity() instanceof Player)) {
             return;
         }
@@ -73,7 +73,7 @@ public class DeathMessageListener implements Listener {
      * @param event the death
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onVanillaDeath(final VanillaDeathEvent event) {
+    public void onVanillaDeath(final VanillaDeathEvent event) {
         if (!(event.getEntity() instanceof Player)) {
             return;
         }
@@ -92,7 +92,7 @@ public class DeathMessageListener implements Listener {
      * @param event the message event for one recipient
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onCustomDeathMessage(final CustomDeathMessageEvent event) {
+    public void onCustomDeathMessage(final CustomDeathMessageEvent event) {
         if (event.isCancelled()) {
             return;
         }

@@ -23,7 +23,7 @@ import org.bukkit.inventory.meta.ItemMeta;
  */
 @AllArgsConstructor
 @Getter
-public class ItemMetaUpdateEvent extends CustomEvent {
+public final class ItemMetaUpdateEvent extends CustomEvent {
 
     /**
      * The item building the stack.

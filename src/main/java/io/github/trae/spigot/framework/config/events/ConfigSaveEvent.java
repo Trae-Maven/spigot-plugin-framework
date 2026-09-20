@@ -14,7 +14,7 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
-public class ConfigSaveEvent extends CustomEvent {
+public final class ConfigSaveEvent extends CustomEvent {
 
     /**
      * The plugin that owns the saved configuration.

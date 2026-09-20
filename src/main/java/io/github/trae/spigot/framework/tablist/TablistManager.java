@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Getter
 @Singleton
-public class TablistManager {
+public final class TablistManager {
 
     /**
      * Every registered tablist, sorted by priority.
@@ -57,7 +57,7 @@ public class TablistManager {
      * per-player resolution in {@link TablistListener}.
      */
     @Scheduler(period = 1, unit = TimeUnit.SECONDS, asynchronous = true)
-    public final void onScheduler() {
+    public void onScheduler() {
         UtilServer.getOnlinePlayers().forEach(player -> UtilEvent.dispatch(new TablistUpdateEvent(player)));
     }
 
@@ -71,7 +71,7 @@ public class TablistManager {
      * @param player  the player the tablist is sent to
      * @param tablist the tablist supplying the header and footer
      */
-    public final void create(final Player player, final Tablist tablist) {
+    public void create(final Player player, final Tablist tablist) {
         player.sendPlayerListHeaderAndFooter(tablist.getHeader(player), tablist.getFooter(player));
 
         this.activeTablistSet.add(player.getUniqueId());
@@ -86,7 +86,7 @@ public class TablistManager {
      *
      * @param player the player whose tablist to clear
      */
-    public final void remove(final Player player) {
+    public void remove(final Player player) {
         if (!this.activeTablistSet.remove(player.getUniqueId())) {
             return;
         }
@@ -104,7 +104,7 @@ public class TablistManager {
      * @param player the player to resolve for
      * @return an {@link Optional} containing the eligible tablist, or empty if none qualify
      */
-    public final Optional<Tablist> getEligibleTablist(final Player player) {
+    public Optional<Tablist> getEligibleTablist(final Player player) {
         if (this.tablistList == null) {
             this.tablistList = InjectorApi.getAll(Tablist.class).stream().sorted(Comparator.comparingInt(Tablist::getPriority)).toList();
         }

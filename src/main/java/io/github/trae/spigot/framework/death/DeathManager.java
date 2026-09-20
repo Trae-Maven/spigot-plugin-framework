@@ -14,7 +14,7 @@ import io.github.trae.spigot.framework.damage.DamageManager;
  * @see io.github.trae.spigot.framework.death.listeners.DeathListener
  */
 @Singleton
-public class DeathManager {
+public final class DeathManager {
 
     /**
      * The cached answer, {@code null} until it is first asked for.
@@ -30,7 +30,7 @@ public class DeathManager {
      *
      * @return {@code true} when the damage pipeline is available
      */
-    public final boolean isDamageManagerRegistered() {
+    public boolean isDamageManagerRegistered() {
         if (this.damageManagerRegistered == null) {
             try {
                 this.damageManagerRegistered = InjectorApi.get(DamageManager.class) != null;

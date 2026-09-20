@@ -21,7 +21,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class HologramDespawnEvent extends CustomEvent {
+public final class HologramDespawnEvent extends CustomEvent {
 
     private final Hologram hologram;
     private final Player player;

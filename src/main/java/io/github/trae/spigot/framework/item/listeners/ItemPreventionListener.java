@@ -36,7 +36,7 @@ import java.util.stream.Stream;
  */
 @AllArgsConstructor
 @Singleton
-public class ItemPreventionListener implements Listener {
+public final class ItemPreventionListener implements Listener {
 
     /**
      * The registry a slot's contents are resolved against.
@@ -50,7 +50,7 @@ public class ItemPreventionListener implements Listener {
      * @param event the anvil preparation event
      */
     @EventHandler(priority = EventPriority.LOWEST)
-    public final void onPrepareAnvil(final PrepareAnvilEvent event) {
+    public void onPrepareAnvil(final PrepareAnvilEvent event) {
         if (event.getResult() == null) {
             return;
         }
@@ -75,7 +75,7 @@ public class ItemPreventionListener implements Listener {
      * @param event the enchantment preparation event
      */
     @EventHandler(priority = EventPriority.LOWEST)
-    public final void onPrepareItemEnchant(final PrepareItemEnchantEvent event) {
+    public void onPrepareItemEnchant(final PrepareItemEnchantEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -101,7 +101,7 @@ public class ItemPreventionListener implements Listener {
      * @param event the enchantment event
      */
     @EventHandler(priority = EventPriority.LOWEST)
-    public final void onEnchantItem(final EnchantItemEvent event) {
+    public void onEnchantItem(final EnchantItemEvent event) {
         if (event.isCancelled()) {
             return;
         }

@@ -26,7 +26,7 @@ import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
  */
 @RequiredArgsConstructor
 @Singleton
-public class DamageCriticalListener implements Listener {
+public final class DamageCriticalListener implements Listener {
 
     private final DamageManager damageManager;
 
@@ -39,7 +39,7 @@ public class DamageCriticalListener implements Listener {
      * @param event the pre stage
      */
     @EventHandler(priority = EventPriority.NORMAL)
-    public final void onCustomPreDamage(final CustomPreDamageEvent event) {
+    public void onCustomPreDamage(final CustomPreDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }

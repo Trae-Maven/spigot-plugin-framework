@@ -21,7 +21,7 @@ import org.bukkit.entity.Player;
 @AllArgsConstructor
 @Getter
 @Setter
-public class ChatSendEvent extends CustomAsynchronousCancellableEvent {
+public final class ChatSendEvent extends CustomAsynchronousCancellableEvent {
 
     /**
      * The player sending the message.

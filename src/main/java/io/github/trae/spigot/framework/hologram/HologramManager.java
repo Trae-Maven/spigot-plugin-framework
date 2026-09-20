@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
  * @see io.github.trae.spigot.framework.utility.UtilHologram
  */
 @Singleton
-public class HologramManager {
+public final class HologramManager {
 
     /**
      * Every registered hologram, keyed by lowercased name.
@@ -77,7 +77,7 @@ public class HologramManager {
      * when resolving its lines both assume it.</p>
      */
     @Scheduler(period = 500, unit = TimeUnit.MILLISECONDS)
-    public final void onScheduler() {
+    public void onScheduler() {
         final List<Player> playerList = UtilServer.getOnlinePlayers();
         if (playerList.isEmpty()) {
             return;
@@ -123,7 +123,7 @@ public class HologramManager {
      * @param name the registered name
      * @return the hologram, or empty if the name is blank or unknown
      */
-    public final Optional<Hologram> getHologramByName(final String name) {
+    public Optional<Hologram> getHologramByName(final String name) {
         if (UtilString.isEmpty(name)) {
             return Optional.empty();
         }
@@ -143,7 +143,7 @@ public class HologramManager {
      *
      * @param hologram the hologram that has moved
      */
-    public final void relocate(final Hologram hologram) {
+    public void relocate(final Hologram hologram) {
         this.despawn(hologram);
 
         hologram.build();
@@ -158,7 +158,7 @@ public class HologramManager {
      *
      * @param hologram the hologram to refresh
      */
-    public final void refresh(final Hologram hologram) {
+    public void refresh(final Hologram hologram) {
         hologram.build();
 
         if (!hologram.isBuilt()) {
@@ -184,7 +184,7 @@ public class HologramManager {
      *
      * @param hologram the hologram to despawn
      */
-    public final void despawn(final Hologram hologram) {
+    public void despawn(final Hologram hologram) {
         if (!hologram.isBuilt()) {
             return;
         }
@@ -208,7 +208,7 @@ public class HologramManager {
      *
      * @param player the player to forget
      */
-    public final void forget(final Player player) {
+    public void forget(final Player player) {
         this.getHologramMap().values().forEach(hologram -> hologram.getViewerSet().remove(player.getUniqueId()));
     }
 }

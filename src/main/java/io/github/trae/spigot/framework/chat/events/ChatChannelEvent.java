@@ -28,7 +28,7 @@ import org.bukkit.entity.Player;
 @AllArgsConstructor
 @Getter
 @Setter
-public class ChatChannelEvent extends CustomAsynchronousEvent {
+public final class ChatChannelEvent extends CustomAsynchronousEvent {
 
     /**
      * The player whose message is being routed.

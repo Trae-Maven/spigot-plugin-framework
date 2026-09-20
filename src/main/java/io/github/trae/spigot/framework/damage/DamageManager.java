@@ -61,7 +61,7 @@ import java.util.concurrent.TimeUnit;
 @AllArgsConstructor
 @Getter
 @Singleton
-public class DamageManager {
+public final class DamageManager {
 
     private static final long RETENTION = TimeUnit.MINUTES.toMillis(1L);
 
@@ -103,7 +103,7 @@ public class DamageManager {
      * generous.</p>
      */
     @Scheduler(period = 1, unit = TimeUnit.MINUTES)
-    public final void onScheduler() {
+    public void onScheduler() {
         final long now = System.currentTimeMillis();
 
         this.lastDamageMap.values().removeIf(event -> now - event.getSystemTime() >= RETENTION);
@@ -125,7 +125,7 @@ public class DamageManager {
      *
      * @param event the completed post stage
      */
-    public final void apply(final CustomPostDamageEvent event) {
+    public void apply(final CustomPostDamageEvent event) {
         if (!(event.getDamagee() instanceof final LivingEntity bukkitDamagee)) {
             return;
         }

@@ -14,7 +14,7 @@ import org.bukkit.command.CommandSender;
  */
 @AllArgsConstructor
 @Getter
-public class CommandExecuteEvent extends CustomCancellableEvent {
+public final class CommandExecuteEvent extends CustomCancellableEvent {
 
     /**
      * The command that is about to be executed.

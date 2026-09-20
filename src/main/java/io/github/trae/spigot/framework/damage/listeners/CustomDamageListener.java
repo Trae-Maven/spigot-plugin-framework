@@ -26,7 +26,7 @@ import org.bukkit.event.Listener;
  */
 @AllArgsConstructor
 @Singleton
-public class CustomDamageListener implements Listener {
+public final class CustomDamageListener implements Listener {
 
     private final DamageManager damageManager;
 
@@ -36,7 +36,7 @@ public class CustomDamageListener implements Listener {
      * @param event the pre stage
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onCustomPreDamage(final CustomPreDamageEvent event) {
+    public void onCustomPreDamage(final CustomPreDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -50,7 +50,7 @@ public class CustomDamageListener implements Listener {
      * @param event the damage stage
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onCustomDamage(final CustomDamageEvent event) {
+    public void onCustomDamage(final CustomDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -67,7 +67,7 @@ public class CustomDamageListener implements Listener {
      * @param event the completed post stage
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onCustomPostDamage(final CustomPostDamageEvent event) {
+    public void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }

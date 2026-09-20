@@ -17,7 +17,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Configuration(value = "Damage", type = ConfigType.JSON)
-public class DamageConfig {
+public final class DamageConfig {
 
     /**
      * Whether combat follows pre-1.9 rules rather than vanilla's.

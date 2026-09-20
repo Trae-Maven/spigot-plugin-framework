@@ -15,7 +15,7 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
-public class PluginShutdownEvent extends CustomEvent {
+public final class PluginShutdownEvent extends CustomEvent {
 
     /**
      * The plugin that is about to shut down.

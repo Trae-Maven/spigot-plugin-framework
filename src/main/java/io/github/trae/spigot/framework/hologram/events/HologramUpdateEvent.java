@@ -20,7 +20,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class HologramUpdateEvent extends CustomEvent {
+public final class HologramUpdateEvent extends CustomEvent {
 
     private final Hologram hologram;
     private final Player player;

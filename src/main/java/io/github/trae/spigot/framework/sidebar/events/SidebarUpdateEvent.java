@@ -16,7 +16,7 @@ import org.bukkit.entity.Player;
  * Fired asynchronously, as the manager's scheduler dispatches it off the main thread.
  */
 @Getter
-public class SidebarUpdateEvent extends CustomCancellableEvent {
+public final class SidebarUpdateEvent extends CustomCancellableEvent {
 
     /**
      * The identifier of the sidebar to scope this update to, or {@code null} to update the active sidebar.

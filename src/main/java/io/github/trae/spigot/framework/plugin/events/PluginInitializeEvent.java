@@ -15,7 +15,7 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
-public class PluginInitializeEvent extends CustomEvent {
+public final class PluginInitializeEvent extends CustomEvent {
 
     /**
      * The plugin that has finished initializing.

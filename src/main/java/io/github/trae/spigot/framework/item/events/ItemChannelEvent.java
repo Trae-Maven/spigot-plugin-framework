@@ -22,7 +22,7 @@ import org.bukkit.inventory.ItemStack;
  */
 @AllArgsConstructor
 @Getter
-public class ItemChannelEvent extends CustomCancellableEvent {
+public final class ItemChannelEvent extends CustomCancellableEvent {
 
     /**
      * The item being channelled.

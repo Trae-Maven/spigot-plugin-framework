@@ -47,7 +47,7 @@ import java.util.UUID;
  */
 @RequiredArgsConstructor
 @Singleton
-public class DamagePotionEffectListener implements Listener {
+public final class DamagePotionEffectListener implements Listener {
 
     private final DamageManager damageManager;
 
@@ -67,7 +67,7 @@ public class DamagePotionEffectListener implements Listener {
      * @param event the pre attack event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPrePlayerAttackEntity(final PrePlayerAttackEntityEvent event) {
+    public void onPrePlayerAttackEntity(final PrePlayerAttackEntityEvent event) {
         if (event.isCancelled() || !event.willAttack()) {
             return;
         }
@@ -86,7 +86,7 @@ public class DamagePotionEffectListener implements Listener {
      * @param event the pre stage
      */
     @EventHandler(priority = EventPriority.HIGH)
-    public final void onCustomPreDamage(final CustomPreDamageEvent event) {
+    public void onCustomPreDamage(final CustomPreDamageEvent event) {
         if (!(event.getDamager() instanceof final Player player) || event.getProjectile() != null || !this.usesAttackDamage(event.getCause())) {
             return;
         }
@@ -118,7 +118,7 @@ public class DamagePotionEffectListener implements Listener {
      * @param event the post stage
      */
     @EventHandler(priority = EventPriority.LOW)
-    public final void onCustomPostDamage(final CustomPostDamageEvent event) {
+    public void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -141,7 +141,7 @@ public class DamagePotionEffectListener implements Listener {
      * @param event the quit event
      */
     @EventHandler
-    public final void onPlayerQuit(final PlayerQuitEvent event) {
+    public void onPlayerQuit(final PlayerQuitEvent event) {
         this.attackChargeMap.remove(event.getPlayer().getUniqueId());
     }
 

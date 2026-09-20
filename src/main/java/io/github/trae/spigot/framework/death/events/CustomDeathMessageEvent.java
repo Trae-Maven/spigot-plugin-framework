@@ -26,7 +26,7 @@ import org.bukkit.entity.Player;
  */
 @Getter
 @Setter
-public class CustomDeathMessageEvent extends CustomCancellableEvent {
+public final class CustomDeathMessageEvent extends CustomCancellableEvent {
 
     /**
      * The death being described, and the player it is being described to. Held as the shared
@@ -80,7 +80,7 @@ public class CustomDeathMessageEvent extends CustomCancellableEvent {
      *
      * @return the name ready to drop into a sentence, or {@code null} when there was no killer
      */
-    public final Component getFormattedKillerName() {
+    public Component getFormattedKillerName() {
         final DisplayName killerName = this.killerName;
         if (killerName == null) {
             return null;

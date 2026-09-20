@@ -42,7 +42,7 @@ import java.util.List;
  */
 @RequiredArgsConstructor
 @Singleton
-public class DamageArmourReductionListener implements Listener {
+public final class DamageArmourReductionListener implements Listener {
 
     private final DamageManager damageManager;
 
@@ -52,7 +52,7 @@ public class DamageArmourReductionListener implements Listener {
      * @param event the post stage
      */
     @EventHandler(priority = EventPriority.LOW)
-    public final void onCustomPostDamage(final CustomPostDamageEvent event) {
+    public void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }

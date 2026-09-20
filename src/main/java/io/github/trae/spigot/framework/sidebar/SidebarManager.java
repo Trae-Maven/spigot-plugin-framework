@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Getter
 @Singleton
-public class SidebarManager {
+public final class SidebarManager {
 
     /**
      * Every registered sidebar, sorted by priority.
@@ -88,7 +88,7 @@ public class SidebarManager {
      * a static sidebar costs resolution time and no bandwidth at all.
      */
     @Scheduler(period = 250, unit = TimeUnit.MILLISECONDS, asynchronous = true)
-    public final void onScheduler() {
+    public void onScheduler() {
         for (final Player player : Bukkit.getServer().getOnlinePlayers()) {
             final Sidebar activeSidebar = this.activeSidebarMap.get(player.getUniqueId());
             if (activeSidebar != null) {
@@ -112,7 +112,7 @@ public class SidebarManager {
      * @param player  the player to display the sidebar to
      * @param sidebar the sidebar to create
      */
-    public final void create(final Player player, final Sidebar sidebar) {
+    public void create(final Player player, final Sidebar sidebar) {
         final String identifier = sidebar.getIdentifier();
         final Component title = sidebar.getTitle(player);
         final List<Component> lines = sidebar.getLines(player);
@@ -159,7 +159,7 @@ public class SidebarManager {
      * @param player  the player whose title to refresh
      * @param sidebar the active sidebar providing the title
      */
-    public final void refreshTitle(final Player player, final Sidebar sidebar) {
+    public void refreshTitle(final Player player, final Sidebar sidebar) {
         final Component newTitle = sidebar.getTitle(player);
         final Component cachedTitle = this.cachedTitleMap.get(player.getUniqueId());
 
@@ -188,7 +188,7 @@ public class SidebarManager {
      * @param player  the player whose lines to update
      * @param sidebar the sidebar providing the new lines
      */
-    public final void updateLines(final Player player, final Sidebar sidebar) {
+    public void updateLines(final Player player, final Sidebar sidebar) {
         final List<Component> newLines = sidebar.getLines(player);
         final List<Component> oldLines = this.cachedLinesMap.getOrDefault(player.getUniqueId(), Collections.emptyList());
 
@@ -249,7 +249,7 @@ public class SidebarManager {
      *
      * @param player the player whose sidebar to clear
      */
-    public final void clear(final Player player) {
+    public void clear(final Player player) {
         this.cachedTitleMap.remove(player.getUniqueId());
         this.cachedLinesMap.remove(player.getUniqueId());
 
@@ -293,7 +293,7 @@ public class SidebarManager {
      * @param player the player to resolve a sidebar for
      * @return an {@link Optional} containing the eligible sidebar, or empty if none qualify
      */
-    public final Optional<Sidebar> getEligibleSidebar(final Player player) {
+    public Optional<Sidebar> getEligibleSidebar(final Player player) {
         if (this.sidebarList == null) {
             this.sidebarList = InjectorApi.getAll(Sidebar.class).stream().sorted(Comparator.comparingInt(Sidebar::getPriority)).toList();
         }

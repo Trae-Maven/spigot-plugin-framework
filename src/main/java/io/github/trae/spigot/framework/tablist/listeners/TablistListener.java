@@ -16,7 +16,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
  */
 @AllArgsConstructor
 @Singleton
-public class TablistListener implements Listener {
+public final class TablistListener implements Listener {
 
     /**
      * The manager every tablist packet and lookup is delegated to.

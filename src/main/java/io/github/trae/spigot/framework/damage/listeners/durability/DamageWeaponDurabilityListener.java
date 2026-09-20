@@ -19,7 +19,7 @@ import org.bukkit.inventory.ItemStack;
  * @see WeaponDurabilityEvent
  */
 @Singleton
-public class DamageWeaponDurabilityListener implements Listener {
+public final class DamageWeaponDurabilityListener implements Listener {
 
     private static final int WEAPON_DURABILITY_AMOUNT = 1;
 
@@ -29,7 +29,7 @@ public class DamageWeaponDurabilityListener implements Listener {
      * @param event the completed post stage
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onCustomPostDamage(final CustomPostDamageEvent event) {
+    public void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }

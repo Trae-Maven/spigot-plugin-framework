@@ -32,7 +32,7 @@ import org.bukkit.util.Vector;
  */
 @RequiredArgsConstructor
 @Singleton
-public class DamageKnockbackListener implements Listener {
+public final class DamageKnockbackListener implements Listener {
 
     private static final double DEFAULT_RESISTANCE = 0.0D;
     private static final double MINIMUM_DISTANCE_SQUARED = 1.0E-5D;
@@ -48,7 +48,7 @@ public class DamageKnockbackListener implements Listener {
      * @param event the completed post stage
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onCustomPostDamage(final CustomPostDamageEvent event) {
+    public void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -88,7 +88,7 @@ public class DamageKnockbackListener implements Listener {
      * @param event the knockback event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onCustomKnockback(final CustomKnockbackEvent event) {
+    public void onCustomKnockback(final CustomKnockbackEvent event) {
         if (event.isCancelled()) {
             return;
         }

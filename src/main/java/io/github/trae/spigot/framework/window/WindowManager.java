@@ -22,7 +22,7 @@ import java.util.UUID;
  */
 @Getter
 @Singleton
-public class WindowManager {
+public final class WindowManager {
 
     /**
      * The window each player currently has open, keyed by their identifier.
@@ -40,7 +40,7 @@ public class WindowManager {
      * @param player the player to look up
      * @return an {@link Optional} containing the window, or empty if they have none open
      */
-    public final Optional<Window> getWindowByPlayer(final Player player) {
+    public Optional<Window> getWindowByPlayer(final Player player) {
         return Optional.ofNullable(this.windowByPlayerMap.get(player.getUniqueId()));
     }
 
@@ -50,7 +50,7 @@ public class WindowManager {
      * @param inventory the inventory to look up
      * @return an {@link Optional} containing the window, or empty if the inventory is not a window's
      */
-    public final Optional<Window> getWindowByInventory(final Inventory inventory) {
+    public Optional<Window> getWindowByInventory(final Inventory inventory) {
         return Optional.ofNullable(this.windowByInventoryMap.get(inventory));
     }
 }

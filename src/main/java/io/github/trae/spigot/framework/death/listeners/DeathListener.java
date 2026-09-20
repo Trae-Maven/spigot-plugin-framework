@@ -50,7 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @RequiredArgsConstructor
 @Singleton
-public class DeathListener implements Listener {
+public final class DeathListener implements Listener {
 
     private final DeathManager deathManager;
 
@@ -69,7 +69,7 @@ public class DeathListener implements Listener {
      * @param event the vanilla death event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onEntityDeath(final EntityDeathEvent event) {
+    public void onEntityDeath(final EntityDeathEvent event) {
         if (event.isCancelled()) {
             return;
         }

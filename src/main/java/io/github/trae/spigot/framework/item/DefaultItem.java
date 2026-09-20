@@ -19,14 +19,14 @@ import java.util.List;
  * This exists so a listener can apply something uniformly across every stack, rather than only
  * across the ones this framework defines.
  */
-public class DefaultItem extends Item {
+public final class DefaultItem extends Item {
 
     /**
      * Creates the default definition for the given material.
      *
      * @param material the material represented by this definition
      */
-    protected DefaultItem(final Material material) {
+    DefaultItem(final Material material) {
         super(material);
     }
 

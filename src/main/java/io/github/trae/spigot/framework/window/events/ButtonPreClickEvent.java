@@ -21,7 +21,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class ButtonPreClickEvent extends CustomCancellableEvent {
+public final class ButtonPreClickEvent extends CustomCancellableEvent {
 
     /**
      * The window the button belongs to.

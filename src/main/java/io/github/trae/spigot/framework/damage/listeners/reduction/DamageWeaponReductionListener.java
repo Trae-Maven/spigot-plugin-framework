@@ -46,7 +46,7 @@ import java.util.UUID;
  */
 @RequiredArgsConstructor
 @Singleton
-public class DamageWeaponReductionListener implements Listener {
+public final class DamageWeaponReductionListener implements Listener {
 
     private final DamageManager damageManager;
 
@@ -66,7 +66,7 @@ public class DamageWeaponReductionListener implements Listener {
      * @param event the pre attack event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPrePlayerAttackEntity(final PrePlayerAttackEntityEvent event) {
+    public void onPrePlayerAttackEntity(final PrePlayerAttackEntityEvent event) {
         if (event.isCancelled() || !event.willAttack()) {
             return;
         }
@@ -87,7 +87,7 @@ public class DamageWeaponReductionListener implements Listener {
      * @param event the pre stage
      */
     @EventHandler(priority = EventPriority.NORMAL)
-    public final void onCustomPreDamage(final CustomPreDamageEvent event) {
+    public void onCustomPreDamage(final CustomPreDamageEvent event) {
         if (!(event.getDamager() instanceof final Player player) || event.getProjectile() != null || !this.usesWeapon(event.getCause())) {
             return;
         }
@@ -134,7 +134,7 @@ public class DamageWeaponReductionListener implements Listener {
      * @param event the quit event
      */
     @EventHandler
-    public final void onPlayerQuit(final PlayerQuitEvent event) {
+    public void onPlayerQuit(final PlayerQuitEvent event) {
         this.attackChargeMap.remove(event.getPlayer().getUniqueId());
     }
 

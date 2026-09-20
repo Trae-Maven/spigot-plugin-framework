@@ -19,7 +19,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class ChatSwitchChannelEvent extends CustomCancellableEvent {
+public final class ChatSwitchChannelEvent extends CustomCancellableEvent {
 
     /**
      * The player switching channels.

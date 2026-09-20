@@ -26,7 +26,7 @@ import org.bukkit.inventory.ItemStack;
  * @see ArmourDurabilityEvent
  */
 @Singleton
-public class DamageArmourDurabilityListener implements Listener {
+public final class DamageArmourDurabilityListener implements Listener {
 
     private static final double ARMOUR_DURABILITY_DIVISOR = 4.0D;
 
@@ -36,7 +36,7 @@ public class DamageArmourDurabilityListener implements Listener {
      * @param event the completed post stage
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onCustomPostDamage(final CustomPostDamageEvent event) {
+    public void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }

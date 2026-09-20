@@ -40,7 +40,7 @@ import java.util.Set;
  */
 @DependsOn(values = ItemManager.class)
 @Singleton
-public class SwordBlockListener implements Listener {
+public final class SwordBlockListener implements Listener {
 
     /**
      * Every sword material, in descending tier order.
@@ -61,7 +61,7 @@ public class SwordBlockListener implements Listener {
      */
     @SuppressWarnings("UnstableApiUsage")
     @EventHandler
-    public final void onItemStackUpdate(final ItemStackUpdateEvent event) {
+    public void onItemStackUpdate(final ItemStackUpdateEvent event) {
         final ItemStack itemStack = event.getItemStack();
 
         if (!MATERIAL_SET.contains(itemStack.getType())) {

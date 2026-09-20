@@ -16,7 +16,7 @@ import java.awt.Color;
  */
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
-public class ItemStyle {
+public final class ItemStyle {
 
     /**
      * The name of this style.

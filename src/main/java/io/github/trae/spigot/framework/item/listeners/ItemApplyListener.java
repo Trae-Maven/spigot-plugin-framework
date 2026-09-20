@@ -28,7 +28,7 @@ import org.bukkit.inventory.ItemStack;
  */
 @AllArgsConstructor
 @Singleton
-public class ItemApplyListener implements Listener {
+public final class ItemApplyListener implements Listener {
 
     /**
      * The registry every stack is reconciled against.
@@ -45,7 +45,7 @@ public class ItemApplyListener implements Listener {
      * @param event the pickup event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onEntityPickupItem(final EntityPickupItemEvent event) {
+    public void onEntityPickupItem(final EntityPickupItemEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -72,7 +72,7 @@ public class ItemApplyListener implements Listener {
      * @param event the craft preparation event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPrepareItemCraft(final PrepareItemCraftEvent event) {
+    public void onPrepareItemCraft(final PrepareItemCraftEvent event) {
         final CraftingInventory craftingInventory = event.getInventory();
 
         craftingInventory.setResult(this.itemManager.apply(craftingInventory.getResult()));
@@ -87,7 +87,7 @@ public class ItemApplyListener implements Listener {
      * @param event the smelt event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onFurnaceSmelt(final FurnaceSmeltEvent event) {
+    public void onFurnaceSmelt(final FurnaceSmeltEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -109,7 +109,7 @@ public class ItemApplyListener implements Listener {
      * @param event the player join event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerJoin(final PlayerJoinEvent event) {
+    public void onPlayerJoin(final PlayerJoinEvent event) {
         this.itemManager.updateInventory(event.getPlayer().getInventory());
     }
 
@@ -125,7 +125,7 @@ public class ItemApplyListener implements Listener {
      * @param event the inventory open event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onInventoryOpen(final InventoryOpenEvent event) {
+    public void onInventoryOpen(final InventoryOpenEvent event) {
         if (event.isCancelled()) {
             return;
         }

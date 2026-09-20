@@ -22,7 +22,7 @@ import org.bukkit.inventory.ItemStack;
  */
 @AllArgsConstructor
 @Getter
-public class ItemPreActivateEvent extends CustomCancellableEvent {
+public final class ItemPreActivateEvent extends CustomCancellableEvent {
 
     /**
      * The item being activated.

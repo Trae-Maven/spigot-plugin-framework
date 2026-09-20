@@ -29,7 +29,7 @@ import java.util.Optional;
  */
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
-public class SoundProvider {
+public final class SoundProvider {
 
     /**
      * The namespaced key of the sound to play, or {@code null} if it could not be resolved.
@@ -115,7 +115,7 @@ public class SoundProvider {
      *
      * @return the sound, or empty when the key is absent, malformed or not registered
      */
-    public final Optional<Sound> getSound() {
+    public Optional<Sound> getSound() {
         return Optional.ofNullable(this.key)
                 .map(NamespacedKey::fromString)
                 .map(Registry.SOUNDS::get);
@@ -128,7 +128,7 @@ public class SoundProvider {
      *
      * @param location the location to play at
      */
-    public final void play(final Location location) {
+    public void play(final Location location) {
         if (this.key == null || this.category == null) {
             return;
         }
@@ -144,7 +144,7 @@ public class SoundProvider {
      *
      * @param player the player to play to
      */
-    public final void play(final Player player) {
+    public void play(final Player player) {
         if (this.key == null || this.category == null) {
             return;
         }
@@ -158,7 +158,7 @@ public class SoundProvider {
      *
      * <p>Does nothing when the key or the category is absent.</p>
      */
-    public final void broadcast() {
+    public void broadcast() {
         if (this.key == null || this.category == null) {
             return;
         }

@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Getter
 @Singleton
-public class TeamManager {
+public final class TeamManager {
 
     /**
      * Every registered team, sorted by priority.
@@ -72,7 +72,7 @@ public class TeamManager {
      * @param viewer the viewer the team is sent to
      * @param team   the team supplying the options
      */
-    public final void create(final Player player, final Player viewer, final Team team) {
+    public void create(final Player player, final Player viewer, final Team team) {
         final String teamName = this.getTeamName(player, viewer);
 
         final PlayerTeam playerTeam = this.buildPlayerTeam(teamName, player, viewer, team);
@@ -93,7 +93,7 @@ public class TeamManager {
      * @param player the target player whose team to remove
      * @param viewer the viewer the removal is sent to
      */
-    public final void remove(final Player player, final Player viewer) {
+    public void remove(final Player player, final Player viewer) {
         final String teamName = this.getTeamName(player, viewer);
 
         if (!this.activeTeamSet.remove(teamName)) {
@@ -113,7 +113,7 @@ public class TeamManager {
      * @param player the target player the team applies to
      * @param viewer the viewer the team is rendered for
      */
-    public final void refresh(final Player player, final Player viewer) {
+    public void refresh(final Player player, final Player viewer) {
         this.getEligibleTeam(player, viewer).ifPresentOrElse(team -> this.create(player, viewer, team), () -> this.remove(player, viewer));
     }
 
@@ -179,7 +179,7 @@ public class TeamManager {
      * @param viewer the viewer
      * @return an {@link Optional} containing the eligible team, or empty if none qualify
      */
-    public final Optional<Team> getEligibleTeam(final Player player, final Player viewer) {
+    public Optional<Team> getEligibleTeam(final Player player, final Player viewer) {
         if (this.teamList == null) {
             this.teamList = InjectorApi.getAll(Team.class).stream().sorted(Comparator.comparingInt(Team::getPriority)).toList();
         }

@@ -21,7 +21,7 @@ import org.bukkit.inventory.ItemStack;
  */
 @AllArgsConstructor
 @Getter
-public class ItemPostActivateEvent extends CustomEvent {
+public final class ItemPostActivateEvent extends CustomEvent {
 
     /**
      * The item that was activated.

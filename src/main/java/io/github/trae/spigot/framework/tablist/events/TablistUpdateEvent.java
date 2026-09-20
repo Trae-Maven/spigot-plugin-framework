@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
  * display for that player.
  */
 @Getter
-public class TablistUpdateEvent extends CustomCancellableEvent {
+public final class TablistUpdateEvent extends CustomCancellableEvent {
 
     /**
      * The player whose tablist should be refreshed.

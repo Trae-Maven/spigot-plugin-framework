@@ -18,7 +18,7 @@ import org.bukkit.inventory.ItemStack;
  */
 @AllArgsConstructor
 @Getter
-public class ItemStackUpdateEvent extends CustomEvent {
+public final class ItemStackUpdateEvent extends CustomEvent {
 
     /**
      * The item that built the stack.

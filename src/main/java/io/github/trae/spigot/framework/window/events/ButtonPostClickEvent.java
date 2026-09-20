@@ -20,7 +20,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class ButtonPostClickEvent extends CustomEvent {
+public final class ButtonPostClickEvent extends CustomEvent {
 
     /**
      * The window the button belongs to.

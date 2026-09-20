@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Getter
 @Singleton
-public class ChatManager {
+public final class ChatManager {
 
     /**
      * The channel every message starts in, supplied by the plugin that owns chat.

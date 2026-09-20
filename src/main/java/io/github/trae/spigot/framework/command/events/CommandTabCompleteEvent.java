@@ -14,7 +14,7 @@ import org.bukkit.command.CommandSender;
  */
 @AllArgsConstructor
 @Getter
-public class CommandTabCompleteEvent extends CustomCancellableEvent {
+public final class CommandTabCompleteEvent extends CustomCancellableEvent {
 
     /**
      * The command whose tab-completion is being requested.

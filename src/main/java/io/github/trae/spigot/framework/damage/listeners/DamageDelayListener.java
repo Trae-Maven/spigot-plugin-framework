@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit;
  */
 @AllArgsConstructor
 @Singleton
-public class DamageDelayListener implements Listener {
+public final class DamageDelayListener implements Listener {
 
     private final DamageManager damageManager;
 
@@ -68,7 +68,7 @@ public class DamageDelayListener implements Listener {
      * purely to stop the maps growing.</p>
      */
     @Scheduler(period = 10, unit = TimeUnit.SECONDS)
-    public final void onScheduler() {
+    public void onScheduler() {
         final long now = System.currentTimeMillis();
 
         this.delayMap.values().removeIf(expiry -> now >= expiry);
@@ -89,7 +89,7 @@ public class DamageDelayListener implements Listener {
      * @param event the pre stage
      */
     @EventHandler(priority = EventPriority.LOWEST)
-    public final void onCustomPreDamage(final CustomPreDamageEvent event) {
+    public void onCustomPreDamage(final CustomPreDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }
@@ -110,7 +110,7 @@ public class DamageDelayListener implements Listener {
      * @param event the completed post stage
      */
     @EventHandler(priority = EventPriority.HIGHEST)
-    public final void onCustomPostDamage(final CustomPostDamageEvent event) {
+    public void onCustomPostDamage(final CustomPostDamageEvent event) {
         if (event.isCancelled()) {
             return;
         }

@@ -44,7 +44,7 @@ import java.util.function.Predicate;
  * so this only matters for a plugin enabled well after the server has started.
  */
 @Singleton
-public class ItemManager {
+public final class ItemManager {
 
     /**
      * Every registered item, keyed by its identifier.
@@ -110,7 +110,7 @@ public class ItemManager {
      *
      * @return the registered items
      */
-    public final List<CustomItem> getItems() {
+    public List<CustomItem> getItems() {
         this.populateIfNecessary();
 
         return List.copyOf(this.identifierItemMap.values());
@@ -123,7 +123,7 @@ public class ItemManager {
      * @param identifier the identifier to look up
      * @return an {@link Optional} containing the item, or empty if none is registered
      */
-    public final Optional<CustomItem> getItemByIdentifier(final String identifier) {
+    public Optional<CustomItem> getItemByIdentifier(final String identifier) {
         this.populateIfNecessary();
 
         return Optional.ofNullable(this.identifierItemMap.get(identifier));
@@ -136,7 +136,7 @@ public class ItemManager {
      * @param material the material to look up
      * @return an {@link Optional} containing the item, or empty if none is registered
      */
-    public final Optional<CustomItem> getObtainableItemByMaterial(final Material material) {
+    public Optional<CustomItem> getObtainableItemByMaterial(final Material material) {
         this.populateIfNecessary();
 
         return Optional.ofNullable(this.obtainableItemMap.get(material));
@@ -153,7 +153,7 @@ public class ItemManager {
      * @return an {@link Optional} containing the owning item, or empty if the stack carries no known
      * identifier
      */
-    public final Optional<CustomItem> getItemByItemStack(final ItemStack itemStack) {
+    public Optional<CustomItem> getItemByItemStack(final ItemStack itemStack) {
         return UtilItemStack.getPersistentData(itemStack, CustomItem.IDENTIFIER_KEY, PersistentDataType.STRING).flatMap(this::getItemByIdentifier);
     }
 
@@ -170,7 +170,7 @@ public class ItemManager {
      *                  no filter
      * @return an {@link Optional} containing the resolved item, or empty if nothing matched
      */
-    public final Optional<CustomItem> searchItem(final CommandSender sender, final String input, final boolean inform, final Predicate<CustomItem> predicate) {
+    public Optional<CustomItem> searchItem(final CommandSender sender, final String input, final boolean inform, final Predicate<CustomItem> predicate) {
         return this.itemSearchEngine.find(
                 sender,
                 input,
@@ -187,7 +187,7 @@ public class ItemManager {
      * @param inform whether to message the sender when nothing matches or the term is ambiguous
      * @return an {@link Optional} containing the resolved item, or empty if nothing matched
      */
-    public final Optional<CustomItem> searchItem(final CommandSender sender, final String input, final boolean inform) {
+    public Optional<CustomItem> searchItem(final CommandSender sender, final String input, final boolean inform) {
         return this.searchItem(sender, input, inform, null);
     }
 
@@ -213,7 +213,7 @@ public class ItemManager {
      * @param itemStack the stack to reconcile, may be {@code null} or empty
      * @return the reconciled stack, or {@code null} if the stack should be removed entirely
      */
-    public final ItemStack apply(final ItemStack itemStack) {
+    public ItemStack apply(final ItemStack itemStack) {
         if (itemStack != null && !itemStack.isEmpty()) {
             // Identifier Check
             final CustomItem identifierItem = this.getItemByItemStack(itemStack).orElse(null);
@@ -254,7 +254,7 @@ public class ItemManager {
      *
      * @param inventory the inventory whose contents should be reconciled
      */
-    public final void updateInventory(final Inventory inventory) {
+    public void updateInventory(final Inventory inventory) {
         final ItemStack[] contents = inventory.getContents();
 
         for (int i = 0; i < contents.length; i++) {

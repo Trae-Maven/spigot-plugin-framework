@@ -14,7 +14,7 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
-public class ConfigReloadEvent extends CustomEvent {
+public final class ConfigReloadEvent extends CustomEvent {
 
     /**
      * The plugin that owns the reloaded configuration.

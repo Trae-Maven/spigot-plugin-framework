@@ -16,7 +16,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class TeamUpdateEvent extends CustomEvent {
+public final class TeamUpdateEvent extends CustomEvent {
 
     /**
      * The identifier of the team to scope this update to, or {@code null} to update the eligible team.

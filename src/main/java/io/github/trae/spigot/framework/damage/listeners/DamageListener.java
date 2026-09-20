@@ -24,7 +24,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
  * @see CustomDamageListener
  */
 @Singleton
-public class DamageListener implements Listener {
+public final class DamageListener implements Listener {
 
     /**
      * Cancels the vanilla event and dispatches the pre stage in its place.
@@ -35,7 +35,7 @@ public class DamageListener implements Listener {
      * @param entityDamageEvent the vanilla event being taken over
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onEntityDamage(final EntityDamageEvent entityDamageEvent) {
+    public void onEntityDamage(final EntityDamageEvent entityDamageEvent) {
         if (entityDamageEvent.isCancelled()) {
             return;
         }

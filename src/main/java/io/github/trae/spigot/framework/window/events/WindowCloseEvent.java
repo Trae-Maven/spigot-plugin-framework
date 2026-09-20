@@ -18,7 +18,7 @@ import org.bukkit.entity.Player;
  */
 @AllArgsConstructor
 @Getter
-public class WindowCloseEvent extends CustomCancellableEvent {
+public final class WindowCloseEvent extends CustomCancellableEvent {
 
     /**
      * The window being closed.

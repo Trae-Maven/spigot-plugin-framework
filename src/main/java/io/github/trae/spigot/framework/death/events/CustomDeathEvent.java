@@ -32,7 +32,7 @@ import java.util.List;
  */
 @Getter
 @Setter
-public class CustomDeathEvent extends CustomEvent implements DeathEvent {
+public final class CustomDeathEvent extends CustomEvent implements DeathEvent {
 
     /**
      * The damage pass that killed the entity, still holding the item, the names and the cause.
@@ -111,7 +111,7 @@ public class CustomDeathEvent extends CustomEvent implements DeathEvent {
      * @return the damage cause behind the death
      */
     @Override
-    public final EntityDamageEvent.DamageCause getCause() {
+    public EntityDamageEvent.DamageCause getCause() {
         return this.damageEvent.getCause();
     }
 }

@@ -28,7 +28,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
  */
 @AllArgsConstructor
 @Singleton
-public class DamageAttackSpeedListener implements Listener {
+public final class DamageAttackSpeedListener implements Listener {
 
     private final DamageManager damageManager;
 
@@ -38,7 +38,7 @@ public class DamageAttackSpeedListener implements Listener {
      * @param event the join event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerJoin(final PlayerJoinEvent event) {
+    public void onPlayerJoin(final PlayerJoinEvent event) {
         this.apply(event.getPlayer());
     }
 
@@ -48,7 +48,7 @@ public class DamageAttackSpeedListener implements Listener {
      * @param event the respawn event
      */
     @EventHandler(priority = EventPriority.MONITOR)
-    public final void onPlayerRespawn(final PlayerRespawnEvent event) {
+    public void onPlayerRespawn(final PlayerRespawnEvent event) {
         this.apply(event.getPlayer());
     }
 
@@ -59,7 +59,7 @@ public class DamageAttackSpeedListener implements Listener {
      * @param event the config reload event
      */
     @EventHandler
-    public final void onConfigReload(final ConfigReloadEvent event) {
+    public void onConfigReload(final ConfigReloadEvent event) {
         if (!event.getConfigurationClass().equals(DamageConfig.class)) {
             return;
         }

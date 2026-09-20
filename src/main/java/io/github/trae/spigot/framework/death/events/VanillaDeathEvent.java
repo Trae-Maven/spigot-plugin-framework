@@ -29,7 +29,7 @@ import java.util.Optional;
  */
 @Getter
 @Setter
-public class VanillaDeathEvent extends CustomEvent implements DeathEvent {
+public final class VanillaDeathEvent extends CustomEvent implements DeathEvent {
 
     /**
      * The entity that died.
@@ -116,7 +116,7 @@ public class VanillaDeathEvent extends CustomEvent implements DeathEvent {
      * @return the weapon as a reason, or {@code null} when the killer had nothing in hand
      */
     @Override
-    public final Reason getReason() {
+    public Reason getReason() {
         return Optional.ofNullable(this.itemStack)
                 .map(value -> value.effectiveName().hoverEvent(value.asHoverEvent()))
                 .map(component -> component.colorIfAbsent(UtilColor.toTextColor(ChatColor.GREEN.getColor())))
