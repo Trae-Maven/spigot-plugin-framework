@@ -10,7 +10,9 @@ import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.utilities.UtilJava;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -27,7 +29,7 @@ import java.util.List;
  * Describes an {@link ItemStack} declaratively: its material, display name, lore, and presentation
  * options. Subclasses supply the description; {@link #create(int, int)} and
  * {@link #update(ItemStack)} turn it into a stack, and {@link #refresh(ItemStack)} dispatches the
- * update events against one that needs no rewriting.
+ * stack update event against one that needs no rewriting.
  * <p>
  * This base type carries no identity, so the stacks it produces are indistinguishable from any
  * other. It suits transient stacks such as window icons, which are never picked up, persisted, or
@@ -35,7 +37,7 @@ import java.util.List;
  * inventories and need to be recognised and kept up to date.
  * <p>
  * Every option hook has a default, so the minimum a subclass supplies is
- * {@link #getDisplayName()} and {@link #getLore()}.
+ * {@link #getName()} and {@link #getLore()}.
  */
 @AllArgsConstructor
 @Getter
@@ -98,10 +100,11 @@ public abstract class Item {
     /**
      * Returns the shared visual style this item belongs to, or {@code null} for none.
      * <p>
-     * A style supplies the display name colour, the tooltip style, and a tag appended to the lore,
-     * so an item declaring one gets all three from a single decision rather than setting each
-     * itself. The framework attaches no meaning to a style beyond those three values; grouping them
-     * into rarities, tiers, or anything else is a decision for the plugin that defines them.
+     * A style supplies the display name colour and decorations, the tooltip style, and a tag
+     * appended to the lore, so an item declaring one gets all four from a single decision rather
+     * than setting each itself. The framework attaches no meaning to a style beyond those values;
+     * grouping them into rarities, tiers, or anything else is a decision for the plugin that defines
+     * them.
      *
      * @return the style, or {@code null}
      */
@@ -139,17 +142,29 @@ public abstract class Item {
     }
 
     /**
-     * Returns the display name, or {@code null} to leave the stack's name at the vanilla default.
-     * The name is deserialized through {@link UtilMessage} and coloured with {@link #getColor()}
-     * where it carries no colour of its own.
+     * Returns the decorations applied to the display name when the name itself does not set them.
+     * Resolved from {@link #getStyle()}, or {@code null} for an item with no style.
      *
-     * @return the display name, or {@code null}
+     * @return the display name decorations, or {@code null}
      */
-    public abstract String getDisplayName();
+    public List<TextDecoration> getDecorations() {
+        return this.getStyle() != null ? this.getStyle().getDecorations() : null;
+    }
 
     /**
-     * Returns the lore lines, or an empty list for no lore. Each line is deserialized through
-     * {@link UtilMessage} and defaults to white where it carries no colour of its own.
+     * Returns the raw name the display name is built from, or {@code null} to leave the stack's name
+     * at the vanilla default. The name is deserialized through {@link UtilMessage} and styled by
+     * {@link #getDisplayName()} with {@link #getColor()} and {@link #getDecorations()} where it
+     * carries none of its own.
+     *
+     * @return the raw name, or {@code null}
+     */
+    public abstract String getName();
+
+    /**
+     * Returns the lore lines, an empty list for no lore, or {@code null} to leave the stack's lore at
+     * the vanilla default. Each line is deserialized through {@link UtilMessage} and defaults to
+     * white where it carries no colour of its own.
      * <p>
      * An item with a style has its tag appended beneath these lines, separated by a blank, so a
      * subclass never writes the tag itself.
@@ -157,6 +172,25 @@ public abstract class Item {
      * @return the lore lines
      */
     public abstract List<String> getLore();
+
+    /**
+     * Builds the display name component from {@link #getName()}, with {@link #getColor()} and
+     * {@link #getDecorations()} applied as a fallback so any formatting in the name itself wins.
+     * Italic is disabled unless the decorations or the name itself enable it.
+     *
+     * @return the display name component
+     */
+    protected Component getDisplayName() {
+        final Style style = Style.style(builder -> {
+            builder.color(UtilColor.toTextColor(this.getColor()));
+
+            if (this.getDecorations() != null) {
+                this.getDecorations().forEach(decoration -> builder.decoration(decoration, true));
+            }
+        });
+
+        return UtilMessage.deserialize(this.getName()).applyFallbackStyle(style).decorationIfAbsent(TextDecoration.ITALIC, TextDecoration.State.FALSE);
+    }
 
     /**
      * Returns whether the given stack shares this item's material. Material alone says nothing about
@@ -322,11 +356,12 @@ public abstract class Item {
 
     /**
      * Applies this item's full description to a meta: the subclass stamp where requested, then
-     * display name, lore, model, tooltip style, and item flags. Options returning {@code null} are
-     * skipped, leaving the vanilla default in place.
+     * display name, lore, model, tooltip style, and item flags, and finally
+     * {@link #editMeta(ItemMeta)}. Options returning {@code null} are skipped, leaving the vanilla
+     * default in place.
      * <p>
-     * The style's tag is appended beneath the item's own lore, separated by a blank line, so it
-     * always reads as a footer rather than as another lore line.
+     * The style's tag is appended beneath the item's own lore, separated by a blank line when there
+     * is lore above it, so it always reads as a footer rather than as another lore line.
      *
      * @param itemMeta the meta to write to
      * @param stamp    whether to run {@link #stamp(ItemMeta)}, which is skipped for a display stack
@@ -338,23 +373,19 @@ public abstract class Item {
             this.stamp(itemMeta);
         }
 
-        // Edit Meta
-        this.editMeta(itemMeta);
-
         // Display Name
-        if (this.getDisplayName() != null) {
-            itemMeta.displayName(UtilMessage.deserialize(this.getDisplayName()).applyFallbackStyle(UtilColor.toTextColor(this.getColor())).decoration(TextDecoration.ITALIC, false));
+        if (this.getName() != null) {
+            itemMeta.displayName(this.getDisplayName());
         }
 
         // Lore
         if (this.getLore() != null) {
-            final List<String> lore = UtilJava.createCollection(new ArrayList<>(), list -> {
-                if (!this.getLore().isEmpty()) {
-                    list.addAll(this.getLore());
-                }
-
+            final List<String> lore = UtilJava.createCollection(new ArrayList<>(this.getLore()), list -> {
                 if (this.getStyle() != null && this.getStyle().getTag() != null) {
-                    list.add("");
+                    if (!list.isEmpty()) {
+                        list.add("");
+                    }
+
                     list.add("<font:custom:tags>%s</font>".formatted(this.getStyle().getTag()));
                 }
             });
@@ -376,6 +407,9 @@ public abstract class Item {
         if (this.hideAttributes()) {
             itemMeta.addItemFlags(ItemFlag.values());
         }
+
+        // Edit Meta
+        this.editMeta(itemMeta);
     }
 
     /**
@@ -389,6 +423,9 @@ public abstract class Item {
      * When downgrading to a less durable material, the number of remaining uses is preserved
      * instead. If the old item has more remaining uses than the new material can represent, the
      * new item is capped at full durability rather than penalizing the player for the downgrade.
+     * <p>
+     * Either way the new item is always left with at least one remaining use, so a material change
+     * never breaks it outright.
      * <p>
      * No adjustment is made if either item's metadata is not {@link Damageable} or either material
      * does not have durability.

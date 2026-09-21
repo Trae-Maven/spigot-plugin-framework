@@ -200,15 +200,16 @@ public final class ItemManager {
      * is converted into that item. Anything else is refreshed under its {@link DefaultItem}, which
      * writes nothing to it.
      * <p>
-     * Two paths replace a stack outright rather than editing it. The obtainable path does so
-     * deliberately, since the material is being reinterpreted as a custom item. The default path does
-     * so for a stack still carrying an identifier or version from an item that is no longer
-     * registered, rebuilding it clean so the orphaned data does not follow it around: either key
-     * alone is enough, since a half-stamped stack is as stale as a fully stamped one. An orphan whose
-     * item asked to be deleted rather than reset returns {@code null} instead, which every caller
-     * carries out in whatever way its own context allows. Every other path returns the input by
-     * reference, so an identity comparison tells a caller whether the stack was replaced rather than
-     * merely altered.
+     * Three paths replace a stack outright rather than editing it. The identifier path does so only
+     * when the item's material has changed since the stack was made, since the stack has to be
+     * rebuilt as the new material. The obtainable path does so deliberately, since the material is
+     * being reinterpreted as a custom item. The default path does so for a stack still carrying an
+     * identifier or version from an item that is no longer registered, rebuilding it clean so the
+     * orphaned data does not follow it around: either key alone is enough, since a half-stamped
+     * stack is as stale as a fully stamped one. An orphan whose item asked to be deleted rather than
+     * reset returns {@code null} instead, which every caller carries out in whatever way its own
+     * context allows. Every other path returns the input by reference, so an identity comparison
+     * tells a caller whether the stack was replaced rather than merely altered.
      *
      * @param itemStack the stack to reconcile, may be {@code null} or empty
      * @return the reconciled stack, or {@code null} if the stack should be removed entirely
@@ -247,7 +248,7 @@ public final class ItemManager {
      * Reconciles every slot in the given inventory against the item registry, writing back only
      * stacks that {@link #apply(ItemStack)} replaces.
      * <p>
-     * The check is by reference, so in practice only the two replacing paths in
+     * The check is by reference, so in practice only the three replacing paths in
      * {@link #apply(ItemStack)} trigger a write, along with a {@code null} return, which clears the
      * slot. Every other path edits the stack in place and returns it, which for a live inventory
      * stack is enough for the change to stick.

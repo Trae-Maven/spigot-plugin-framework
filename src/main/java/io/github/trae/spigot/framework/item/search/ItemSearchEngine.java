@@ -44,7 +44,7 @@ public final class ItemSearchEngine extends SpigotSearchEngine<CustomItem> {
      */
     @Override
     protected String getTypeFormat(final CustomItem customItem) {
-        return UtilMessage.serialize(Component.text(customItem.getDisplayName()).colorIfAbsent(UtilColor.toTextColor(customItem.getColor())));
+        return UtilMessage.serialize(Component.text(customItem.getName()).colorIfAbsent(UtilColor.toTextColor(customItem.getColor())));
     }
 
     /**

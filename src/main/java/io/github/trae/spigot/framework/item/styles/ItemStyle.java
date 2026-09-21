@@ -3,9 +3,11 @@ package io.github.trae.spigot.framework.item.styles;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.NamespacedKey;
 
 import java.awt.Color;
+import java.util.List;
 
 /**
  * Describes the shared visual style of an item.
@@ -28,6 +30,8 @@ public final class ItemStyle {
      */
     private final Color color;
 
+    private final List<TextDecoration> decorations;
+
     /**
      * The tooltip style applied to items using this style.
      */
@@ -47,7 +51,11 @@ public final class ItemStyle {
      * @param tag          the tag appended to item lore
      * @return the created item style
      */
+    public static ItemStyle of(final String name, final Color color, final List<TextDecoration> decorations, final NamespacedKey tooltipStyle, final String tag) {
+        return new ItemStyle(name, color, decorations, tooltipStyle, tag);
+    }
+
     public static ItemStyle of(final String name, final Color color, final NamespacedKey tooltipStyle, final String tag) {
-        return new ItemStyle(name, color, tooltipStyle, tag);
+        return of(name, color, null, tooltipStyle, tag);
     }
 }

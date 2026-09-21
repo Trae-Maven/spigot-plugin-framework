@@ -51,7 +51,7 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 
 ## Hierarchy
 
-```
+```text
 SpigotPlugin (extends JavaPlugin, implements Plugin)
   └─ Manager
        └─ BaseCommand (Node under the Manager)
@@ -296,7 +296,7 @@ This registers `/account admin` automatically: the parent `AccountCommand` route
 
 ### Command Execution Flow
 
-```
+```text
 /account admin
   │
   ├─ Sender type validation (Player)
@@ -402,7 +402,7 @@ public class BackIcon extends Item {
     }
 
     @Override
-    public String getDisplayName() {
+    public String getName() {
         return "Back";
     }
 
@@ -430,7 +430,7 @@ public class MinersPickaxe extends CustomItem {
     }
 
     @Override
-    public String getDisplayName() {
+    public String getName() {
         return "Miner's Pickaxe";
     }
 
@@ -501,7 +501,7 @@ It runs after the display options, so an option set here overrides the equivalen
 
 ### Styles
 
-An `ItemStyle` carries a colour, a tooltip style key and a tag glyph, so an item makes one decision rather than three:
+An `ItemStyle` carries a colour, a set of decorations, a tooltip style key and a tag glyph, so an item makes one decision rather than four:
 
 ```java
 @Override
@@ -510,9 +510,9 @@ protected ItemStyle getStyle() {
 }
 ```
 
-The style supplies the display name colour, sets the tooltip frame, and appends its tag beneath the item's lore separated by a blank line. An item declaring one writes no colour, no tooltip style and no tag line of its own.
+The style supplies the display name colour and decorations, sets the tooltip frame, and appends its tag beneath the item's lore, separated by a blank line when there is lore above it. An item declaring one writes no colour, no decorations, no tooltip style and no tag line of its own.
 
-The framework attaches no meaning to a style beyond those three values. Grouping them into rarities, tiers or anything else is a decision for the plugin that defines them:
+The framework attaches no meaning to a style beyond those values. Grouping them into rarities, tiers or anything else is a decision for the plugin that defines them:
 
 ```java
 @UtilityClass
@@ -536,7 +536,7 @@ An item declaring `naturallyObtainable()` is registered under its material as we
 public class RawIron extends CustomItem {
 
     public RawIron() {
-        super(Material.RAW_IRON, "raw_iron");
+        super(Material.RAW_IRON, "9b3e6f12-4c85-4d27-a1f0-5e8d2c7b6a49", "RAW_IRON");
     }
 
     @Override
@@ -545,7 +545,7 @@ public class RawIron extends CustomItem {
     }
 
     @Override
-    public String getDisplayName() {
+    public String getName() {
         return "Raw Iron";
     }
 
@@ -561,7 +561,7 @@ public class RawIron extends CustomItem {
 }
 ```
 
-Only one item may claim a given material. Registering two throws at server load.
+Only one item may claim a given material. If two do, only one of them is registered under it, and which one is not defined, so declare it on a single item.
 
 ### Activatable Items
 
@@ -569,14 +569,14 @@ Extend `ActivatableCustomItem` for an item that does something when clicked. `It
 
 ```java
 @Singleton
-public class MinersPickaxe extends SingleActivatableCustomItem {
+public class MinersPickaxe extends ActivatableCustomItem {
 
     public MinersPickaxe() {
-        super(Material.IRON_PICKAXE, "2f9c1e04-7a13-4f60-9d2b-5c81ab3e7f10", "MINERS_PICKAXE", ActivateType.RIGHT_CLICK);
+        super(Material.IRON_PICKAXE, "2f9c1e04-7a13-4f60-9d2b-5c81ab3e7f10", "MINERS_PICKAXE");
     }
 
     @Override
-    public String getDisplayName() {
+    public String getName() {
         return "Miner's Pickaxe";
     }
 
@@ -586,7 +586,7 @@ public class MinersPickaxe extends SingleActivatableCustomItem {
     }
 
     @Override
-    public void onActivate(final Player player, final ItemStack itemStack) {
+    public void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
         UtilMessage.message(player, "Items", "Vein mining <green>enabled</green>.");
     }
 }
@@ -596,7 +596,7 @@ An item extending `CustomItem` directly is never invoked, so the capability is o
 
 ### Single-Click Items
 
-Most items respond to one kind of click and branch on nothing. `SingleActivatableCustomItem` fixes the click type at construction and drops the `ActivateType` parameter from every hook:
+Most items respond to one kind of click and branch on nothing. `SingleActivatableCustomItem` fixes the click type at construction and drops the `ActivateType` parameter from every hook that has an overload without it:
 
 ```java
 @Singleton
@@ -607,7 +607,7 @@ public class WarpStone extends SingleActivatableCustomItem {
     }
 
     @Override
-    public String getDisplayName() {
+    public String getName() {
         return "Warp Stone";
     }
 
@@ -640,7 +640,7 @@ public class WarpStone extends SingleActivatableCustomItem {
 
 The cooldown hooks lose their `ActivateType` parameter too, since the click type is already fixed.
 
-Any other click type is refused before the item's own checks run, so a left click never reaches `onActivate` and the item writes no click-type check. Every parameterised hook is final, so a subclass cannot accidentally override the wrong overload.
+Any other click type is refused before the item's own checks run, so a left click never reaches `onActivate` and the item writes no click-type check. Every hook with a click-type overload is final, so a subclass cannot accidentally override the wrong one. `activateOnItemUse` and `activateOnBlockUse` have no such overload and still take the click type.
 
 ### Channelled Items
 
@@ -651,11 +651,11 @@ Any other click type is refused before the item's own checks run, so a left clic
 public class DiviningRod extends ChannelCustomItem {
 
     public DiviningRod() {
-        super(Material.STICK, "0d4f8a21-6b3c-4e79-8f15-c2a70b9e4d33", "DIVINING_ROD");
+        super(Material.BRUSH, "0d4f8a21-6b3c-4e79-8f15-c2a70b9e4d33", "DIVINING_ROD");
     }
 
     @Override
-    public String getDisplayName() {
+    public String getName() {
         return "Divining Rod";
     }
 
@@ -686,7 +686,7 @@ public class DiviningRod extends ChannelCustomItem {
 }
 ```
 
-The right click starts a channel and a scheduler ticks it from there. `onChannel` runs every tick until the player lets go, swaps items, logs out, an `ItemChannelEvent` is cancelled, or `canChannel` stops returning `true`. Whichever ends it, `onStop` fires exactly once.
+The right click starts a channel and a scheduler ticks it from there. `onChannel` runs every tick until the player lets go, swaps items, logs out, an `ItemChannelEvent` is cancelled, or `canChannel` stops returning `true`. Whichever ends it, `onStop` fires exactly once, except for a logout, where there is no player left to act on.
 
 Note `canChannel` is checked every tick rather than only at the start, so this rod stops on its own the moment the player climbs above ground.
 
@@ -694,10 +694,10 @@ Note `canChannel` is checked every tick rather than only at the start, so this r
 |---|---|
 | `onStart` | Once, when the channel begins |
 | `onChannel` | Every tick the channel runs |
-| `onStop` | Once, however the channel ended |
+| `onStop` | Once, however the channel ended, except a logout |
 | `canChannel` | Every tick, before `onChannel` |
 
-Holding right click requires the item to have a use action. Many materials have none, a sword and a stick among them, and the hold never registers for those. See [Sword Blocking](#sword-blocking) for the component that gives one to a sword.
+Holding right click requires the item to have a use action. Many materials have none, a sword and a stick among them, which is why the rod above is built on a brush, and the hold never registers for those. See [Sword Blocking](#sword-blocking) for the component that gives one to a sword.
 
 ### Activation Types
 
@@ -726,7 +726,7 @@ public void onActivate(final Player player, final ItemStack itemStack, final Act
 
 ### Gating an Activation
 
-`canActivate` is the item-level check, evaluated after the pre-activate event, for conditions the item itself owns such as a cooldown or a durability threshold:
+`canActivate` is the item-level check, evaluated after the pre-activate event, for conditions the item itself owns such as a resource or a durability threshold. Cooldowns have their own hooks, covered below:
 
 ```java
 @Override
@@ -736,7 +736,7 @@ public boolean canActivate(final Player player, final ItemStack itemStack, final
     }
 
     if (player.isInWater() || player.isInLava()) {
-        UtilMessage.message(player, "Item", "You cannot use <green>%s</green> while in liquid.".formatted(this.getDisplayName()));
+        UtilMessage.message(player, "Item", "You cannot use <green>%s</green> while in liquid.".formatted(this.getName()));
         return false;
     }
 
@@ -764,7 +764,7 @@ An item declares its own cooldown rather than each caller managing one:
 ```java
 @Override
 public String getCooldownName(final ActivateType activateType) {
-    return this.getDisplayName();
+    return this.getName();
 }
 
 @Override
@@ -773,7 +773,7 @@ public long getCooldownDuration(final ActivateType activateType) {
 }
 ```
 
-The name is the key rather than the item, so two items returning the same name share a cooldown, and one item returning different names per click type gates each independently. `getCooldownName` defaults to the display name and `getCooldownDuration` to zero, meaning no cooldown.
+The name is the key rather than the item, so two items returning the same name share a cooldown, and one item returning different names per click type gates each independently. `getCooldownName` defaults to the item's raw `getName()` and `getCooldownDuration` to zero, meaning no cooldown.
 
 A `SingleActivatableCustomItem` gets the parameterless overloads, since the click type is already fixed.
 
@@ -866,7 +866,7 @@ A custom item is refused as a reagent too, not only as the thing being worked on
 
 Every stack a `CustomItem` produces carries a SHA-256 hash of the item's full description. Change the display name, lore, model, colour, or any other described property, and the hash changes, which marks every stack already in circulation as outdated.
 
-`ItemManager#apply(ItemStack)` reads the stamped identifier, finds the owning item, and replaces the stack when its version no longer matches. Amount and durability are preserved, so a pickaxe a player has been using for weeks keeps its damage while gaining the new lore.
+`ItemManager#apply(ItemStack)` reads the stamped identifier, finds the owning item, and updates the stack when its version no longer matches. Amount and durability are preserved, so a pickaxe a player has been using for weeks keeps its damage while gaining the new lore.
 
 Reconciliation runs automatically at every point a stack enters a player's possession:
 
@@ -928,14 +928,14 @@ this.itemManager.searchItem(sender, input, true).ifPresent(item -> player.getInv
 
 | Stack | Route |
 |---|---|
-| Known identifier, outdated version | `update`, rewriting the description in place |
+| Known identifier, outdated version | `update`, rewriting the description in place, or rebuilding the stack if the item's material changed |
 | Known identifier, current version | `refresh`, dispatching the events and nothing else |
 | No identifier, obtainable material | `create`, building a fresh stack |
 | Orphan marked deletable | `null`, removing the stack |
 | Orphan otherwise | `create` under its `DefaultItem`, building a clean stack |
 | Anything else | `refresh` under its `DefaultItem` |
 
-Two routes replace a stack outright, and both do so deliberately. The obtainable route reinterprets the material as a custom item, and the orphan route strips data that belongs to an item that no longer exists, so enchantments and other data do not carry across either. Either an identifier or a version alone is enough to count as an orphan, since a half-stamped stack is as stale as a fully stamped one.
+Three routes replace a stack outright. The update route does so only when the item's material has changed, since the stack has to be rebuilt as the new material. The obtainable route reinterprets the material as a custom item, and the orphan route strips data that belongs to an item that no longer exists, so enchantments and other data do not carry across either of those two. Either an identifier or a version alone is enough to count as an orphan, since a half-stamped stack is as stale as a fully stamped one.
 
 A `null` return means the stack should be removed, and every caller carries that out in whatever way its own context allows. `updateInventory` clears the slot. Every other route returns the input by reference, so an identity comparison tells a caller whether the stack was replaced rather than merely altered.
 
@@ -1002,7 +1002,7 @@ public class SettingsButton extends Button<ProfileWindow> {
 
 The window is typed, so a button reaches its window's own state and methods without a cast: paging, toggling a filter, or triggering a re-render.
 
-`getDisplayName` and `getLore` layer over the base stack rather than replacing it. The base is cloned first, so a button handed a shared stack never mutates it; a display name the button declares overrides the base's own, and lore is appended beneath the base's, separated by a blank line. That lets a button annotate an item with what clicking it does while leaving the item's own description intact.
+`getName` and `getLore` layer over the base stack rather than replacing it. The base is cloned first, so a button handed a shared stack never mutates it; a display name the button declares overrides the base's own, and lore is appended beneath the base's, separated by a blank line. That lets a button annotate an item with what clicking it does while leaving the item's own description intact.
 
 Use `createView()` rather than `create()` for the base stack. A menu icon has no business carrying an item's identity, and a view stack cannot be mistaken for the real thing were it ever to escape the window.
 
@@ -1088,7 +1088,7 @@ public class SettingsWindow extends Window {
 this.windowManager.getWindowByPlayer(player).ifPresent(window -> window.refresh());
 
 // Which window owns this inventory
-this.windowManager.getWindowByInventory(inventory);
+this.windowManager.getWindowByInventory(inventory).ifPresent(window -> window.refresh());
 ```
 
 Click dispatch never consults these maps. A window is its own `InventoryHolder`, so a click resolves straight off the event and a momentarily stale map can never misroute one.
@@ -2597,7 +2597,6 @@ All but `ChatChannelEvent` are cancellable. Cancelling a send refuses the messag
 | `Node` | Typed parent access for commands and subcommands (provided by Hierarchy-Framework) |
 | `SharedBaseCommand` | Shared contract between commands and subcommands: sender validation, permission, execution, and tab-complete |
 | `IBaseCommand` | Command contract with subcommand management |
-| `Activatable` | Capability a `CustomItem` implements to gain a click action |
 | `ICustomCancellableEvent` | Cancellable event with reason support |
 | `DeathEvent` | Shared contract of both death events: entity, killer, cause, reason, drops, experience and death sound |
 | `SystemTimeMixin` | Carries a timestamp of when something was created or started |

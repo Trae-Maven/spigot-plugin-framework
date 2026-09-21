@@ -22,13 +22,14 @@ import java.util.UUID;
  * {@link #onChannel(Player, ItemStack)} every tick until the player lets go, swaps items, logs out,
  * a {@link io.github.trae.spigot.framework.item.events.ItemChannelEvent} is cancelled, or
  * {@link #canChannel(Player, ItemStack)} stops returning {@code true}. Whichever ends it,
- * {@link #onStop(Player, ItemStack)} fires exactly once.
+ * {@link #onStop(Player, ItemStack)} fires exactly once, except for a logout, where there is no
+ * player left to act on.
  * <p>
  * Holding right click requires the item to have a use action. Many materials have none, a sword
  * among them, and the hold never registers for those. Attaching the {@code blocks_attacks} data
  * component gives a sword one, so a channelling sword needs that component to work at all.
  * <p>
- * The click type is fixed to {@link ActivateType#RIGHT_CLICK} by the superclass, and
+ * The click type is fixed to {@link ActivateType#RIGHT_CLICK} through the superclass, and
  * {@link #onActivate(Player, ItemStack)} is final here, since starting a channel is the only thing
  * an activation may do. Every way a channel ends belongs to the tick instead. A subclass implements
  * {@link #onChannel(Player, ItemStack)} and overrides the start, stop, and gate hooks as needed.

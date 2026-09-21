@@ -14,10 +14,12 @@ import org.bukkit.inventory.ItemStack;
  * {@link ActivateType} parameter it would otherwise have to branch on. An item that only ever
  * responds to a right click writes no click-type check at all.
  * <p>
- * Every parameterised hook is final here and forwards to a parameterless one, so a subclass cannot
- * accidentally override the wrong overload and find its item responding to clicks it never meant to
- * handle. Extend {@link ActivatableCustomItem} directly for an item that does different things on
- * different clicks.
+ * Every hook with a click-type overload is final here and forwards to the overload without it, so a
+ * subclass cannot accidentally override the wrong one and find its item responding to clicks it
+ * never meant to handle. {@link #activateOnItemUse(Player, ItemStack, ActivateType)} and
+ * {@link #activateOnBlockUse(Player, ItemStack, Block, ActivateType)} have no such overload and
+ * still take the click type. Extend {@link ActivatableCustomItem} directly for an item that does
+ * different things on different clicks.
  */
 public abstract class SingleActivatableCustomItem extends ActivatableCustomItem {
 
@@ -144,11 +146,11 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
     }
 
     /**
-     * Returns how long this item's activation cooldown lasts.
+     * Returns how long this item's activation cooldown lasts, in milliseconds.
      * <p>
      * Defaults to the cooldown duration associated with this item's click type.
      *
-     * @return the cooldown duration
+     * @return the cooldown duration in milliseconds
      */
     public long getCooldownDuration() {
         return super.getCooldownDuration(this.activateType);
@@ -157,7 +159,7 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
     /**
      * Returns whether this item may activate for the given player and stack (e.g. gated behind a
      * resource or a durability threshold). The click type is not passed, since it is already known
-     * to be this item's own.
+     * to be this item's own. Defaults to {@code true}.
      * <p>
      * This is the item-level check, evaluated after the pre-activate event, for conditions the item
      * itself owns.
@@ -171,7 +173,8 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
     }
 
     /**
-     * Performs this item's action.
+     * Performs this item's action. Called only after the click has survived the pre-activate event
+     * and passed {@link #canActivate(Player, ItemStack)}.
      *
      * @param player    the player who clicked
      * @param itemStack the specific stack that was clicked with

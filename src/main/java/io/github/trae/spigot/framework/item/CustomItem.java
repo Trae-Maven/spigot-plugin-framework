@@ -7,6 +7,7 @@ import io.github.trae.spigot.framework.utility.UtilItemStack;
 import io.github.trae.utilities.UtilHash;
 import io.github.trae.utilities.UtilString;
 import lombok.Getter;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.LivingEntity;
@@ -17,6 +18,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * An {@link Item} that stamps its identity onto every stack it produces, so the stack can be
@@ -133,8 +135,8 @@ public abstract class CustomItem extends Item {
     }
 
     /**
-     * Returns whether the material's vanilla use cooldown should be removed from
-     * stacks of this item.
+     * Returns whether the material's vanilla use cooldown should be removed from stacks of this
+     * item. Defaults to {@code true}.
      *
      * @return {@code true} to remove the vanilla use cooldown
      */
@@ -175,7 +177,7 @@ public abstract class CustomItem extends Item {
 
     /**
      * Returns the values the version hash is computed from, meaning every part of the description
-     * that changes what the stack should look like.
+     * that changes how the stack should look or behave.
      * <p>
      * Changing any of them changes the hash, which marks every existing stack as outdated and causes
      * {@link ItemManager#apply(ItemStack)} to update it. Neither the identifier nor the namespace
@@ -188,9 +190,10 @@ public abstract class CustomItem extends Item {
     protected List<String> generateVersionEntries() {
         return List.of(
                 UtilString.pair("Material", this.getMaterial().name()),
-                UtilString.pair("Display-Name", this.getDisplayName()),
-                UtilString.pair("Lore", String.join("\u0001", this.getLore())),
+                UtilString.pair("Name", this.getName()),
+                UtilString.pair("Lore", this.getLore() != null ? String.join("\u0001", this.getLore()) : ""),
                 UtilString.pair("Color", Integer.toString(this.getColor().getRGB())),
+                UtilString.pair("Decorations", this.getDecorations() != null ? this.getDecorations().stream().map(TextDecoration::name).collect(Collectors.joining("\u0001")) : ""),
                 UtilString.pair("Model", this.getModel() != null ? this.getModel().asString() : ""),
                 UtilString.pair("Tooltip-Style", this.getTooltipStyle() != null ? this.getTooltipStyle().asString() : ""),
                 UtilString.pair("Hide-Attributes", Boolean.toString(this.hideAttributes())),

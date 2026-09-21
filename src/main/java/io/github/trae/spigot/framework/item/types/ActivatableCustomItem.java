@@ -117,7 +117,10 @@ public abstract class ActivatableCustomItem extends CustomItem {
 
     /**
      * Returns whether this item may activate for the given player, stack, and click type (e.g. gated
-     * behind a cooldown, a permission, or a durability threshold). Defaults to {@code true}.
+     * behind a resource, a permission, or a durability threshold). Defaults to {@code true}.
+     * <p>
+     * Cooldowns do not belong here, since {@link #getCooldownName(ActivateType)} and
+     * {@link #getCooldownDuration(ActivateType)} already handle them.
      * <p>
      * This is the item-level check, evaluated after the pre-activate event, for conditions the item
      * itself owns.
@@ -143,17 +146,17 @@ public abstract class ActivatableCustomItem extends CustomItem {
 
     /**
      * Returns the name this item's activation cooldown is recorded under for the given click type.
-     * Defaults to the item's display name, so a cooldown message reads as the item the player
-     * recognises rather than an internal key.
+     * Defaults to the item's raw {@link #getName()}, so a cooldown message reads as the item the
+     * player recognises rather than an internal key.
      * <p>
-     * The name is the key rather than the item, so two items sharing a display name share a
+     * The name is the key rather than the item, so two items sharing a name share a
      * cooldown, and one item returning different names per click type gates each independently.
      *
      * @param activateType the kind of click
      * @return the cooldown name
      */
     public String getCooldownName(final ActivateType activateType) {
-        return this.getDisplayName();
+        return this.getName();
     }
 
     /**
