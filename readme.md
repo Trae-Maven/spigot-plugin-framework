@@ -1,6 +1,6 @@
 # Spigot-Plugin-Framework
 
-A Spigot/Paper plugin framework providing structured command systems, event utilities, a staged damage and death pipeline, channel-based chat, packet-based sidebars, tablists, teams and holograms, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
+A Spigot/Paper plugin framework providing structured command systems, event utilities, a staged damage and death pipeline, channel-based chat, packet-based sidebars, tablists, teams and holograms, real-entity NPCs, map-based pictures, configurable resource packs, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
 
 Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-based hierarchy architecture, automatically handling registration and teardown of listeners, commands, and subcommands as components are initialized and shut down.
 
@@ -19,6 +19,10 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Tablist system with priority resolution for per-player header and footer content
 - Packet-based team system with per-viewer prefix and suffix resolution, giving relation-aware nametag colours through priority-sorted `Team` subclasses
 - Packet-based hologram system built on text displays rather than armour stands, with per-player text, per-player visibility, and no entity in the world
+- Hologram backgrounds drawn from a bitmap font glyph, for a textured or shaped panel behind the text
+- Map-based picture system that renders a PNG or JPG across a grid of item frames, reusing the same maps across restarts and redrawing them only when the image changes
+- Real-entity NPC system with typed backing entities, opt-in interaction and damage, respawn gating after death, and no duplicates across restarts or chunk reloads
+- Resource pack system driven by a JSON list of packs, each with its own URL, hash, requirement, worlds and permission, sent in one request and swapped per pack on world change
 - Staged damage pipeline that replaces vanilla damage entirely, with a gate stage, an ability stage and a reduction stage, each cancellable
 - Damage modifiers filed under named keys so a weapon's damage, a critical multiplier and an armour reduction all compose instead of overwriting one another
 - Vanilla-accurate defaults for armour, toughness, protection, resistance, strength, weakness, weapon damage, critical hits, knockback, durability and immunity windows, each replaceable per piece or per item through its own event
@@ -67,7 +71,7 @@ Commands and subcommands integrate directly into the hierarchy as Nodes, each wi
 | `BaseCommand` | Node under a Manager | Registered with `CommandMap` |
 | `BaseSubCommand` | Node under a command | Attached to parent command |
 
-The damage, death, chat, effect, sidebar, tablist, team, hologram, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
+The damage, death, chat, effect, sidebar, tablist, team, hologram, picture, NPC, resource pack, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
 
 ---
 
@@ -77,7 +81,7 @@ Spigot-Plugin-Framework requires Java 21+ and a Paper API environment.
 
 ### NMS Access (paper-nms-maven-plugin)
 
-The sidebar, team and hologram systems and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
+The sidebar, team, hologram and picture systems and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
 
 Add `.paper-nms` to your `.gitignore`, as it contains locally generated dependencies.
 
@@ -143,7 +147,7 @@ Add the dependency to your Maven project:
 
 ## Enabling Subsystems
 
-The damage, death, chat, effect, sidebar, tablist, team, hologram, item, and window systems each ship their own managers and listeners as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
+The damage, death, chat, effect, sidebar, tablist, team, hologram, picture, NPC, resource pack, item, and window systems each ship their own managers and listeners as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
 
 Declare the packages you want with `@Scan` on your `@Application` class, or on any interface or superclass in its hierarchy. The `ScanResolver` walks the full type graph of the bootstrap class and collects every `@Scan` it finds, so each layer can declare what it owns.
 
@@ -200,6 +204,9 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
 | `io.github.trae.spigot.framework.team` | `TeamManager`, `TeamListener` |
 | `io.github.trae.spigot.framework.hologram` | `HologramManager`, `HologramListener` |
+| `io.github.trae.spigot.framework.picture` | `PictureManager`, `PictureListener` |
+| `io.github.trae.spigot.framework.npc` | `NpcManager`, `NpcInteractListener`, `NpcDamageListener`, `NpcDeathListener`, `NpcStaleListener` |
+| `io.github.trae.spigot.framework.resourcepack` | `ResourcePackManager`, `ResourcePackListener` |
 | `io.github.trae.spigot.framework.damage` | `DamageManager`, `DamageListener`, `CustomDamageListener`, and the reduction, durability, knockback, critical, potion effect, delay, interval and attack-speed listeners |
 | `io.github.trae.spigot.framework.death` | `DeathListener`, `DeathMessageListener` |
 | `io.github.trae.spigot.framework.chat` | `ChatManager`, `PreChatListener`, `CustomChatListener` |
@@ -1533,6 +1540,7 @@ Every appearance hook has a default, so a hologram overrides only what it cares 
 | `getBillboard()` | How the display rotates to face viewers | `CENTER` |
 | `getAlignment()` | How multiple lines align against each other | `CENTER` |
 | `getBackgroundColor()` | The ARGB background behind the text | Fully transparent |
+| `getBackground()` | A bitmap font glyph drawn behind the text, as MiniMessage | `null` |
 | `getScale()` | Uniform scale | `1.0F` |
 | `getTextOpacity()` | Text opacity, `-1` for fully opaque | `-1` |
 | `getLineWidth()` | Pixel width at which text wraps | `200` |
@@ -1556,11 +1564,33 @@ protected Color getBackgroundColor() {
 
 `Billboard.VERTICAL` turns to face the player but stays upright, and `Billboard.CENTER` pivots on both axes and tilts with their pitch.
 
-The vanilla grey box is always disabled, so `getBackgroundColor` is the only background a viewer sees. It is only ever a rectangle: a shaped or textured background is a bitmap font glyph drawn behind the text, the same mechanism as an inline image.
+The vanilla grey box is always disabled, so `getBackgroundColor` is the only flat background a viewer sees, and it is only ever a rectangle. A shaped or textured background comes from `getBackground`, covered below.
 
-### Images
+### Images and Backgrounds
 
-There is no image support in a text display, and no packet that carries one. Both images and shaped backgrounds go through a bitmap font provider in a resource pack: register a glyph mapping a private-use character to a PNG, then return that character in a line like any other text. The provider's height and ascent control how it sits against the text, and a negative-space provider backs the cursor up when something needs to sit behind rather than beside.
+There is no image support in a text display, and no packet that carries one. Both images and backgrounds go through a bitmap font provider in a resource pack: register a glyph mapping a private-use character to a PNG, then return that character in a line like any other text. The provider's height and ascent control how it sits against the text, and a negative-space provider backs the cursor up when something needs to sit behind rather than beside.
+
+`getBackground` returns a glyph to draw behind every line, rendered as its own first line. The string must have a net advance of zero so the line stays centred: a negative space of half the glyph's rendered width, the glyph, then a negative space of half its width plus one, since a bitmap glyph advances one pixel past its width.
+
+```json
+{
+  "providers": [
+    {"type": "space", "advances": {"\uE001": -80, "\uE002": -81}},
+    {"type": "bitmap", "file": "custom:font/hologram/background.png", "ascent": 7, "height": 96, "chars": ["\uE000"]}
+  ]
+}
+```
+
+```java
+@Override
+protected String getBackground() {
+    return "<font:custom:hologram>\uE001\uE000\uE002</font>";
+}
+```
+
+An `ascent` of 7 aligns the image's top with the first row, and `height` sets how far down it reaches behind the lines below, at roughly ten pixels per line. The rendered width is the PNG's width scaled by `height` over its own height, and the two advances follow from that. Keep `isShadowed()` false, or the image is drawn with a darkened copy behind it.
+
+The glyph line adds one row of padding above the first line of text, so draw any padding a design wants into the PNG itself.
 
 ### Visibility Resolution
 
@@ -1596,6 +1626,300 @@ this.hologramManager.getHologramByName("SPAWN").ifPresent(hologram -> this.holog
 `despawn` is not a way to hide a hologram, since the next pass spawns it again if it is still visible. Use `canSee` or a cancelled `HologramSpawnEvent` for that.
 
 A hologram whose `getLocation()` returns `null`, or names a world that is not loaded, is treated as not ready rather than as an error. The scheduler retries it, so a hologram in a world that loads late starts working on its own.
+
+---
+
+## Picture System
+
+The framework provides a map-based picture system. A `Picture` describes an image and where it hangs, and the framework renders it across a grid of maps in invisible item frames, one map per 128x128 tile. PNG, JPG and anything else `ImageIO` reads all work.
+
+The pictures are real item frames rather than packets, so every player sees the same image at no per-player cost. What the framework keeps out of the world is the part that would otherwise pile up: maps are reused across restarts, and frames are never saved to the chunk.
+
+Requires `@Scan("io.github.trae.spigot.framework.picture")`.
+
+### Defining a Picture
+
+Extend `Picture`, passing an identifier, the top-left frame location, the direction the frames face and the grid size, and register it as a component. `PictureManager` collects every subclass through the dependency injector:
+
+```java
+@Singleton
+public class PracticeBannerPicture extends Picture {
+
+    private final File file;
+
+    public PracticeBannerPicture(final CorePlugin plugin) {
+        super("practice_banner", new Location(Bukkit.getWorld("lobby"), 100.0D, 80.0D, 50.0D), BlockFace.SOUTH, 3, 6);
+
+        this.file = new File(plugin.getDataFolder(), "practice.png");
+    }
+
+    @Override
+    protected BufferedImage loadImage() throws IOException {
+        return ImageIO.read(this.file);
+    }
+}
+```
+
+The location is the air block the top-left frame occupies, in front of the wall. Tiles run left to right, then top to bottom, as seen by a player facing the wall, and every tile needs a solid block behind it. Only horizontal facings are supported.
+
+The image is scaled to `columns * 128` by `rows * 128`, stretching if the aspect ratio differs, so export it at exactly that size for the cleanest result: 384 by 768 for the grid above.
+
+### Maps Across Restarts
+
+A naive implementation creates new maps on every boot, leaving a new `map_N.dat` behind per tile per restart. The framework instead stores each picture's map IDs, alongside a hash of the rendered pixels, in the world's persistent data under `custom:picture_state_<identifier>`.
+
+| On Startup | Result |
+|---|---|
+| Stored maps exist and the hash matches | The maps are reused as they are, with nothing drawn |
+| Stored maps exist and the hash differs | The same maps are redrawn with the new image |
+| The grid has grown | Stored maps are reused, and maps are created only for the new tiles |
+| Nothing is stored | Maps are created and drawn, and their IDs stored |
+
+Pixels are written straight into each map's saved data and the map is locked, so vanilla persists the image with the map itself and no renderer is ever attached. Swapping the image and restarting is the whole update process.
+
+The identifier forms part of that key, so it must only contain characters valid in a namespaced key once lowercased: `a-z`, `0-9`, `.`, `_` and `-`.
+
+### Colours
+
+A map can only show vanilla's map palette, roughly two hundred and fifty colours, so every pixel is matched to the nearest one by red-mean distance, a perceptual weighting close to how the eye judges colour. Pixels under half alpha become transparent, letting the wall show through.
+
+Flat colours and bold outlines, the style of most server banners, convert cleanly. Smooth gradients band, since the palette has no colours between its steps.
+
+### Frames
+
+Frames are glow item frames by default, so the image stays at full brightness at night and underground. Override `isGlowing()` to use plain frames, which darken with light level like any other block face.
+
+Every frame is invisible, fixed and invulnerable, and `PictureListener` cancels any break of one, whether by a creative player, an explosion or the wall behind it being removed.
+
+Frames are spawned non-persistent and tagged with `custom:picture_identifier`, so they are never saved to the chunk. When a chunk unloads its frames are discarded, and a scheduler respawns them within a second of the chunk loading again. Any tagged frame still in the world at startup, such as one left behind by a reload, is removed before the pictures are rendered.
+
+A picture whose image cannot be read is skipped with a warning rather than failing startup.
+
+---
+
+## NPC System
+
+The framework provides an NPC system backed by real server entities. An `Npc` describes the entity, where it stands and how it behaves, and the framework keeps it spawned.
+
+Real entities rather than packets are what make an NPC more than a decoration: a boss paths, fights and takes damage through the same systems as any other mob, while a shopkeeper stands still and opens a window. Both are the same base class with different behaviour opted into.
+
+Requires `@Scan("io.github.trae.spigot.framework.npc")`.
+
+### Defining an NPC
+
+Extend `Npc` with the backing entity's type, passing its class, an identifier, a namespace and a location, and register it as a component. `NpcManager` collects every subclass through the dependency injector:
+
+```java
+@Singleton
+public class GuideNpc extends Npc<Villager> {
+
+    public GuideNpc() {
+        super(Villager.class, "GUIDE", "lobby", new Location(Bukkit.getWorld("lobby"), 0.5D, 64.0D, 4.5D));
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.text("Guide", NamedTextColor.GOLD);
+    }
+}
+```
+
+The type parameter carries through to every hook, so `onSpawn` and `getEntity()` hand back a `Villager` rather than a `LivingEntity` to cast. The identifier is unique per NPC and is what it is looked up by, while the namespace groups NPCs by the plugin or feature that owns them.
+
+NPCs are collected once the server has finished starting, so an NPC registered by any plugin is picked up regardless of enable order.
+
+### Settings
+
+Every setting has a default, so an NPC overrides only what it needs:
+
+| Hook | Controls | Default |
+|---|---|---|
+| `getDisplayName()` | The name shown above the entity, and in death messages | `null` |
+| `hasAI()` | Whether the entity moves, paths and attacks | `false` |
+| `isInvulnerable()` | Whether the entity ignores damage | `true`, or `false` for a `DamageableNpc` |
+| `isSilent()` | Whether the entity makes no sounds | `true` |
+| `isCollidable()` | Whether the entity pushes and is pushed | `false` |
+| `canSpawn()` | Whether the NPC may spawn right now | `true` |
+| `onSpawn(entity)` | Further setup once spawned, such as equipment or attributes | Nothing |
+
+### Interaction
+
+Implement `InteractableNpc` for an NPC players can right-click:
+
+```java
+@Singleton
+public class ShopkeeperNpc extends Npc<Villager> implements InteractableNpc {
+
+    public ShopkeeperNpc() {
+        super(Villager.class, "SHOPKEEPER", "lobby", new Location(Bukkit.getWorld("lobby"), 0.5D, 64.0D, 0.5D));
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.text("Shopkeeper", NamedTextColor.GOLD);
+    }
+
+    @Override
+    public boolean canInteract(final Player player) {
+        return !player.isSneaking();
+    }
+
+    @Override
+    public void onInteract(final Player player) {
+        UtilWindow.open(player, new ShopWindow());
+    }
+}
+```
+
+A click passes the cancellable `NpcInteractEvent` first, then the NPC's own `canInteract`, and only reaches `onInteract` if both allow it. Only the main hand is routed, so a click never fires twice.
+
+The vanilla interaction is cancelled for every NPC, interactable or not and in either hand, so a villager never opens its trade screen and an armour stand never gives up its equipment.
+
+### Damage, Death and Respawning
+
+Implement `DamageableNpc` for an NPC that can be hurt and killed:
+
+```java
+@Singleton
+public class BossNpc extends Npc<Zombie> implements DamageableNpc {
+
+    private long deathTime;
+
+    public BossNpc() {
+        super(Zombie.class, "BOSS", "arena", new Location(Bukkit.getWorld("arena"), 0.5D, 64.0D, 0.5D));
+    }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.text("The Warden of Ash", NamedTextColor.RED);
+    }
+
+    @Override
+    protected boolean hasAI() {
+        return true;
+    }
+
+    @Override
+    protected void onSpawn(final Zombie entity) {
+        entity.getAttribute(Attribute.MAX_HEALTH).setBaseValue(500.0D);
+        entity.setHealth(500.0D);
+    }
+
+    @Override
+    public boolean canRespawn() {
+        return System.currentTimeMillis() - this.deathTime >= TimeUnit.MINUTES.toMillis(10L);
+    }
+
+    @Override
+    public void onCustomDeathEvent(final CustomDeathEvent event) {
+        this.deathTime = System.currentTimeMillis();
+
+        event.getDrops().clear();
+    }
+}
+```
+
+An NPC that does not implement it has every hit cancelled, whether or not the active damage pipeline respects the invulnerability flag, so a shopkeeper is safe even under custom damage.
+
+Damage and death each reach the NPC through exactly one callback, decided by which framework subsystems are registered:
+
+| Registered | Damage Callback | Death Callback |
+|---|---|---|
+| Neither | `onEntityDamageByEntityEvent` | `onEntityDeathEvent` |
+| Death system only | `onEntityDamageByEntityEvent` | `onVanillaDeathEvent` |
+| Damage system only | `onCustomDamageEvent` | `onEntityDeathEvent` |
+| Damage and death systems | `onCustomDamageEvent` | `onCustomDeathEvent` |
+
+`canRespawn` is only consulted after an actual death. An NPC missing for any other reason, such as its chunk unloading, comes back as soon as it can, as does one that has never spawned. It defaults to `false`, so a `DamageableNpc` that says nothing stays gone once killed.
+
+Under the damage pipeline, a `DamageableNpc`'s death is announced like a player's. In any death message, an NPC with a display name is named by it, whether it died or did the killing.
+
+### Lifecycle
+
+There is no spawn call to make. A scheduler runs once a second and spawns every NPC with no entity whose location is in a loaded chunk, through the cancellable `NpcPreSpawnEvent` and then `canSpawn`.
+
+The entity is spawned non-persistent and tagged with `custom:npc_identifier`, so it is never saved to the chunk and never duplicates across a restart. When its chunk unloads the entity is discarded with it, and the NPC comes back once the chunk loads again. Any tagged entity left in the world, such as one that survived a reload, is removed as soon as it is found.
+
+Two events bracket each spawn. `NpcInitializeEvent` fires once every base setting is applied but before the entity is added to the world, so a change a listener makes is in place before any client sees it. `NpcPostSpawnEvent` fires once the entity is in the world and tracked.
+
+```java
+// Look an NPC up by its identifier
+this.npcManager.getNpcByIdentifier("BOSS").ifPresent(npc -> this.npcManager.despawn(npc));
+
+// Resolve the NPC behind an entity, including one that has already died
+this.npcManager.getNpcByTag(entity).ifPresent(npc -> UtilMessage.log("NPC", npc.getIdentifier()));
+```
+
+`getNpcByEntity` only resolves entities that are still tracked, while `getNpcByTag` reads the entity's tag and works on one that has already been untracked, such as after a death.
+
+`despawn` is not a way to hide an NPC, since the next pass spawns it again. Use `canSpawn` or a cancelled `NpcPreSpawnEvent` for that.
+
+---
+
+## Resource Pack System
+
+The framework sends server resource packs from a JSON list, through the Adventure multi-pack API. Each pack is addressed by its own identifier and sent without replacing anything, so packs stack, and applying or removing one never disturbs another the client has loaded.
+
+Requires `@Scan("io.github.trae.spigot.framework.resourcepack")`.
+
+### Configuration
+
+`Resourcepack.json` holds every setting. It is a system configuration, so it lives in the data folder of the first plugin that scans the resource pack package. Resource packs are off until `enabled` is set.
+
+```json
+{
+  "enabled": true,
+  "prompt": "",
+  "kickMessage": "<red>You must accept the resource pack to play.",
+  "resourcePacks": [
+    {"id": "4b1d6f0e-2c7a-4e93-9a58-1f3e7c0d2b64", "url": "https://example.com/core.zip", "hash": "2fd4e1c67a2d28fced849ee1bb76e7391b93eb12", "required": true, "worlds": [], "permission": ""},
+    {"id": "c83a0f52-91d7-4b6e-8e2f-7a4c5d19b0e3", "url": "https://example.com/lobby.zip", "hash": "", "required": false, "worlds": ["lobby"], "permission": ""}
+  ]
+}
+```
+
+| Setting | Controls |
+|---|---|
+| `enabled` | Whether any pack is sent, `false` by default |
+| `prompt` | The MiniMessage prompt on the download screen, or empty for vanilla's |
+| `kickMessage` | The MiniMessage kick message for a required pack that fails |
+| `resourcePacks` | The packs, in stacking order |
+
+Each entry in `resourcePacks` holds its own settings:
+
+| Setting | Controls |
+|---|---|
+| `id` | The pack's identifier, generated once and kept |
+| `url` | The direct download URL, where an entry with none is never sent |
+| `hash` | The SHA-1 of the zip as 40 hex characters, or empty to skip verification |
+| `required` | Whether declining it or failing to load it kicks the player |
+| `worlds` | The worlds the pack is active in, or empty for every world |
+| `permission` | The permission needed to receive it, or empty for none |
+
+Packs apply in list order, so a later entry overrides assets from an earlier one. A fresh file is seeded with one empty entry to show the shape.
+
+### Delivery
+
+On join, every pack the player is eligible for goes out in a single request, so the player sees one prompt. The request is required if any pack in it is.
+
+On a world change, only the difference is sent: packs eligible in the old world and not the new one are removed, and packs eligible only in the new one are applied. A pack eligible in both stays loaded, with no second download.
+
+A required pack that is declined, fails to download, has an invalid URL or fails to reload kicks the player with `kickMessage`. The check is per pack, so an optional pack failing alongside a required one kicks nobody.
+
+Permission is checked on join and on world change only, so granting or revoking it mid-session takes effect on the player's next world change or rejoin.
+
+### Gating a Pack
+
+`ResourcePackApplyEvent` fires once per pack, after its world and permission checks pass. Cancelling it skips that pack alone, leaving the rest of the request intact:
+
+```java
+@EventHandler
+public void onResourcePackApply(final ResourcePackApplyEvent event) {
+    if (!event.getResourcePack().isRequired() && this.settingsManager.hasCosmeticPacksDisabled(event.getPlayer())) {
+        event.setCancelled(true);
+    }
+}
+```
 
 ---
 
@@ -1932,7 +2256,7 @@ public void onCustomDeathMessage(final CustomDeathMessageEvent event) {
 
 The message takes one of three shapes: a self-inflicted death names nobody, a death with a killer names them and what it was attributed to, and anything else names the cause.
 
-Messages are only produced for player deaths. Mob deaths still fire the death events, so a plugin wanting to announce those listens to them directly.
+Messages are only produced for player deaths, and for the deaths of a `DamageableNpc` under the damage pipeline, which the NPC system announces like a player's. Other mob deaths still fire the death events, so a plugin wanting to announce those listens to them directly.
 
 ---
 
@@ -2416,6 +2740,8 @@ The damage system reaches deeper than this, driving vanilla's own damage interna
 | `Tablist` | Define a priority-sorted tab list header and footer |
 | `Team` | Define a priority-sorted, per-viewer nametag decoration |
 | `Hologram` | Define a packet-based floating text display with per-player text and visibility |
+| `Picture` | Define an image shown across a grid of item frames |
+| `Npc` | Define a non-player character backed by a real entity |
 | `Reason` | Describe what a hit is attributed to in messages |
 | `CustomReason` | Describe an attribution that outlives the hit that set it |
 | `ChatChannel` | Define a chat channel with its own recipients and format |
@@ -2526,6 +2852,29 @@ Only the spawn event is cancellable, and cancelling it stops the hologram being 
 
 ---
 
+## NPC Events
+
+| Event | Fired When |
+|---|---|
+| `NpcPreSpawnEvent` | An NPC's entity is about to be spawned |
+| `NpcInitializeEvent` | An NPC's entity has been configured, before it is added to the world |
+| `NpcPostSpawnEvent` | An NPC's entity has been spawned and is being tracked |
+| `NpcInteractEvent` | A player right-clicked an `InteractableNpc`, before its own gate runs |
+
+`NpcPreSpawnEvent` and `NpcInteractEvent` are cancellable. A cancelled spawn is retried on the next scheduler pass, so a listener hiding an NPC keeps cancelling for as long as that holds. `NpcInitializeEvent` fires while the entity is not yet in the world, so a listener may change its equipment or attributes but must not teleport or mount it.
+
+---
+
+## Resource Pack Events
+
+| Event | Fired When |
+|---|---|
+| `ResourcePackApplyEvent` | A configured pack is about to be sent to a player, once per pack |
+
+Cancellable. Cancelling skips only that pack, leaving the rest of the request intact.
+
+---
+
 ## Damage Events
 
 | Event | Fired When |
@@ -2599,6 +2948,8 @@ All but `ChatChannelEvent` are cancellable. Cancelling a send refuses the messag
 | `IBaseCommand` | Command contract with subcommand management |
 | `ICustomCancellableEvent` | Cancellable event with reason support |
 | `DeathEvent` | Shared contract of both death events: entity, killer, cause, reason, drops, experience and death sound |
+| `InteractableNpc` | Opts an NPC into right-click handling, with its own gate |
+| `DamageableNpc` | Opts an NPC into damage, death and respawn handling |
 | `SystemTimeMixin` | Carries a timestamp of when something was created or started |
 | `DurationMixin` | Carries a duration, with `-1` meaning permanent |
 | `ExpiredMixin` | Reports whether a duration has elapsed |
