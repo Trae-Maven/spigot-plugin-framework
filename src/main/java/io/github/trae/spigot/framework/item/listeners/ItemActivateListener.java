@@ -24,6 +24,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
@@ -33,21 +34,21 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Routes player interactions to the {@link ActivatableCustomItem} behind the clicked stack, and
- * ticks any channel those activations started.
+ * Routes player clicks, drops and hand swaps to the {@link ActivatableCustomItem} behind the stack,
+ * and ticks any channel those activations started.
  * <p>
- * A click reaches the item's own {@code onActivate} only after resolving to a registered item of
- * that type, surviving a cancellable {@link ItemPreActivateEvent}, and passing the item's own
- * {@code canActivate}. Anything else is left entirely alone, so vanilla items and custom items
- * without the capability behave normally.
+ * An interaction reaches the item's own {@code onActivate} only after resolving to a registered item
+ * of that type, being one of its supported activate types, surviving a cancellable
+ * {@link ItemPreActivateEvent}, and passing the item's own {@code canActivate}. Anything else is left
+ * entirely alone, so vanilla items and custom items without the capability behave normally.
  */
 @AllArgsConstructor
 @Singleton
 public final class ItemActivateListener implements Listener {
 
     /**
-     * The registry a clicked stack is resolved against, and the source of the items whose channels
-     * are ticked.
+     * The registry a stack is resolved against, and the source of the items whose channels are
+     * ticked.
      */
     private final ItemManager itemManager;
 
@@ -58,6 +59,12 @@ public final class ItemActivateListener implements Listener {
     private final Map<UUID, Integer> blockedClickTickMap = new HashMap<>();
 
     /**
+     * The tick each player last performed a genuine left or right click, one that survived the phantom
+     * click check, keyed by their identifier and cleared when they leave.
+     */
+    private final Map<UUID, Integer> clickTickMap = new HashMap<>();
+
+    /**
      * Resolves the clicked stack to its item and activates it when eligible.
      * <p>
      * Only the main hand is handled, since the interaction event fires once per hand and an item
@@ -66,14 +73,16 @@ public final class ItemActivateListener implements Listener {
      * A denied right click desyncs the client, which answers with an arm swing the server reads as a
      * left click, so a left click landing within a tick of a right click is discarded before anything
      * else runs. Without it an item that suppresses its material's use would activate twice per
-     * click.
+     * click. Every click that survives is recorded, so a drop in the same or the next tick is not
+     * treated as a drop activation.
      * <p>
      * The handler deliberately does not ignore cancelled events. An air click carries no block to
      * interact with, so the event arrives already reporting itself as cancelled, and skipping those
      * would leave an item that only responds to blocks.
      * <p>
-     * A right click that competes with vanilla is skipped entirely rather than fought over: the
-     * material's own use wins unless the item declares otherwise through
+     * A click type the item does not support is ignored before anything else runs. A right click that
+     * competes with vanilla is skipped entirely rather than fought over: the material's own use wins
+     * unless the item declares otherwise through
      * {@link ActivatableCustomItem#activateOnItemUse(Player, ItemStack, ActivateType)}, and so does
      * the clicked block through
      * {@link ActivatableCustomItem#activateOnBlockUse(Player, ItemStack, Block, ActivateType)}. A
@@ -81,8 +90,7 @@ public final class ItemActivateListener implements Listener {
      * full hand. Left clicks compete with nothing and are never gated.
      * <p>
      * Past those, the item's declared interaction results are applied before the action runs, so an
-     * item can suppress the vanilla use of its material or of the block it was aimed at. A post event
-     * follows a successful activation.
+     * item can suppress the vanilla use of its material or of the block it was aimed at.
      *
      * @param event the interaction event
      */
@@ -98,9 +106,11 @@ public final class ItemActivateListener implements Listener {
 
         if (action.isRightClick()) {
             this.blockedClickTickMap.put(player.getUniqueId(), tick);
-        } else if (tick - this.blockedClickTickMap.getOrDefault(player.getUniqueId(), Integer.MIN_VALUE) <= 1) {
+        } else if (this.isRecent(this.blockedClickTickMap, player.getUniqueId(), tick)) {
             return;
         }
+
+        this.clickTickMap.put(player.getUniqueId(), tick);
 
         final ItemStack itemStack = event.getItem();
         if (itemStack == null || itemStack.isEmpty()) {
@@ -110,6 +120,10 @@ public final class ItemActivateListener implements Listener {
         ActivateType.getByAction(action).ifPresent(activateType -> {
             this.itemManager.getItemByItemStack(itemStack).ifPresent(item -> {
                 if (!(item instanceof final ActivatableCustomItem activatableCustomItem)) {
+                    return;
+                }
+
+                if (!activatableCustomItem.getSupportedActivateTypes().contains(activateType)) {
                     return;
                 }
 
@@ -135,53 +149,109 @@ public final class ItemActivateListener implements Listener {
                     event.setUseInteractedBlock(activatableCustomItem.useInteractedBlock(player, itemStack, clickedBlock, activateType));
                 }
 
-                if (UtilEvent.supply(new ItemPreActivateEvent(activatableCustomItem, player, itemStack, activateType)).isCancelled()) {
-                    return;
-                }
-
-                if (!activatableCustomItem.canActivate(player, itemStack, activateType)) {
-                    return;
-                }
-
-                activatableCustomItem.onActivate(player, itemStack, activateType);
-
-                UtilEvent.dispatch(new ItemPostActivateEvent(activatableCustomItem, player, itemStack, activateType));
+                this.activate(player, itemStack, activatableCustomItem, activateType);
             });
         });
     }
 
     /**
      * Records a drop so the arm swing it provokes does not activate the item on its way out of the
-     * inventory.
+     * inventory, then activates the item for {@link ActivateType#DROP_ITEM} when it supports it.
      * <p>
      * Dropping sends a swing packet the server reads as a left click, which would otherwise reach the
      * interact handler a tick later and fire the dropped item's left click action. Only a stack this
      * framework recognises is recorded, so a plain drop leaves a player's next real left click
-     * untouched.
+     * untouched. The drop is recorded before anything else, so its phantom swing is swallowed either
+     * way.
+     * <p>
+     * A drop landing in the same or the next tick as a genuine click is not treated as an activation.
+     * Otherwise, for an item supporting {@link ActivateType#DROP_ITEM}, the drop is cancelled so the
+     * item stays with the player, and the activation runs through the usual gate. This covers any drop
+     * of the stack, including one thrown out of an open inventory.
      *
      * @param event the drop event
      */
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerDropItem(final PlayerDropItemEvent event) {
         if (event.isCancelled()) {
             return;
         }
 
-        if (this.itemManager.getItemByItemStack(event.getItemDrop().getItemStack()).isEmpty()) {
+        final ItemStack itemStack = event.getItemDrop().getItemStack();
+
+        final CustomItem customItem = this.itemManager.getItemByItemStack(itemStack).orElse(null);
+        if (customItem == null) {
             return;
         }
 
-        this.blockedClickTickMap.put(event.getPlayer().getUniqueId(), Bukkit.getCurrentTick());
+        final Player player = event.getPlayer();
+
+        final int tick = Bukkit.getCurrentTick();
+
+        this.blockedClickTickMap.put(player.getUniqueId(), tick);
+
+        if (this.isRecent(this.clickTickMap, player.getUniqueId(), tick)) {
+            return;
+        }
+
+        if (!(customItem instanceof final ActivatableCustomItem activatableCustomItem)) {
+            return;
+        }
+
+        if (!activatableCustomItem.getSupportedActivateTypes().contains(ActivateType.DROP_ITEM)) {
+            return;
+        }
+
+        event.setCancelled(true);
+
+        this.activate(player, itemStack, activatableCustomItem, ActivateType.DROP_ITEM);
     }
 
     /**
-     * Drops the leaving player's recorded tick, so the map holds only players who are online.
+     * Activates the item being swapped out of the main hand for {@link ActivateType#SWAP_HAND} when it
+     * supports it.
+     * <p>
+     * The item leaving the main hand is the one the event reports as moving to the off hand. For an
+     * item supporting {@link ActivateType#SWAP_HAND}, the swap is cancelled so the item stays in the
+     * main hand, and the activation runs through the usual gate.
+     *
+     * @param event the swap hand items event
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerSwapHandItems(final PlayerSwapHandItemsEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+
+        final ItemStack itemStack = event.getOffHandItem();
+
+        final CustomItem customItem = this.itemManager.getItemByItemStack(itemStack).orElse(null);
+        if (customItem == null) {
+            return;
+        }
+
+        if (!(customItem instanceof final ActivatableCustomItem activatableCustomItem)) {
+            return;
+        }
+
+        if (!(activatableCustomItem.getSupportedActivateTypes().contains(ActivateType.SWAP_HAND))) {
+            return;
+        }
+
+        event.setCancelled(true);
+
+        this.activate(event.getPlayer(), itemStack, activatableCustomItem, ActivateType.SWAP_HAND);
+    }
+
+    /**
+     * Drops the leaving player's recorded ticks, so the maps hold only players who are online.
      *
      * @param event the quit event
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(final PlayerQuitEvent event) {
         this.blockedClickTickMap.remove(event.getPlayer().getUniqueId());
+        this.clickTickMap.remove(event.getPlayer().getUniqueId());
     }
 
     /**
@@ -230,5 +300,44 @@ public final class ItemActivateListener implements Listener {
                 return false;
             });
         }
+    }
+
+    /**
+     * Returns whether the player's recorded tick in the map is the current tick or the one before.
+     * A player with no recorded tick is never recent.
+     *
+     * @param tickMap the map of recorded ticks
+     * @param uuid    the player's identifier
+     * @param tick    the current tick
+     * @return {@code true} if the recorded tick is within one tick of the current one
+     */
+    private boolean isRecent(final Map<UUID, Integer> tickMap, final UUID uuid, final int tick) {
+        final Integer recordedTick = tickMap.get(uuid);
+
+        return recordedTick != null && tick - recordedTick <= 1;
+    }
+
+    /**
+     * Runs an activation through the shared gate: a cancellable {@link ItemPreActivateEvent} first,
+     * then the item's own {@code canActivate}, and only if both pass the item's {@code onActivate},
+     * followed by an {@link ItemPostActivateEvent}.
+     *
+     * @param player                the player activating the item
+     * @param itemStack             the specific stack being used
+     * @param activatableCustomItem the item being activated
+     * @param activateType          the kind of interaction
+     */
+    private void activate(final Player player, final ItemStack itemStack, final ActivatableCustomItem activatableCustomItem, final ActivateType activateType) {
+        if (UtilEvent.supply(new ItemPreActivateEvent(activatableCustomItem, player, itemStack, activateType)).isCancelled()) {
+            return;
+        }
+
+        if (!activatableCustomItem.canActivate(player, itemStack, activateType)) {
+            return;
+        }
+
+        activatableCustomItem.onActivate(player, itemStack, activateType);
+
+        UtilEvent.dispatch(new ItemPostActivateEvent(activatableCustomItem, player, itemStack, activateType));
     }
 }
