@@ -8,6 +8,7 @@ import io.github.trae.spigot.framework.utility.UtilEvent;
 import io.github.trae.spigot.framework.utility.UtilPermission;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.Setter;
 import net.kyori.adventure.resource.ResourcePackRequest;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.World;
@@ -17,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 
 /**
  * Sends and removes the configured resource packs using the Adventure multi-pack API.
@@ -31,6 +33,10 @@ import java.util.UUID;
 @Getter
 @Singleton
 public final class ResourcePackManager {
+
+    @Getter
+    @Setter
+    private static BiPredicate<Player, String> permissionCheckPredicate = UtilPermission::hasPermission;
 
     /**
      * The configuration providing the packs, prompt and kick message.
@@ -121,7 +127,7 @@ public final class ResourcePackManager {
             return false;
         }
 
-        if (!resourcePack.getPermission().isBlank() && !UtilPermission.hasPermission(player, resourcePack.getPermission())) {
+        if (!resourcePack.getPermission().isBlank() && !permissionCheckPredicate.test(player, resourcePack.getPermission())) {
             return false;
         }
 
