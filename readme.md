@@ -1,6 +1,6 @@
 # Spigot-Plugin-Framework
 
-A Spigot/Paper plugin framework providing structured command systems, event utilities, a staged damage and death pipeline, channel-based chat, packet-based sidebars, tablists, teams and holograms, real-entity NPCs, map-based pictures, configurable resource packs, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
+A Spigot/Paper plugin framework providing structured command systems, event utilities, a staged damage and death pipeline, channel-based chat, packet-based sidebars, tablists, teams and holograms, real-entity NPCs, map-based billboards for images and video, configurable resource packs, a custom item system, an inventory window system, and lifecycle integration built on the [Hierarchy-Framework](https://github.com/Trae-Maven/hierarchy-framework).
 
 Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-based hierarchy architecture, automatically handling registration and teardown of listeners, commands, and subcommands as components are initialized and shut down.
 
@@ -20,7 +20,8 @@ Spigot-Plugin-Framework bridges the Bukkit plugin lifecycle with the component-b
 - Packet-based team system with per-viewer prefix and suffix resolution, giving relation-aware nametag colours through priority-sorted `Team` subclasses
 - Packet-based hologram system built on text displays rather than armour stands, with per-player text, per-player visibility, and no entity in the world
 - Hologram backgrounds drawn from a bitmap font glyph, for a textured or shaped panel behind the text
-- Map-based picture system that renders a PNG or JPG across a grid of item frames, reusing the same maps across restarts and redrawing them only when the image changes
+- Packet-based billboard system that shows a PNG, a JPG or a sequence of video frames across a grid of item frames, with no entity or map in the world
+- Billboard images sent to each player once per session, and billboard video streamed only to players in range, as the regions that changed between frames
 - Real-entity NPC system with typed backing entities, opt-in interaction and damage, respawn gating after death, and no duplicates across restarts or chunk reloads
 - Resource pack system driven by a JSON list of packs, each with its own URL, hash, requirement, worlds and permission, sent in one request and swapped per pack on world change
 - Staged damage pipeline that replaces vanilla damage entirely, with a gate stage, an ability stage and a reduction stage, each cancellable
@@ -71,7 +72,7 @@ Commands and subcommands integrate directly into the hierarchy as Nodes, each wi
 | `BaseCommand` | Node under a Manager | Registered with `CommandMap` |
 | `BaseSubCommand` | Node under a command | Attached to parent command |
 
-The damage, death, chat, effect, sidebar, tablist, team, hologram, picture, NPC, resource pack, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
+The damage, death, chat, effect, sidebar, tablist, team, hologram, billboard, NPC, resource pack, item, and window systems sit outside this hierarchy. Their managers and listeners are framework-owned singletons, discovered through `@Scan` rather than declared per plugin. See [Enabling Subsystems](#enabling-subsystems).
 
 ---
 
@@ -81,7 +82,7 @@ Spigot-Plugin-Framework requires Java 21+ and a Paper API environment.
 
 ### NMS Access (paper-nms-maven-plugin)
 
-The sidebar, team, hologram and picture systems and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
+The sidebar, team, hologram and billboard systems and `UtilNms` use NMS (net.minecraft.server) classes directly. To compile against NMS with Maven, the framework uses the [paper-nms-maven-plugin](https://github.com/Alvinn8/paper-nms-maven-plugin).
 
 Add `.paper-nms` to your `.gitignore`, as it contains locally generated dependencies.
 
@@ -147,7 +148,7 @@ Add the dependency to your Maven project:
 
 ## Enabling Subsystems
 
-The damage, death, chat, effect, sidebar, tablist, team, hologram, picture, NPC, resource pack, item, and window systems each ship their own managers and listeners as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
+The damage, death, chat, effect, sidebar, tablist, team, hologram, billboard, NPC, resource pack, item, and window systems each ship their own managers and listeners as framework-owned singletons. They are not active by default: the dependency injector only constructs components in packages it has been told to scan.
 
 Declare the packages you want with `@Scan` on your `@Application` class, or on any interface or superclass in its hierarchy. The `ScanResolver` walks the full type graph of the bootstrap class and collects every `@Scan` it finds, so each layer can declare what it owns.
 
@@ -204,7 +205,7 @@ public class CorePlugin extends SpigotPlugin {
 | `io.github.trae.spigot.framework.tablist` | `TablistManager`, `TablistListener` |
 | `io.github.trae.spigot.framework.team` | `TeamManager`, `TeamListener` |
 | `io.github.trae.spigot.framework.hologram` | `HologramManager`, `HologramListener` |
-| `io.github.trae.spigot.framework.picture` | `PictureManager`, `PictureListener` |
+| `io.github.trae.spigot.framework.billboard` | `BillboardManager`, `BillboardListener` |
 | `io.github.trae.spigot.framework.npc` | `NpcManager`, `NpcInteractListener`, `NpcDamageListener`, `NpcDeathListener`, `NpcStaleListener` |
 | `io.github.trae.spigot.framework.resourcepack` | `ResourcePackManager`, `ResourcePackListener` |
 | `io.github.trae.spigot.framework.damage` | `DamageManager`, `DamageListener`, `CustomDamageListener`, and the reduction, durability, knockback, critical, potion effect, delay, interval and attack-speed listeners |
@@ -1629,26 +1630,39 @@ A hologram whose `getLocation()` returns `null`, or names a world that is not lo
 
 ---
 
-## Picture System
+## Billboard System
 
-The framework provides a map-based picture system. A `Picture` describes an image and where it hangs, and the framework renders it across a grid of maps in invisible item frames, one map per 128x128 tile. PNG, JPG and anything else `ImageIO` reads all work.
+The framework provides a packet-based billboard system. A billboard is an image or a video shown across a grid of maps in invisible item frames, one map per 128x128 tile.
 
-The pictures are real item frames rather than packets, so every player sees the same image at no per-player cost. What the framework keeps out of the world is the part that would otherwise pile up: maps are reused across restarts, and frames are never saved to the chunk.
+Nothing exists server-side. The frames are constructed but never added to a level, and the maps use IDs counted down from `Integer.MAX_VALUE`, so they never collide with a real map and nothing is written to the world. That is also what keeps bandwidth down: every packet goes to a player who can see the billboard, and an image's colours go to each player only once.
 
-Requires `@Scan("io.github.trae.spigot.framework.picture")`.
+Requires `@Scan("io.github.trae.spigot.framework.billboard")`.
 
-### Defining a Picture
+### Two Kinds of Billboard
 
-Extend `Picture`, passing an identifier, the top-left frame location, the direction the frames face and the grid size, and register it as a component. `PictureManager` collects every subclass through the dependency injector:
+`Billboard` is sealed, and plugins never extend it directly. They extend one of its two forms:
+
+| Type | Shows | Supplies |
+|---|---|---|
+| `BillboardImage` | A still image | `loadImage()`, returning the image |
+| `BillboardVideo` | A sequence of frames | `getDirectory()`, returning the folder of frames |
+
+Both take the same constructor arguments: an identifier, the location of the top-left frame, the direction the frames face, and the grid size in columns and rows. Both are registered as a component, and `BillboardManager` collects every one through the dependency injector.
+
+The location is the block the top-left frame occupies, in front of the wall. Tiles run left to right, then top to bottom, as seen by a player facing the wall. Only horizontal facings are supported. The frames are never placed in the world, so nothing needs to be behind them, though a wall keeps them from looking like they float.
+
+### Defining an Image
+
+Extend `BillboardImage` and return the image. PNG, JPG and anything else `ImageIO` reads all work:
 
 ```java
 @Singleton
-public class PracticeBannerPicture extends Picture {
+public class PracticeBannerBillboard extends BillboardImage {
 
     private final File file;
 
-    public PracticeBannerPicture(final CorePlugin plugin) {
-        super("practice_banner", new Location(Bukkit.getWorld("lobby"), 100.0D, 80.0D, 50.0D), BlockFace.SOUTH, 3, 6);
+    public PracticeBannerBillboard(final CorePlugin plugin) {
+        super("practice_banner", new Location(Bukkit.getWorld("lobby"), 100.0D, 80.0D, 50.0D), BlockFace.SOUTH, 4, 7);
 
         this.file = new File(plugin.getDataFolder(), "practice.png");
     }
@@ -1660,24 +1674,66 @@ public class PracticeBannerPicture extends Picture {
 }
 ```
 
-The location is the air block the top-left frame occupies, in front of the wall. Tiles run left to right, then top to bottom, as seen by a player facing the wall, and every tile needs a solid block behind it. Only horizontal facings are supported.
+The image is scaled to `columns * 128` by `rows * 128`, stretching if the aspect ratio differs, so export it at exactly that size for the cleanest result: 512 by 896 for the grid above. It is loaded once, off the main thread.
 
-The image is scaled to `columns * 128` by `rows * 128`, stretching if the aspect ratio differs, so export it at exactly that size for the cleanest result: 384 by 768 for the grid above.
+### Defining a Video
 
-### Maps Across Restarts
+A video is a folder of frames, played in file name order. The simplest way to produce one is to let ffmpeg split a video file, at the frame rate and grid size the billboard uses:
 
-A naive implementation creates new maps on every boot, leaving a new `map_N.dat` behind per tile per restart. The framework instead stores each picture's map IDs, alongside a hash of the rendered pixels, in the world's persistent data under `custom:picture_state_<identifier>`.
+```bash
+ffmpeg -i trailer.mp4 -vf "fps=10,scale=256:256" plugins/CorePlugin/videos/trailer/%05d.png
+```
 
-| On Startup | Result |
+Then extend `BillboardVideo` and point it at the folder:
+
+```java
+@Singleton
+public class TrailerBillboard extends BillboardVideo {
+
+    private final File directory;
+
+    public TrailerBillboard(final CorePlugin plugin) {
+        super("trailer", new Location(Bukkit.getWorld("lobby"), 100.0D, 80.0D, 50.0D), BlockFace.SOUTH, 2, 2);
+
+        this.directory = new File(plugin.getDataFolder(), "videos/trailer");
+    }
+
+    @Override
+    protected File getDirectory() {
+        return this.directory;
+    }
+}
+```
+
+Every PNG and JPG in the folder is a frame, so ffmpeg's numbered output drops straight in. Every setting has a default:
+
+| Hook | Controls | Default |
+|---|---|---|
+| `getFrameRate()` | How many frames play per second | `10` |
+| `isLooping()` | Whether playback returns to the first frame after the last | `true` |
+| `isAutoplay()` | Whether playback starts on its own once loaded | `true` |
+| `onLoop(viewers)` | Something to do each time playback reaches the first frame, such as playing a soundtrack | Nothing |
+
+Playback runs on one timeline shared by every player, so everyone watching sees the same frame. `BillboardManager#play` resumes a paused video, or restarts one that does not loop from the beginning, and `BillboardManager#stop` pauses it on its current frame.
+
+### Encoding and Caching
+
+Matching every pixel of every frame to map colours is the expensive part, so it happens once. On the first load, each frame is converted and compared with the one before it, keeping only the region of each tile that changed. The result is written deflated to `.cache` in the frame folder, and every later load reads it back.
+
+The cache is keyed on every frame file's name, size and modification time along with the grid size, so replacing a frame or changing the grid rebuilds it on its own. Encoding runs off the main thread, and the billboard appears once it finishes.
+
+Only the changed regions are held in memory, never whole frames, plus one live copy of the current frame for players who come into range mid-playback.
+
+### Bandwidth
+
+A player is sent a billboard when they come within `getViewDistance()` of its centre, 48 blocks by default, and sent its removal once they are 8 blocks past that, so a player standing on the edge does not have it sent and removed repeatedly. Viewers are reconciled twice a second.
+
+| Billboard | Sent to a Player |
 |---|---|
-| Stored maps exist and the hash matches | The maps are reused as they are, with nothing drawn |
-| Stored maps exist and the hash differs | The same maps are redrawn with the new image |
-| The grid has grown | Stored maps are reused, and maps are created only for the new tiles |
-| Nothing is stored | Maps are created and drawn, and their IDs stored |
+| Image | Its colours once per session, the first time they come into range, then only the frames on each return |
+| Video | The current frame in full on coming into range, then only the regions that change, for as long as they stay in range |
 
-Pixels are written straight into each map's saved data and the map is locked, so vanilla persists the image with the map itself and no renderer is ever attached. Swapping the image and restarting is the whole update process.
-
-The identifier forms part of that key, so it must only contain characters valid in a namespaced key once lowercased: `a-z`, `0-9`, `.`, `_` and `-`.
+The frames themselves are a few bytes each. An image's colours are re-sent only when the client has discarded its maps, on a world change or a rejoin. A video costs nothing for a player out of range, so a small grid and a tight view distance keep it cheap: a 2x2 grid is a quarter of the bandwidth of a 4x4.
 
 ### Colours
 
@@ -1685,15 +1741,9 @@ A map can only show vanilla's map palette, roughly two hundred and fifty colours
 
 Flat colours and bold outlines, the style of most server banners, convert cleanly. Smooth gradients band, since the palette has no colours between its steps.
 
-### Frames
-
 Frames are glow item frames by default, so the image stays at full brightness at night and underground. Override `isGlowing()` to use plain frames, which darken with light level like any other block face.
 
-Every frame is invisible, fixed and invulnerable, and `PictureListener` cancels any break of one, whether by a creative player, an explosion or the wall behind it being removed.
-
-Frames are spawned non-persistent and tagged with `custom:picture_identifier`, so they are never saved to the chunk. When a chunk unloads its frames are discarded, and a scheduler respawns them within a second of the chunk loading again. Any tagged frame still in the world at startup, such as one left behind by a reload, is removed before the pictures are rendered.
-
-A picture whose image cannot be read is skipped with a warning rather than failing startup.
+A billboard whose world is not loaded, or whose source cannot be read, is skipped with a warning rather than failing startup.
 
 ---
 
@@ -2721,6 +2771,7 @@ The damage system reaches deeper than this, driving vanilla's own damage interna
 | `UtilMaterial` | Classifying materials by whether a block responds to a click, to a held item, or whether an item has a use of its own |
 | `UtilAdventure` | Joining components with a separator and an inclusion filter, skipping nulls and empties |
 | `UtilColor` | Converting between AWT, Adventure and Bukkit colours, and wrapping text in MiniMessage colour tags |
+| `UtilMap` | Scaling an image to a grid of maps and matching its pixels to the map palette |
 | `UtilServer` | Server and online player access |
 
 ---
@@ -2740,7 +2791,8 @@ The damage system reaches deeper than this, driving vanilla's own damage interna
 | `Tablist` | Define a priority-sorted tab list header and footer |
 | `Team` | Define a priority-sorted, per-viewer nametag decoration |
 | `Hologram` | Define a packet-based floating text display with per-player text and visibility |
-| `Picture` | Define an image shown across a grid of item frames |
+| `BillboardImage` | Define a still image shown across a grid of item frames |
+| `BillboardVideo` | Define a video, from a folder of frames, shown across a grid of item frames |
 | `Npc` | Define a non-player character backed by a real entity |
 | `Reason` | Describe what a hit is attributed to in messages |
 | `CustomReason` | Describe an attribution that outlives the hit that set it |
