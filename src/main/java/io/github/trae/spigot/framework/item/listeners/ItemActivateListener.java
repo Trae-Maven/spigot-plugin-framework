@@ -155,28 +155,26 @@ public final class ItemActivateListener implements Listener {
     }
 
     /**
-     * Records a drop so the arm swing it provokes does not activate the item on its way out of the
-     * inventory, then activates the item for {@link ActivateType#DROP_ITEM} when it supports it.
+     * Records a drop so the arm swing it provokes does not activate the item as a left click, then
+     * activates the item for {@link ActivateType#DROP_ITEM} when it supports it.
      * <p>
-     * Dropping sends a swing packet the server reads as a left click, which would otherwise reach the
-     * interact handler a tick later and fire the dropped item's left click action. Only a stack this
-     * framework recognises is recorded, so a plain drop leaves a player's next real left click
-     * untouched. The drop is recorded before anything else, so its phantom swing is swallowed either
-     * way.
+     * Dropping sends a swing packet the server reads as a left click. The client swings whether or not
+     * the drop is allowed, so the drop is recorded before anything else, including when another
+     * listener has already cancelled it, and the phantom left click is swallowed either way. Only a
+     * stack this framework recognises is recorded, so a plain drop leaves a player's next real left
+     * click untouched.
      * <p>
-     * A drop landing in the same or the next tick as a genuine click is not treated as an activation.
-     * Otherwise, for an item supporting {@link ActivateType#DROP_ITEM}, the drop is cancelled so the
-     * item stays with the player, and the activation runs through the usual gate. This covers any drop
-     * of the stack, including one thrown out of an open inventory.
+     * For an item supporting {@link ActivateType#DROP_ITEM}, the activation replaces the drop: the drop
+     * is cancelled so the item stays with the player, and the activation runs through the usual gate
+     * even when another listener cancelled the drop first. Vetoing a drop activation belongs on
+     * {@link ItemPreActivateEvent}. A drop landing in the same or the next tick as a genuine click is
+     * not treated as an activation. This covers any drop of the stack, including one thrown out of an
+     * open inventory.
      *
      * @param event the drop event
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerDropItem(final PlayerDropItemEvent event) {
-        if (event.isCancelled()) {
-            return;
-        }
-
         final ItemStack itemStack = event.getItemDrop().getItemStack();
 
         final CustomItem customItem = this.itemManager.getItemByItemStack(itemStack).orElse(null);
