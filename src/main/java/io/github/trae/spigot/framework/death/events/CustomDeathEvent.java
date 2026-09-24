@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 
@@ -83,6 +84,8 @@ public final class CustomDeathEvent extends CustomEvent implements DeathEvent {
      */
     private SoundProvider soundProvider;
 
+    private boolean broadcastMessage;
+
     /**
      * Takes the reason already resolved rather than resolving it here, since the lookup needs the
      * damage manager's retained state and this event is meant to be readable without it.
@@ -103,6 +106,7 @@ public final class CustomDeathEvent extends CustomEvent implements DeathEvent {
         this.drops = drops;
         this.dropExp = dropExp;
         this.soundProvider = soundProvider;
+        this.broadcastMessage = entity instanceof Player;
     }
 
     /**

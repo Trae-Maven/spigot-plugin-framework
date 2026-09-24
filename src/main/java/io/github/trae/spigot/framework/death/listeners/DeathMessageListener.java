@@ -55,7 +55,7 @@ public final class DeathMessageListener implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onCustomDeath(final CustomDeathEvent event) {
-        if (!(event.getEntity() instanceof Player)) {
+        if (!event.isBroadcastMessage()) {
             return;
         }
 

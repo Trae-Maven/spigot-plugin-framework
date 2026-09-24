@@ -3,6 +3,7 @@ package io.github.trae.spigot.framework.death;
 import io.github.trae.di.InjectorApi;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.damage.DamageManager;
+import lombok.Getter;
 
 /**
  * Whether the death system has the damage pipeline behind it.
@@ -19,6 +20,7 @@ public final class DeathManager {
     /**
      * The cached answer, {@code null} until it is first asked for.
      */
+    @Getter
     private Boolean damageManagerRegistered;
 
     /**
