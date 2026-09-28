@@ -4,6 +4,7 @@ import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.sidebar.Sidebar;
 import io.github.trae.spigot.framework.sidebar.SidebarManager;
 import io.github.trae.spigot.framework.sidebar.events.SidebarUpdateEvent;
+import io.github.trae.spigot.framework.utility.UtilEvent;
 import lombok.AllArgsConstructor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -75,18 +76,19 @@ public final class SidebarListener implements Listener {
     }
 
     /**
-     * Creates the eligible sidebar for a player when they join, if any qualifies.
+     * Creates the player's sidebar on join by dispatching a {@link SidebarUpdateEvent}.
+     * <p>
+     * Going through the event rather than creating the sidebar directly means listeners can cancel
+     * it, so a player who has disabled their sidebar never has one shown on login.
+     * <p>
+     * Dispatched asynchronously because {@link SidebarUpdateEvent} is an asynchronous event and
+     * cannot be fired from the main thread.
      *
      * @param event the player join event
      */
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler
     public void onPlayerJoin(final PlayerJoinEvent event) {
-        final Player player = event.getPlayer();
-
-        this.sidebarManager.getEligibleSidebar(player).ifPresent(sidebar -> {
-            this.sidebarManager.create(player, sidebar);
-            this.sidebarManager.getActiveSidebarMap().put(player.getUniqueId(), sidebar);
-        });
+        UtilEvent.dispatchAsynchronous(new SidebarUpdateEvent(event.getPlayer()));
     }
 
     /**
