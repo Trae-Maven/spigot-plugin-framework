@@ -10,6 +10,7 @@ import io.github.trae.spigot.framework.window.events.ButtonPostClickEvent;
 import io.github.trae.spigot.framework.window.events.ButtonPreClickEvent;
 import io.github.trae.spigot.framework.window.events.WindowCloseEvent;
 import lombok.AllArgsConstructor;
+import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -17,6 +18,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryCreativeEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -124,7 +126,9 @@ public final class WindowListener implements Listener {
      * <p>
      * The cancel comes first and applies to every click while a window is open, including
      * shift-clicks from the player's own inventory, so nothing can be moved into or out of a window
-     * regardless of which half was clicked.
+     * regardless of which half was clicked. A creative player is resynchronised in the same tick,
+     * since the creative client applies clicks such as middle-click clones locally and a cancel alone
+     * leaves the resulting ghost stack on its cursor.
      * <p>
      * Two gates stand between the click and {@link Button#onClick(Player, ClickType)}: the
      * {@link ButtonPreClickEvent}, for conditions external to the button, and
@@ -139,6 +143,10 @@ public final class WindowListener implements Listener {
             return;
         }
 
+        if (event instanceof InventoryCreativeEvent) {
+            return;
+        }
+
         if (!(event.getWhoClicked() instanceof final Player player)) {
             return;
         }
@@ -150,6 +158,10 @@ public final class WindowListener implements Listener {
         }
 
         event.setCancelled(true);
+
+        if (player.getGameMode() == GameMode.CREATIVE) {
+            player.updateInventory();
+        }
 
         if (!inventory.equals(event.getClickedInventory())) {
             return;
@@ -170,6 +182,30 @@ public final class WindowListener implements Listener {
 
             UtilEvent.dispatch(new ButtonPostClickEvent(window, button, player));
         });
+    }
+
+    /**
+     * Cancels any creative slot update from a player with a window open and resynchronises them in
+     * the same tick.
+     * <p>
+     * A creative client sets slots directly with whatever stack it holds, so without this a ghost
+     * stack cloned from a window button would be accepted by the server as a real item.
+     *
+     * @param event the inventory creative event
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onInventoryCreative(final InventoryCreativeEvent event) {
+        if (!(event.getWhoClicked() instanceof final Player player)) {
+            return;
+        }
+
+        if (!(event.getInventory().getHolder() instanceof Window) && !this.windowManager.getWindowByPlayerMap().containsKey(player.getUniqueId())) {
+            return;
+        }
+
+        event.setCancelled(true);
+
+        player.updateInventory();
     }
 
     /**
