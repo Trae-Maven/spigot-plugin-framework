@@ -195,6 +195,10 @@ public final class WindowListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryCreative(final InventoryCreativeEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+
         if (!(event.getWhoClicked() instanceof final Player player)) {
             return;
         }
