@@ -73,27 +73,46 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
     /**
      * Returns whether the given {@link CommandSender} is an instance of the expected sender type.
      * <p>
-     * Delegates to {@link #getClassOfCommandSender()} for the type check.
+     * Delegates to {@link #getClassOfCommandSender()} for the type check. If the check fails and
+     * {@code inform} is {@code true}, the sender is sent an invalid sender message.
      *
      * @param commandSender the sender to validate
+     * @param inform        whether to message the sender when validation fails
      * @return {@code true} if the sender matches the expected type
      */
-    default boolean isValidSender(final CommandSender commandSender) {
-        return this.getClassOfCommandSender().isInstance(commandSender);
+    default boolean isValidSender(final CommandSender commandSender, final boolean inform) {
+        if (this.getClassOfCommandSender().isInstance(commandSender)) {
+            return true;
+        }
+
+        if (inform) {
+            UtilMessage.message(commandSender, "Command", "Invalid Command Sender!");
+        }
+
+        return false;
     }
 
     /**
-     * Checks whether the specified {@link CommandSender} has permission to execute this command.
+     * Returns whether the given {@link CommandSender} has permission to execute this command.
+     * <p>
+     * Delegates to {@link UtilPermission#hasPermission} using the permission returned by
+     * {@link #getPermission()}. If the check fails and {@code inform} is {@code true}, the sender
+     * is sent a no permission message.
      *
-     * <p>This check delegates to {@link UtilPermission#hasPermission} using the permission
-     * returned by {@link #getPermission()}.</p>
-     *
-     * @param commandSender the command sender to check
-     * @return {@code true} if the command sender is permitted to execute this command,
-     * otherwise {@code false}
+     * @param commandSender the sender to check
+     * @param inform        whether to message the sender when the check fails
+     * @return {@code true} if the sender is permitted to execute this command
      */
-    default boolean hasPermission(final CommandSender commandSender) {
-        return UtilPermission.hasPermission(commandSender, this.getPermission());
+    default boolean hasPermission(final CommandSender commandSender, final boolean inform) {
+        if (UtilPermission.hasPermission(commandSender, this.getPermission())) {
+            return true;
+        }
+
+        if (inform) {
+            UtilMessage.message(commandSender, "Permissions", "You do not have permission to execute this command!");
+        }
+
+        return false;
     }
 
     /**
@@ -126,8 +145,8 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
      * <p>
      * Performs the following checks in order before delegating to {@link #execute}:
      * <ol>
-     *   <li>Validates the sender type via {@link #isValidSender}</li>
      *   <li>Checks permission via {@link #hasPermission}</li>
+     *   <li>Validates the sender type via {@link #isValidSender}</li>
      *   <li>Fires a cancellable {@link CommandExecuteEvent} via {@link UtilEvent#supply}</li>
      * </ol>
      * If any check fails or the event is cancelled, execution is aborted and {@code false} is returned.
@@ -137,13 +156,11 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
      * @return {@code true} if the command was executed successfully, {@code false} otherwise
      */
     default boolean $execute(final CommandSender commandSender, final String[] args) {
-        if (!this.isValidSender(commandSender)) {
-            UtilMessage.message(commandSender, "Command", "Invalid Command Sender!");
+        if (!this.hasPermission(commandSender, true)) {
             return false;
         }
 
-        if (!this.hasPermission(commandSender)) {
-            UtilMessage.message(commandSender, "Permissions", "You do not have permission to execute this command!");
+        if (!this.isValidSender(commandSender, true)) {
             return false;
         }
 
@@ -160,8 +177,8 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
      * <p>
      * Performs the following checks in order before delegating to {@link #getTabComplete}:
      * <ol>
-     *   <li>Validates the sender type via {@link #isValidSender}</li>
      *   <li>Checks permission via {@link #hasPermission}</li>
+     *   <li>Validates the sender type via {@link #isValidSender}</li>
      *   <li>Fires a cancellable {@link CommandTabCompleteEvent} via {@link UtilEvent#supply}</li>
      * </ol>
      * Returns an empty list if any check fails or the event is cancelled.
@@ -171,11 +188,11 @@ public interface SharedBaseCommand<Sender extends CommandSender> {
      * @return a list of suggestions, or an empty list if blocked
      */
     default List<String> $getTabComplete(final CommandSender commandSender, final String[] args) {
-        if (!this.isValidSender(commandSender)) {
+        if (!this.hasPermission(commandSender, false)) {
             return Collections.emptyList();
         }
 
-        if (!this.hasPermission(commandSender)) {
+        if (!this.isValidSender(commandSender, false)) {
             return Collections.emptyList();
         }
 

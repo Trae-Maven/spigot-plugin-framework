@@ -59,7 +59,7 @@ public class DefaultSuggestions {
                     .getSubCommands()
                     .values()
                     .stream()
-                    .filter(baseSubCommand -> baseSubCommand.isValidSender(commandSender) && baseSubCommand.hasPermission(commandSender))
+                    .filter(baseSubCommand -> baseSubCommand.isValidSender(commandSender, false) && baseSubCommand.hasPermission(commandSender, false))
                     .map(BaseSubCommand::getLabel).toList(),
             arg
     );
