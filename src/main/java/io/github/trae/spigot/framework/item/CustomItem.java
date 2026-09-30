@@ -2,6 +2,7 @@ package io.github.trae.spigot.framework.item;
 
 import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
 import io.github.trae.spigot.framework.item.listeners.ItemApplyListener;
+import io.github.trae.spigot.framework.item.listeners.ItemRecipeListener;
 import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
 import io.github.trae.spigot.framework.utility.UtilItemStack;
 import io.github.trae.utilities.UtilHash;
@@ -37,8 +38,10 @@ import java.util.stream.Collectors;
  * Subclasses are discovered automatically by {@link ItemApplyListener} via the dependency injector
  * and registered under their identifier. An item declaring {@link #naturallyObtainable()} is also
  * registered under its material, so any vanilla stack of that type a player obtains is converted
- * into the custom item. Extend {@link ActivatableCustomItem} instead of this class for an item that
- * also does something when clicked, routed by {@link ItemActivateListener}.
+ * into the custom item. Stacks of an item that does not declare {@link #usableInRecipes()} are
+ * refused as ingredients by {@link ItemRecipeListener}. Extend {@link ActivatableCustomItem} instead
+ * of this class for an item that also does something when clicked, routed by
+ * {@link ItemActivateListener}.
  */
 public abstract class CustomItem extends Item {
 
@@ -145,6 +148,18 @@ public abstract class CustomItem extends Item {
     }
 
     /**
+     * Returns whether stacks of this item may be consumed as an ingredient by any vanilla recipe:
+     * crafting, cooking, smithing, or brewing. When {@code false}, {@link ItemRecipeListener}
+     * refuses every recipe the stack takes part in, so a custom item is never silently spent as its
+     * bare material. Defaults to {@code false}.
+     *
+     * @return {@code true} if stacks of this item may be used as recipe ingredients
+     */
+    public boolean usableInRecipes() {
+        return false;
+    }
+
+    /**
      * Returns whether players obtain this item through normal gameplay: mining, crafting, smelting,
      * or picking it up. When {@code true}, the item is registered under its material and any vanilla
      * stack of that type is converted into this item on the way into a player's inventory. Defaults
@@ -198,6 +213,7 @@ public abstract class CustomItem extends Item {
                 UtilString.pair("Tooltip-Style", this.getTooltipStyle() != null ? this.getTooltipStyle().asString() : ""),
                 UtilString.pair("Hide-Attributes", Boolean.toString(this.hideAttributes())),
                 UtilString.pair("Remove-Use-Cooldown", Boolean.toString(this.removeUseCooldown())),
+                UtilString.pair("Usable-In-Recipes", Boolean.toString(this.usableInRecipes())),
                 UtilString.pair("Naturally-Obtainable", Boolean.toString(this.naturallyObtainable())),
                 UtilString.pair("Delete-If-Removed", Boolean.toString(this.deleteIfRemoved())),
                 UtilString.pair("Style-Name", this.getStyle() != null ? this.getStyle().getName() : ""),
