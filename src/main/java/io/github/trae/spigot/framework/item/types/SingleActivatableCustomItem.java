@@ -7,6 +7,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.Set;
+
 /**
  * An {@link ActivatableCustomItem} that responds to exactly one kind of click.
  * <p>
@@ -41,6 +43,16 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
         super(material, identifier, namespace);
 
         this.activateType = activateType;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Always a single-element set holding this item's click type, fixed at construction.</p>
+     */
+    @Override
+    public final Set<ActivateType> getSupportedActivateTypes() {
+        return Set.of(this.activateType);
     }
 
     /**
