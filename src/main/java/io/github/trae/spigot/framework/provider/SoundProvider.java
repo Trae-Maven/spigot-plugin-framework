@@ -1,4 +1,4 @@
-package io.github.trae.spigot.framework.sound;
+package io.github.trae.spigot.framework.provider;
 
 import io.github.trae.spigot.framework.utility.UtilServer;
 import lombok.AccessLevel;

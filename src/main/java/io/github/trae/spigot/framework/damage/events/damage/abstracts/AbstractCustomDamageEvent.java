@@ -4,7 +4,7 @@ import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.displayname.DisplayName;
 import io.github.trae.spigot.framework.event.CustomCancellableEvent;
-import io.github.trae.spigot.framework.sound.SoundProvider;
+import io.github.trae.spigot.framework.provider.SoundProvider;
 import lombok.Getter;
 import lombok.Setter;
 import net.kyori.adventure.text.Component;

@@ -4,7 +4,7 @@ import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.displayname.DisplayName;
-import io.github.trae.spigot.framework.sound.SoundProvider;
+import io.github.trae.spigot.framework.provider.SoundProvider;
 import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.utilities.UtilString;

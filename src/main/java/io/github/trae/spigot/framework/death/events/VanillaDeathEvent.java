@@ -2,7 +2,7 @@ package io.github.trae.spigot.framework.death.events;
 
 import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.event.CustomEvent;
-import io.github.trae.spigot.framework.sound.SoundProvider;
+import io.github.trae.spigot.framework.provider.SoundProvider;
 import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import lombok.Getter;

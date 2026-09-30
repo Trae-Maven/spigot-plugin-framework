@@ -4,7 +4,7 @@ import io.github.trae.spigot.framework.damage.data.CustomReason;
 import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.CustomPostDamageEvent;
 import io.github.trae.spigot.framework.event.CustomEvent;
-import io.github.trae.spigot.framework.sound.SoundProvider;
+import io.github.trae.spigot.framework.provider.SoundProvider;
 import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.entity.Entity;

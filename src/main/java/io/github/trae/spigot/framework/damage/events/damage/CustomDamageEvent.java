@@ -4,7 +4,7 @@ import io.github.trae.spigot.framework.damage.data.Reason;
 import io.github.trae.spigot.framework.damage.events.damage.abstracts.AbstractCustomDamageEvent;
 import io.github.trae.spigot.framework.damage.modifier.DamageModifier;
 import io.github.trae.spigot.framework.displayname.DisplayName;
-import io.github.trae.spigot.framework.sound.SoundProvider;
+import io.github.trae.spigot.framework.provider.SoundProvider;
 import net.kyori.adventure.text.Component;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.entity.Entity;

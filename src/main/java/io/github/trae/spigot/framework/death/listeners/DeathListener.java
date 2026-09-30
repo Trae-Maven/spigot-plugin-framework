@@ -10,7 +10,7 @@ import io.github.trae.spigot.framework.death.DeathManager;
 import io.github.trae.spigot.framework.death.events.CustomDeathEvent;
 import io.github.trae.spigot.framework.death.events.DeathEvent;
 import io.github.trae.spigot.framework.death.events.VanillaDeathEvent;
-import io.github.trae.spigot.framework.sound.SoundProvider;
+import io.github.trae.spigot.framework.provider.SoundProvider;
 import io.github.trae.spigot.framework.utility.UtilEvent;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Entity;
