@@ -72,6 +72,22 @@ public final class EffectProvider {
     }
 
     /**
+     * Plays the effect at the given location, seen and heard by the given player alone.
+     *
+     * <p>Does nothing when the effect is absent.</p>
+     *
+     * @param player   the player to play to
+     * @param location the location to play at
+     */
+    public void play(final Player player, final Location location) {
+        if (this.effect == null) {
+            return;
+        }
+
+        player.playEffect(location, this.effect, this.data);
+    }
+
+    /**
      * Plays the effect at the given player's location, seen and heard by that player alone.
      *
      * <p>Does nothing when the effect is absent.</p>
@@ -79,11 +95,7 @@ public final class EffectProvider {
      * @param player the player to play to
      */
     public void play(final Player player) {
-        if (this.effect == null) {
-            return;
-        }
-
-        player.playEffect(player.getLocation(), this.effect, this.data);
+        this.play(player, player.getLocation());
     }
 
     /**

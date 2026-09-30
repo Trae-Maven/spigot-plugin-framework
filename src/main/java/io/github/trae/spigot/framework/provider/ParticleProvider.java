@@ -166,6 +166,18 @@ public final class ParticleProvider {
     }
 
     /**
+     * Spawns the particle at the given location, seen by the given player alone.
+     *
+     * <p>Does nothing when the key is absent or unregistered, or the data does not match.</p>
+     *
+     * @param player   the player to show to
+     * @param location the location to spawn at
+     */
+    public void play(final Player player, final Location location) {
+        this.getSpawnableParticle().ifPresent(particle -> player.spawnParticle(particle, location, this.count, this.offsetX, this.offsetY, this.offsetZ, this.extra, this.data));
+    }
+
+    /**
      * Spawns the particle at the given player's location, seen by that player alone.
      *
      * <p>Does nothing when the key is absent or unregistered, or the data does not match.</p>
@@ -173,7 +185,7 @@ public final class ParticleProvider {
      * @param player the player to show to
      */
     public void play(final Player player) {
-        this.getSpawnableParticle().ifPresent(particle -> player.spawnParticle(particle, player.getLocation(), this.count, this.offsetX, this.offsetY, this.offsetZ, this.extra, this.data));
+        this.play(player, player.getLocation());
     }
 
     /**
