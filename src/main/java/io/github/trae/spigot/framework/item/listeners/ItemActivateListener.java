@@ -149,7 +149,7 @@ public final class ItemActivateListener implements Listener {
                     event.setUseInteractedBlock(activatableCustomItem.useInteractedBlock(player, itemStack, clickedBlock, activateType));
                 }
 
-                this.activate(player, itemStack, activatableCustomItem, activateType);
+                this.activate(player, itemStack, clickedBlock, activatableCustomItem, activateType);
             });
         });
     }
@@ -202,7 +202,7 @@ public final class ItemActivateListener implements Listener {
 
         event.setCancelled(true);
 
-        this.activate(player, itemStack, activatableCustomItem, ActivateType.DROP_ITEM);
+        this.activate(player, itemStack, null, activatableCustomItem, ActivateType.DROP_ITEM);
     }
 
     /**
@@ -238,7 +238,7 @@ public final class ItemActivateListener implements Listener {
 
         event.setCancelled(true);
 
-        this.activate(event.getPlayer(), itemStack, activatableCustomItem, ActivateType.SWAP_HAND);
+        this.activate(event.getPlayer(), itemStack, null, activatableCustomItem, ActivateType.SWAP_HAND);
     }
 
     /**
@@ -257,7 +257,7 @@ public final class ItemActivateListener implements Listener {
      * <p>
      * A channel survives the tick only while the player is online, still holding the item that
      * started it, still holding the use action, not vetoed by a cancelled {@link ItemChannelEvent},
-     * and still passing {@code canChannel}. Failing any of those ends the channel and fires
+     * and still passing both {@code canActivate}, with a {@code null} block, and {@code canChannel}. Failing any of those ends the channel and fires
      * {@code onStop}, so a player who logs out, swaps items, or lets go leaves cleanly without the
      * item having to watch for it.
      * <p>
@@ -289,7 +289,7 @@ public final class ItemActivateListener implements Listener {
                     return true;
                 }
 
-                if (UtilEvent.supply(new ItemChannelEvent(channelCustomItem, player, itemStack)).isCancelled() || !channelCustomItem.canActivate(player, itemStack) || !channelCustomItem.canChannel(player, itemStack)) {
+                if (UtilEvent.supply(new ItemChannelEvent(channelCustomItem, player, itemStack)).isCancelled() || !channelCustomItem.canActivate(player, itemStack, null) || !channelCustomItem.canChannel(player, itemStack)) {
                     channelCustomItem.onStop(player, itemStack);
                     return true;
                 }
@@ -322,20 +322,22 @@ public final class ItemActivateListener implements Listener {
      *
      * @param player                the player activating the item
      * @param itemStack             the specific stack being used
+     * @param clickedBlock          the block that was clicked, or {@code null} for an air click, a drop,
+     *                              or a hand swap
      * @param activatableCustomItem the item being activated
      * @param activateType          the kind of interaction
      */
-    private void activate(final Player player, final ItemStack itemStack, final ActivatableCustomItem activatableCustomItem, final ActivateType activateType) {
-        if (UtilEvent.supply(new ItemPreActivateEvent(activatableCustomItem, player, itemStack, activateType)).isCancelled()) {
+    private void activate(final Player player, final ItemStack itemStack, final Block clickedBlock, final ActivatableCustomItem activatableCustomItem, final ActivateType activateType) {
+        if (UtilEvent.supply(new ItemPreActivateEvent(activatableCustomItem, player, itemStack, clickedBlock, activateType)).isCancelled()) {
             return;
         }
 
-        if (!activatableCustomItem.canActivate(player, itemStack, activateType)) {
+        if (!activatableCustomItem.canActivate(player, itemStack, clickedBlock, activateType)) {
             return;
         }
 
-        activatableCustomItem.onActivate(player, itemStack, activateType);
+        activatableCustomItem.onActivate(player, itemStack, clickedBlock, activateType);
 
-        UtilEvent.dispatch(new ItemPostActivateEvent(activatableCustomItem, player, itemStack, activateType));
+        UtilEvent.dispatch(new ItemPostActivateEvent(activatableCustomItem, player, itemStack, clickedBlock, activateType));
     }
 }

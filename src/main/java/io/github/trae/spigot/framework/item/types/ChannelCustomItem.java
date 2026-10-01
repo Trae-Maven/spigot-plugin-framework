@@ -5,6 +5,7 @@ import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -30,7 +31,7 @@ import java.util.UUID;
  * component gives a sword one, so a channelling sword needs that component to work at all.
  * <p>
  * The click type is fixed to {@link ActivateType#RIGHT_CLICK} through the superclass, and
- * {@link #onActivate(Player, ItemStack)} is final here, since starting a channel is the only thing
+ * {@link #onActivate(Player, ItemStack, Block)} is final here, since starting a channel is the only thing
  * an activation may do. Every way a channel ends belongs to the tick instead. A subclass implements
  * {@link #onChannel(Player, ItemStack)} and overrides the start, stop, and gate hooks as needed.
  */
@@ -65,7 +66,7 @@ public abstract class ChannelCustomItem extends SingleActivatableCustomItem {
      * way the channel ends.</p>
      */
     @Override
-    public final void onActivate(final Player player, final ItemStack itemStack) {
+    public final void onActivate(final Player player, final ItemStack itemStack, final Block clickedBlock) {
         if (this.activeChannelSet.add(player.getUniqueId())) {
             this.onStart(player, itemStack);
         }
@@ -76,8 +77,9 @@ public abstract class ChannelCustomItem extends SingleActivatableCustomItem {
      * resource or a durability threshold). Defaults to {@code true}.
      * <p>
      * Checked every tick, not just at the start, so returning {@code false} mid-channel ends it and
-     * fires {@link #onStop(Player, ItemStack)}. This is separate from
-     * {@link #canActivate(Player, ItemStack)}, which decides only whether a channel may begin.
+     * fires {@link #onStop(Player, ItemStack)}. {@link #canActivate(Player, ItemStack, Block)} is also
+     * re-checked every tick, with a {@code null} block, so a condition shared by starting and
+     * continuing belongs there, and one that only governs continuing belongs here.
      * <p>
      * This is the item-level check, evaluated after the
      * {@link io.github.trae.spigot.framework.item.events.ItemChannelEvent}, for conditions the item

@@ -59,23 +59,23 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
      * {@inheritDoc}
      *
      * <p>Refuses any click type other than this item's own before consulting
-     * {@link #canActivate(Player, ItemStack)}, so a subclass never sees a click it does not
+     * {@link #canActivate(Player, ItemStack, Block)}, so a subclass never sees a click it does not
      * handle.</p>
      */
     @Override
-    public final boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
-        return this.activateType == activateType && this.canActivate(player, itemStack);
+    public final boolean canActivate(final Player player, final ItemStack itemStack, final Block clickedBlock, final ActivateType activateType) {
+        return this.activateType == activateType && this.canActivate(player, itemStack, clickedBlock);
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Forwards to {@link #onActivate(Player, ItemStack)}, dropping the click type, which is
+     * <p>Forwards to {@link #onActivate(Player, ItemStack, Block)}, dropping the click type, which is
      * already known to be this item's own.</p>
      */
     @Override
-    public final void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
-        this.onActivate(player, itemStack);
+    public final void onActivate(final Player player, final ItemStack itemStack, final Block clickedBlock, final ActivateType activateType) {
+        this.onActivate(player, itemStack, clickedBlock);
     }
 
     /**
@@ -176,20 +176,24 @@ public abstract class SingleActivatableCustomItem extends ActivatableCustomItem 
      * This is the item-level check, evaluated after the pre-activate event, for conditions the item
      * itself owns.
      *
-     * @param player    the player clicking
-     * @param itemStack the specific stack being clicked with
+     * @param player       the player clicking
+     * @param itemStack    the specific stack being clicked with
+     * @param clickedBlock the block that was clicked, or {@code null} for an air click, a drop, a hand
+     *                     swap, or a channel tick
      * @return {@code true} if the activation should proceed
      */
-    public boolean canActivate(final Player player, final ItemStack itemStack) {
+    public boolean canActivate(final Player player, final ItemStack itemStack, final Block clickedBlock) {
         return true;
     }
 
     /**
      * Performs this item's action. Called only after the click has survived the pre-activate event
-     * and passed {@link #canActivate(Player, ItemStack)}.
+     * and passed {@link #canActivate(Player, ItemStack, Block)}.
      *
-     * @param player    the player who clicked
-     * @param itemStack the specific stack that was clicked with
+     * @param player       the player who clicked
+     * @param itemStack    the specific stack that was clicked with
+     * @param clickedBlock the block that was clicked, or {@code null} for an air click, a drop, or a
+     *                     hand swap
      */
-    public abstract void onActivate(final Player player, final ItemStack itemStack);
+    public abstract void onActivate(final Player player, final ItemStack itemStack, final Block clickedBlock);
 }

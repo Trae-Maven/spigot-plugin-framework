@@ -6,6 +6,7 @@ import io.github.trae.spigot.framework.item.listeners.ItemActivateListener;
 import io.github.trae.spigot.framework.item.types.ActivatableCustomItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -37,6 +38,11 @@ public final class ItemPostActivateEvent extends CustomEvent {
      * The specific stack that was clicked with.
      */
     private final ItemStack itemStack;
+
+    /**
+     * The block that was clicked, or {@code null} for an air click, a drop, or a hand swap.
+     */
+    private final Block clickedBlock;
 
     /**
      * The kind of click that triggered the activation.

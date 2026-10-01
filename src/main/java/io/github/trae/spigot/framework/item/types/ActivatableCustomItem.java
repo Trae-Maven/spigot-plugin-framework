@@ -16,16 +16,17 @@ import java.util.Set;
  * A {@link CustomItem} that does something when a player clicks, drops or swaps it.
  * <p>
  * {@link ItemActivateListener} resolves the item behind the stack and calls
- * {@link #onActivate(Player, ItemStack, ActivateType)} once the interaction is one of
+ * {@link #onActivate(Player, ItemStack, Block, ActivateType)} once the interaction is one of
  * {@link #getSupportedActivateTypes()}, has survived the cancellable
  * {@link io.github.trae.spigot.framework.item.events.ItemPreActivateEvent}, and has passed
- * {@link #canActivate(Player, ItemStack, ActivateType)}. An item extending {@link CustomItem}
+ * {@link #canActivate(Player, ItemStack, Block, ActivateType)}. An item extending {@link CustomItem}
  * directly is never invoked, so the capability is opt-in per item rather than a hook every custom
  * item has to override.
  * <p>
  * The stack is passed alongside the player because it is the specific stack that was used, carrying
  * its own amount, durability, and persistent data, which the item definition itself does not know
- * about.
+ * about. The clicked block is passed for the same reason, so an item can act on what it was aimed at.
+ * It is {@code null} whenever there is no block: an air click, a drop, a hand swap, or a channel tick.
  */
 public abstract class ActivatableCustomItem extends CustomItem {
 
@@ -142,22 +143,26 @@ public abstract class ActivatableCustomItem extends CustomItem {
      *
      * @param player       the player activating
      * @param itemStack    the specific stack being used
+     * @param clickedBlock the block that was clicked, or {@code null} for an air click, a drop, a hand
+     *                     swap, or a channel tick
      * @param activateType the kind of interaction
      * @return {@code true} if the activation should proceed
      */
-    public boolean canActivate(final Player player, final ItemStack itemStack, final ActivateType activateType) {
+    public boolean canActivate(final Player player, final ItemStack itemStack, final Block clickedBlock, final ActivateType activateType) {
         return true;
     }
 
     /**
      * Performs this item's action. Called only after the interaction has survived the pre-activate
-     * event and passed {@link #canActivate(Player, ItemStack, ActivateType)}.
+     * event and passed {@link #canActivate(Player, ItemStack, Block, ActivateType)}.
      *
      * @param player       the player who activated the item
      * @param itemStack    the specific stack that was used
+     * @param clickedBlock the block that was clicked, or {@code null} for an air click, a drop, or a
+     *                     hand swap
      * @param activateType the kind of interaction
      */
-    public abstract void onActivate(final Player player, final ItemStack itemStack, final ActivateType activateType);
+    public abstract void onActivate(final Player player, final ItemStack itemStack, final Block clickedBlock, final ActivateType activateType);
 
     /**
      * Returns the name this item's activation cooldown is recorded under for the given activate type.
