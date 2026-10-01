@@ -414,20 +414,30 @@ public abstract class Effect {
          * be vetoed, since the removal is still a proposal at that point.
          */
         NORMAL,
+
+        /**
+         * Removed by a staff command, such as {@code /effect take}. Behaves like {@link #NORMAL} but
+         * lets listeners tell a staff removal apart from a gameplay one.
+         */
+        COMMAND,
+
         /**
          * The effect's duration elapsed. Reported through {@link EffectExpireEvent} rather than the
          * removal events, with the map entry left for {@link EffectManager}'s tick to prune.
          */
         EXPIRE,
+
         /**
          * {@link #removeOnCondition(LivingEntity, EffectData)} returned {@code true} during the
          * tick. The map entry is left for the tick's own iteration to prune.
          */
         CONDITIONAL,
+
         /**
          * The holder died and the effect opted into {@link #removeOnDeath()}.
          */
         DEATH,
+
         /**
          * The holder disconnected and the effect opted into {@link #removeOnQuit()}.
          */
