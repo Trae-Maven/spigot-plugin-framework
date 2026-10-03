@@ -6,55 +6,58 @@ import org.bukkit.entity.Player;
 import java.util.List;
 
 /**
- * A channel a chat message can be sent in, such as global, staff, faction or ally chat.
+ * A chat channel, registered as a singleton and looked up by name.
  *
- * <p>A channel decides two things about a message: who receives it, and how it reads. Both are
- * decided per sender, so one channel implementation serves every player in it, and a faction
- * channel resolves each sender's own faction rather than holding one per faction.</p>
+ * <p>A line is rendered by {@link io.github.trae.spigot.framework.chat.ChatManager} from
+ * {@link #getFormat()}, a MiniMessage string such as {@code "<rank> <username> <message>"}. Every tag
+ * that is not a standard MiniMessage tag is a placeholder, filled from
+ * {@link #getPlaceholderValue(String, Player, Player, Component)}.</p>
  *
- * <p>Implementations are plugin-side. The framework only routes messages through whichever channel
- * the sender resolves to, as settled by {@link io.github.trae.spigot.framework.chat.events.ChatChannelEvent}.</p>
- *
- * @see DefaultChatChannel
+ * <p>When several channels share a name, the one with the highest {@link #getPriority()} is used, so a
+ * plugin replaces another plugin's channel by extending it, raising the priority, and overriding the
+ * format and the placeholder values it changes, handing the rest to {@code super}.</p>
  */
 public interface ChatChannel {
 
     /**
-     * The channel's name, used to identify it in commands, messages and logs.
+     * Returns the name the channel is looked up by, matched case-insensitively.
      *
-     * @return the channel name
+     * @return the name
      */
     String getName();
 
     /**
-     * Everyone who receives a message the given player sends in this channel.
+     * Returns which channel is used when several share a name, the highest winning.
      *
-     * <p>Resolved once per message, so membership reflects the moment it was sent. The sender is not
-     * added automatically: include them if they should see their own message.</p>
-     *
-     * <p>Called off the main thread for a message a player typed, so an implementation must only
-     * read state that is safe to read there.</p>
+     * @return the priority, zero by default
+     */
+    default int getPriority() {
+        return Integer.MAX_VALUE;
+    }
+
+    /**
+     * Returns the players a message sent by the given player is delivered to.
      *
      * @param sender the player sending the message
-     * @return the recipients, in the order they are messaged
+     * @return the recipients
      */
     List<Player> getRecipients(final Player sender);
 
     /**
-     * How a message the given player sends reads in this channel.
+     * Returns the MiniMessage format every line is rendered from.
      *
-     * <p>Wraps the message with whatever the channel puts around it, such as a channel tag, the
-     * sender's name and a separator. Applied at delivery, once per recipient, to the message that
-     * recipient's {@link io.github.trae.spigot.framework.chat.events.ChatReceiveEvent} settled on,
-     * so a listener that changes one recipient's copy changes only the message inside the line, and
-     * the channel's wrapping stays the same for everyone.</p>
-     *
-     * <p>Called off the main thread for a message a player typed, so an implementation must only
-     * read state that is safe to read there.</p>
-     *
-     * @param sender  the player sending the message
-     * @param message the message as it stands for the recipient being delivered to
-     * @return the formatted line
+     * @return the format
      */
-    Component getFormat(final Player sender, final Component message);
+    String getFormat();
+
+    /**
+     * Returns one placeholder's value for one recipient's line.
+     *
+     * @param key       the placeholder's name, as written in the format
+     * @param sender    the player sending the message
+     * @param recipient the player receiving this copy
+     * @param message   the message
+     * @return the value, or {@code null} to leave the placeholder out
+     */
+    Component getPlaceholderValue(final String key, final Player sender, final Player recipient, final Component message);
 }
