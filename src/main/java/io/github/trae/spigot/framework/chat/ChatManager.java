@@ -1,7 +1,6 @@
 package io.github.trae.spigot.framework.chat;
 
 import io.github.trae.di.InjectorApi;
-import io.github.trae.di.annotations.method.ApplicationReady;
 import io.github.trae.di.annotations.type.component.Singleton;
 import io.github.trae.spigot.framework.chat.channel.ChatChannel;
 import io.github.trae.spigot.framework.chat.channel.DefaultChatChannel;
@@ -11,6 +10,9 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.ServerLoadEvent;
 import org.intellij.lang.annotations.Subst;
 
 import java.util.Comparator;
@@ -33,7 +35,7 @@ import java.util.stream.Collectors;
  * @see io.github.trae.spigot.framework.chat.listeners.PreChatListener
  */
 @Singleton
-public final class ChatManager {
+public final class ChatManager implements Listener {
 
     /**
      * Matches a simple tag, capturing its name.
@@ -54,10 +56,13 @@ public final class ChatManager {
     /**
      * Collects every registered channel, keeping the lowest priority for each name.
      */
-    @ApplicationReady
-    public void onApplicationReady() {
-        this.chatChannelMap = Map.copyOf(InjectorApi.getAll(ChatChannel.class).stream()
-                .collect(Collectors.toMap(chatChannel -> chatChannel.getName().toUpperCase(Locale.ROOT), Function.identity(), BinaryOperator.minBy(Comparator.comparingInt(ChatChannel::getPriority)))));
+    @EventHandler
+    public void onServerLoad(final ServerLoadEvent event) {
+        if (event.getType() != ServerLoadEvent.LoadType.STARTUP) {
+            return;
+        }
+
+        this.chatChannelMap = Map.copyOf(InjectorApi.getAll(ChatChannel.class).stream().collect(Collectors.toMap(chatChannel -> chatChannel.getName().toUpperCase(Locale.ROOT), Function.identity(), BinaryOperator.minBy(Comparator.comparingInt(ChatChannel::getPriority)))));
 
         this.defaultChatChannel = InjectorApi.getAll(DefaultChatChannel.class).stream()
                 .min(Comparator.comparingInt(ChatChannel::getPriority))
