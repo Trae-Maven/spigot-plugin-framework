@@ -32,7 +32,7 @@ public interface ChatChannel {
      * @return the priority, zero by default
      */
     default int getPriority() {
-        return 0;
+        return Integer.MAX_VALUE;
     }
 
     /**
