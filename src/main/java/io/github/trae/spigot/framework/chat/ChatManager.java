@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * Holds what the chat system needs to route and render a message.
  *
  * <p>Every registered {@link ChatChannel} is collected once the application is ready. When several share
- * a name, the one with the highest priority is kept, and the highest-priority {@link DefaultChatChannel}
+ * a name, the one with the lowest priority is kept, and the lowest-priority {@link DefaultChatChannel}
  * is the one every message starts in.</p>
  *
  * @see io.github.trae.spigot.framework.chat.listeners.PreChatListener
@@ -41,7 +41,7 @@ public final class ChatManager {
     private static final Pattern TAG_PATTERN = Pattern.compile("<([a-z0-9_-]+)>");
 
     /**
-     * The channels by their upper-cased names, the highest priority kept for each.
+     * The channels by their upper-cased names, the lowest priority kept for each.
      */
     private Map<String, ChatChannel> chatChannelMap = Map.of();
 
@@ -52,14 +52,15 @@ public final class ChatManager {
     private DefaultChatChannel defaultChatChannel;
 
     /**
-     * Collects every registered channel, keeping the highest priority for each name.
+     * Collects every registered channel, keeping the lowest priority for each name.
      */
     @ApplicationReady
     public void onApplicationReady() {
-        this.chatChannelMap = Map.copyOf(InjectorApi.getAll(ChatChannel.class).stream().collect(Collectors.toMap(chatChannel -> chatChannel.getName().toUpperCase(Locale.ROOT), Function.identity(), BinaryOperator.maxBy(Comparator.comparingInt(ChatChannel::getPriority)))));
+        this.chatChannelMap = Map.copyOf(InjectorApi.getAll(ChatChannel.class).stream()
+                .collect(Collectors.toMap(chatChannel -> chatChannel.getName().toUpperCase(Locale.ROOT), Function.identity(), BinaryOperator.minBy(Comparator.comparingInt(ChatChannel::getPriority)))));
 
         this.defaultChatChannel = InjectorApi.getAll(DefaultChatChannel.class).stream()
-                .max(Comparator.comparingInt(ChatChannel::getPriority))
+                .min(Comparator.comparingInt(ChatChannel::getPriority))
                 .orElse(null);
     }
 
@@ -67,7 +68,7 @@ public final class ChatManager {
      * Gets a registered chat channel by name.
      *
      * <p>Channel names are matched case-insensitively. When several channels share the name, the one
-     * with the highest priority is returned.</p>
+     * with the lowest priority is returned.</p>
      *
      * @param name the name of the chat channel
      * @return the matching chat channel, or {@link Optional#empty()} if the name is {@code null} or no channel is registered with that name

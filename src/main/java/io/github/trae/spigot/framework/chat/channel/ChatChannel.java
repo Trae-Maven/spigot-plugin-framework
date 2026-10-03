@@ -13,8 +13,8 @@ import java.util.List;
  * that is not a standard MiniMessage tag is a placeholder, filled from
  * {@link #getPlaceholderValue(String, Player, Player, Component)}.</p>
  *
- * <p>When several channels share a name, the one with the highest {@link #getPriority()} is used, so a
- * plugin replaces another plugin's channel by extending it, raising the priority, and overriding the
+ * <p>When several channels share a name, the one with the lowest {@link #getPriority()} is used, so a
+ * plugin replaces another plugin's channel by extending it with a lower priority, and overriding the
  * format and the placeholder values it changes, handing the rest to {@code super}.</p>
  */
 public interface ChatChannel {
@@ -27,12 +27,12 @@ public interface ChatChannel {
     String getName();
 
     /**
-     * Returns which channel is used when several share a name, the highest winning.
+     * Returns which channel is used when several share a name, the lowest winning, zero being first.
      *
      * @return the priority, zero by default
      */
     default int getPriority() {
-        return Integer.MAX_VALUE;
+        return 0;
     }
 
     /**
