@@ -1,12 +1,12 @@
 package io.github.trae.spigot.framework.utility.search.types;
 
-import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 
+import java.awt.Color;
 import java.util.Locale;
 
 /**
@@ -28,11 +28,21 @@ public class WorldSearchEngine extends SpigotSearchEngine<World> {
     /**
      * {@inheritDoc}
      *
-     * @return the world name serialized in yellow
+     * <p>Returns the world's name.
      */
     @Override
-    protected String getTypeFormat(final World world, final CommandSender commandSender) {
-        return UtilColor.serialize(ChatColor.YELLOW.getColor(), world.getName());
+    protected String getTypeName(final World world, final CommandSender commandSender) {
+        return world.getName();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Every world is displayed in yellow.
+     */
+    @Override
+    protected Color getTypeColor(final World world, final CommandSender commandSender) {
+        return ChatColor.YELLOW.getColor();
     }
 
     /**

@@ -1,12 +1,12 @@
 package io.github.trae.spigot.framework.utility.search.types;
 
-import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.UtilServer;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.awt.Color;
 import java.util.Locale;
 
 /**
@@ -28,11 +28,21 @@ public class OnlinePlayerSearchEngine extends SpigotSearchEngine<Player> {
     /**
      * {@inheritDoc}
      *
-     * @return the player's username serialized in yellow
+     * <p>Returns the player's username.
      */
     @Override
-    protected String getTypeFormat(final Player player, final CommandSender commandSender) {
-        return UtilColor.serialize(ChatColor.YELLOW.getColor(), player.getName());
+    protected String getTypeName(final Player player, final CommandSender commandSender) {
+        return player.getName();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Every player is displayed in yellow.
+     */
+    @Override
+    protected Color getTypeColor(final Player player, final CommandSender commandSender) {
+        return ChatColor.YELLOW.getColor();
     }
 
     /**

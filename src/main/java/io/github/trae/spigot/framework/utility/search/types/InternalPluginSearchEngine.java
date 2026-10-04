@@ -1,12 +1,12 @@
 package io.github.trae.spigot.framework.utility.search.types;
 
 import io.github.trae.spigot.framework.SpigotPlugin;
-import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.UtilPlugin;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import org.bukkit.command.CommandSender;
 
+import java.awt.Color;
 import java.util.Locale;
 
 /**
@@ -28,11 +28,21 @@ public class InternalPluginSearchEngine extends SpigotSearchEngine<SpigotPlugin>
     /**
      * {@inheritDoc}
      *
-     * @return the plugin name serialized in yellow
+     * <p>Returns the plugin's registered name.
      */
     @Override
-    protected String getTypeFormat(final SpigotPlugin spigotPlugin, final CommandSender commandSender) {
-        return UtilColor.serialize(ChatColor.YELLOW.getColor(), spigotPlugin.getPluginName());
+    protected String getTypeName(final SpigotPlugin spigotPlugin, final CommandSender commandSender) {
+        return spigotPlugin.getPluginName();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Every plugin is displayed in yellow.
+     */
+    @Override
+    protected Color getTypeColor(final SpigotPlugin spigotPlugin, final CommandSender commandSender) {
+        return ChatColor.YELLOW.getColor();
     }
 
     /**

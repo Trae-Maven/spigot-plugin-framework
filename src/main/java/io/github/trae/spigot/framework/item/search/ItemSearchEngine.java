@@ -44,7 +44,7 @@ public final class ItemSearchEngine extends SpigotSearchEngine<CustomItem> {
      * inclusion in a message.</p>
      */
     @Override
-    protected String getTypeFormat(final CustomItem customItem, final CommandSender commandSender) {
+    private String getTypeFormat(final CustomItem customItem, final CommandSender commandSender) {
         return UtilMessage.serialize(Component.text(customItem.getName()).colorIfAbsent(UtilColor.toTextColor(customItem.getColor())));
     }
 

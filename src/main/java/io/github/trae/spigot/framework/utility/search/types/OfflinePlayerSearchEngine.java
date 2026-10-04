@@ -1,6 +1,5 @@
 package io.github.trae.spigot.framework.utility.search.types;
 
-import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.UtilServer;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
@@ -8,6 +7,7 @@ import io.github.trae.utilities.UtilString;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 
+import java.awt.Color;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -31,11 +31,22 @@ public class OfflinePlayerSearchEngine extends SpigotSearchEngine<OfflinePlayer>
     /**
      * {@inheritDoc}
      *
-     * @return the player's username serialized in yellow
+     * <p>Returns the player's cached username, non-null because the supplier filters out unnamed
+     * profiles.
      */
     @Override
-    protected String getTypeFormat(final OfflinePlayer offlinePlayer, final CommandSender commandSender) {
-        return UtilColor.serialize(ChatColor.YELLOW.getColor(), offlinePlayer.getName());
+    protected String getTypeName(final OfflinePlayer offlinePlayer, final CommandSender commandSender) {
+        return offlinePlayer.getName();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Every player is displayed in yellow.
+     */
+    @Override
+    protected Color getTypeColor(final OfflinePlayer offlinePlayer, final CommandSender commandSender) {
+        return ChatColor.YELLOW.getColor();
     }
 
     /**

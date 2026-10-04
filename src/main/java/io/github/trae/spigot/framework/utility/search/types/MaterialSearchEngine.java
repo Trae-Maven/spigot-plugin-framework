@@ -1,12 +1,12 @@
 package io.github.trae.spigot.framework.utility.search.types;
 
-import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import io.github.trae.utilities.UtilString;
 import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 
+import java.awt.Color;
 import java.util.List;
 import java.util.Locale;
 
@@ -29,11 +29,21 @@ public class MaterialSearchEngine extends SpigotSearchEngine<Material> {
     /**
      * {@inheritDoc}
      *
-     * @return the cleaned material name serialized in yellow
+     * <p>Returns the material's constant name cleaned by {@link UtilString#clean} for display.
      */
     @Override
-    protected String getTypeFormat(final Material material, final CommandSender commandSender) {
-        return UtilColor.serialize(ChatColor.YELLOW.getColor(), UtilString.clean(material.name()));
+    protected String getTypeName(final Material material, final CommandSender commandSender) {
+        return UtilString.clean(material.name());
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Every material is displayed in yellow.
+     */
+    @Override
+    protected Color getTypeColor(final Material material, final CommandSender commandSender) {
+        return ChatColor.YELLOW.getColor();
     }
 
     /**
