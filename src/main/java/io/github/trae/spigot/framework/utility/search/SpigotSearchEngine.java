@@ -107,12 +107,13 @@ public abstract class SpigotSearchEngine<Type> extends AbstractSearchEngine<Type
     protected abstract Color getTypeColor(final Type type, final CommandSender commandSender);
 
     /**
-     * Escapes MiniMessage tags in an untrusted value so it renders literally.
+     * Escapes an untrusted value so it renders literally. Backslashes are doubled first, so a trailing
+     * one cannot escape the closing tag that wraps the value, then MiniMessage tags are escaped.
      *
      * @param string the value to escape
      * @return the escaped value
      */
     private String escapeString(final String string) {
-        return MiniMessage.miniMessage().escapeTags(string);
+        return MiniMessage.miniMessage().escapeTags(string.replace("\\", "\\\\"));
     }
 }
