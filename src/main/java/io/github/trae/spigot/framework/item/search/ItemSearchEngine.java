@@ -1,14 +1,13 @@
 package io.github.trae.spigot.framework.item.search;
 
 import io.github.trae.spigot.framework.item.CustomItem;
-import io.github.trae.spigot.framework.utility.UtilColor;
-import io.github.trae.spigot.framework.utility.UtilMessage;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
-import net.kyori.adventure.text.Component;
 import org.bukkit.command.CommandSender;
 
+import java.awt.Color;
 import java.util.Collection;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
@@ -19,8 +18,9 @@ import java.util.function.Supplier;
  * nobody would type. Display names are not matched either: they carry formatting and change with the
  * item's styling, where the namespace is stable and typeable.
  * <p>
- * Results are presented by display name in the item's own colour, so a player reading them sees the
- * item as it appears in game even though they searched by namespace.
+ * Results are presented by display name in the item's own colour, falling back to the input colour
+ * when the item has none, so a player reading them sees the item as it appears in game even though
+ * they searched by namespace.
  */
 public final class ItemSearchEngine extends SpigotSearchEngine<CustomItem> {
 
@@ -40,12 +40,22 @@ public final class ItemSearchEngine extends SpigotSearchEngine<CustomItem> {
     /**
      * {@inheritDoc}
      *
-     * <p>Formats an item as its display name in the item's colour, serialized back to a string for
-     * inclusion in a message.</p>
+     * <p>Returns the item's display name, so results read as the item appears in game even though
+     * matching runs on the namespace.</p>
      */
     @Override
-    private String getTypeFormat(final CustomItem customItem, final CommandSender commandSender) {
-        return UtilMessage.serialize(Component.text(customItem.getName()).colorIfAbsent(UtilColor.toTextColor(customItem.getColor())));
+    protected String getTypeName(final CustomItem customItem, final CommandSender commandSender) {
+        return customItem.getName();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Returns the item's own colour, or the input colour when the item has none.</p>
+     */
+    @Override
+    protected Color getTypeColor(final CustomItem customItem, final CommandSender commandSender) {
+        return Objects.requireNonNullElse(customItem.getColor(), this.getInputColor());
     }
 
     /**
