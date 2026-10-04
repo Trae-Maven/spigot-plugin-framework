@@ -6,6 +6,7 @@ import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import io.github.trae.utilities.UtilString;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.command.CommandSender;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -33,7 +34,7 @@ public class OfflinePlayerSearchEngine extends SpigotSearchEngine<OfflinePlayer>
      * @return the player's username serialized in yellow
      */
     @Override
-    protected String getTypeFormat(final OfflinePlayer offlinePlayer) {
+    protected String getTypeFormat(final OfflinePlayer offlinePlayer, final CommandSender commandSender) {
         return UtilColor.serialize(ChatColor.YELLOW.getColor(), offlinePlayer.getName());
     }
 

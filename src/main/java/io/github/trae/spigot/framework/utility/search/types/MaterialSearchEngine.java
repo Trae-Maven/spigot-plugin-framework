@@ -5,6 +5,7 @@ import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import io.github.trae.utilities.UtilString;
 import org.bukkit.Material;
+import org.bukkit.command.CommandSender;
 
 import java.util.List;
 import java.util.Locale;
@@ -31,7 +32,7 @@ public class MaterialSearchEngine extends SpigotSearchEngine<Material> {
      * @return the cleaned material name serialized in yellow
      */
     @Override
-    protected String getTypeFormat(final Material material) {
+    protected String getTypeFormat(final Material material, final CommandSender commandSender) {
         return UtilColor.serialize(ChatColor.YELLOW.getColor(), UtilString.clean(material.name()));
     }
 

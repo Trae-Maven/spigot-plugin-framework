@@ -5,6 +5,7 @@ import io.github.trae.spigot.framework.utility.enums.ChatColor;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.command.CommandSender;
 
 import java.util.Locale;
 
@@ -30,7 +31,7 @@ public class WorldSearchEngine extends SpigotSearchEngine<World> {
      * @return the world name serialized in yellow
      */
     @Override
-    protected String getTypeFormat(final World world) {
+    protected String getTypeFormat(final World world, final CommandSender commandSender) {
         return UtilColor.serialize(ChatColor.YELLOW.getColor(), world.getName());
     }
 

@@ -5,6 +5,7 @@ import io.github.trae.spigot.framework.utility.UtilColor;
 import io.github.trae.spigot.framework.utility.UtilMessage;
 import io.github.trae.spigot.framework.utility.search.SpigotSearchEngine;
 import net.kyori.adventure.text.Component;
+import org.bukkit.command.CommandSender;
 
 import java.util.Collection;
 import java.util.Locale;
@@ -43,7 +44,7 @@ public final class ItemSearchEngine extends SpigotSearchEngine<CustomItem> {
      * inclusion in a message.</p>
      */
     @Override
-    protected String getTypeFormat(final CustomItem customItem) {
+    protected String getTypeFormat(final CustomItem customItem, final CommandSender commandSender) {
         return UtilMessage.serialize(Component.text(customItem.getName()).colorIfAbsent(UtilColor.toTextColor(customItem.getColor())));
     }
 
