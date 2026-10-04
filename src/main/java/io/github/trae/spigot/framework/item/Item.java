@@ -89,12 +89,39 @@ public abstract class Item {
 
     /**
      * Returns whether every {@link ItemFlag} is applied, hiding attribute modifiers, enchantments,
-     * and similar generated tooltip lines. Defaults to {@code false}.
+     * and similar generated tooltip lines. Defaults to {@code false}, in which case every flag is
+     * removed, so an item that stops hiding its attributes has them shown again on update.
      *
      * @return {@code true} to hide generated tooltip content
      */
     protected boolean hideAttributes() {
         return false;
+    }
+
+    /**
+     * Returns the maximum stack size applied to the stack. Defaults to the material's own maximum,
+     * in which case any override is cleared and the vanilla value stands.
+     * <p>
+     * Any other value is written to the meta as an override, so it must fall between 1 and 99
+     * inclusive.
+     *
+     * @return the maximum stack size
+     */
+    protected int getMaxStackSize() {
+        return this.material.getMaxStackSize();
+    }
+
+    /**
+     * Returns the enchantment glint override applied to the stack, or {@code null} to leave it at the
+     * vanilla default.
+     * <p>
+     * {@code true} forces the glint on regardless of enchantments, and {@code false} suppresses it
+     * even on an enchanted stack.
+     *
+     * @return the glint override, or {@code null}
+     */
+    protected Boolean addGlow() {
+        return null;
     }
 
     /**
@@ -152,24 +179,22 @@ public abstract class Item {
     }
 
     /**
-     * Returns the raw name the display name is built from, or {@code null} to leave the stack's name
-     * at the vanilla default. The name is deserialized through {@link UtilMessage} and styled by
-     * {@link #getDisplayName()} with {@link #getColor()} and {@link #getDecorations()} where it
-     * carries none of its own.
+     * Returns the raw name the display name is built from, or {@code null} for the vanilla name. The
+     * name is deserialized through {@link UtilMessage} and styled by {@link #getDisplayName()} with
+     * {@link #getColor()} and {@link #getDecorations()} where it carries none of its own.
      *
      * @return the raw name, or {@code null}
      */
     public abstract String getName();
 
     /**
-     * Returns the lore lines, an empty list for no lore, or {@code null} to leave the stack's lore at
-     * the vanilla default. Each line is deserialized through {@link UtilMessage} and defaults to
-     * white where it carries no colour of its own.
+     * Returns the lore lines, or an empty list for no lore. Each line is deserialized through
+     * {@link UtilMessage} and defaults to white where it carries no colour of its own.
      * <p>
      * An item with a style has its tag appended beneath these lines, separated by a blank, so a
      * subclass never writes the tag itself.
      *
-     * @return the lore lines
+     * @return the lore lines, never {@code null}
      */
     public abstract List<String> getLore();
 
@@ -178,9 +203,14 @@ public abstract class Item {
      * {@link #getDecorations()} applied as a fallback so any formatting in the name itself wins.
      * Italic is disabled unless the decorations or the name itself enable it.
      *
-     * @return the display name component
+     * @return the display name component, or {@code null} when {@link #getName()} returns
+     * {@code null}
      */
     protected Component getDisplayName() {
+        if (this.getName() == null) {
+            return null;
+        }
+
         final Style style = Style.style(builder -> {
             builder.color(UtilColor.toTextColor(this.getColor()));
 
@@ -356,9 +386,11 @@ public abstract class Item {
 
     /**
      * Applies this item's full description to a meta: the subclass stamp where requested, then
-     * display name, lore, model, tooltip style, and item flags, and finally
-     * {@link #editMeta(ItemMeta)}. Options returning {@code null} are skipped, leaving the vanilla
-     * default in place.
+     * display name, lore, model, tooltip style, item flags, maximum stack size, and glint override,
+     * and finally {@link #editMeta(ItemMeta)}.
+     * <p>
+     * Every option is written unconditionally, with {@code null} or its default clearing it back to
+     * the vanilla value, so updating an existing stack also undoes anything the item no longer sets.
      * <p>
      * The style's tag is appended beneath the item's own lore, separated by a blank line when there
      * is lore above it, so it always reads as a footer rather than as another lore line.
@@ -374,39 +406,39 @@ public abstract class Item {
         }
 
         // Display Name
-        if (this.getName() != null) {
-            itemMeta.displayName(this.getDisplayName());
-        }
+        itemMeta.displayName(this.getDisplayName());
 
         // Lore
-        if (this.getLore() != null) {
-            final List<String> lore = UtilJava.createCollection(new ArrayList<>(this.getLore()), list -> {
-                if (this.getStyle() != null && this.getStyle().getTag() != null) {
-                    if (!list.isEmpty()) {
-                        list.add("");
-                    }
-
-                    list.add("<font:custom:tags>%s</font>".formatted(this.getStyle().getTag()));
+        final List<String> lore = UtilJava.createCollection(new ArrayList<>(this.getLore()), list -> {
+            if (this.getStyle() != null && this.getStyle().getTag() != null) {
+                if (!list.isEmpty()) {
+                    list.add("");
                 }
-            });
 
-            itemMeta.lore(lore.stream().map(line -> UtilMessage.deserialize(line).applyFallbackStyle(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)).toList());
-        }
+                list.add("<font:custom:tags>%s</font>".formatted(this.getStyle().getTag()));
+            }
+        });
+
+        itemMeta.lore(lore.stream().map(line -> UtilMessage.deserialize(line).applyFallbackStyle(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)).toList());
 
         // Model
-        if (this.getModel() != null) {
-            itemMeta.setItemModel(this.getModel());
-        }
+        itemMeta.setItemModel(this.getModel());
 
         // Tooltip Style
-        if (this.getTooltipStyle() != null) {
-            itemMeta.setTooltipStyle(this.getTooltipStyle());
-        }
+        itemMeta.setTooltipStyle(this.getTooltipStyle());
 
         // Hide Attributes
         if (this.hideAttributes()) {
             itemMeta.addItemFlags(ItemFlag.values());
+        } else {
+            itemMeta.removeItemFlags(ItemFlag.values());
         }
+
+        // Max Stack Size
+        itemMeta.setMaxStackSize(this.getMaxStackSize() != this.material.getMaxStackSize() ? this.getMaxStackSize() : null);
+
+        // Add Glow
+        itemMeta.setEnchantmentGlintOverride(this.addGlow());
 
         // Edit Meta
         this.editMeta(itemMeta);
