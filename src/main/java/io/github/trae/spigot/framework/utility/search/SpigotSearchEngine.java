@@ -22,7 +22,7 @@ import java.util.function.Supplier;
  * MiniMessage tags escaped before colouring, so player-controlled text always renders literally.</p>
  *
  * <p>Subclasses supply the matching rules, each candidate's raw name through
- * {@link #getTypeName(Object, CommandSender)} and its colour through
+ * {@link AbstractSearchEngine#getTypeName(Object, Object)} and its colour through
  * {@link #getTypeColor(Object, CommandSender)}.</p>
  *
  * @param <Type> the type being searched for
