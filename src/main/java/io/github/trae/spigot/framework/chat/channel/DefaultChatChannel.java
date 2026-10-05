@@ -12,4 +12,9 @@ package io.github.trae.spigot.framework.chat.channel;
  * apart from every other channel by type alone.</p>
  */
 public interface DefaultChatChannel extends ChatChannel {
+
+    @Override
+    default boolean removeOnDisconnect() {
+        return false;
+    }
 }
