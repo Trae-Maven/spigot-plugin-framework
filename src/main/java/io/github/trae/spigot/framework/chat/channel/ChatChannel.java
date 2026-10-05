@@ -29,10 +29,19 @@ public interface ChatChannel {
     /**
      * Returns which channel is used when several share a name, the lowest winning, zero being first.
      *
-     * @return the priority, zero by default
+     * @return the priority, {@link Integer#MAX_VALUE} by default, so any channel that sets one replaces it
      */
     default int getPriority() {
         return Integer.MAX_VALUE;
+    }
+
+    /**
+     * Returns whether a player is taken out of this channel when they disconnect, so they rejoin in the default channel.
+     *
+     * @return {@code true} to remove them, {@code true} by default
+     */
+    default boolean removeOnDisconnect() {
+        return true;
     }
 
     /**
